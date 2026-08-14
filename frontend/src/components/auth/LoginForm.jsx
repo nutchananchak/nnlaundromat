@@ -1,55 +1,84 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import Card from '../common/Card';
 import Input from '../common/Input';
 import Button from '../common/Button';
 
-export default function LoginForm({ role, icon: Icon, title, subtitle, onSubmit, footer }) {
-  const [phone, setPhone] = useState('');
+const LoginForm = ({
+  subtitle = "บริการรับ-ส่งผ้าถึงหน้าบ้านคุณ",
+  identifierLabel = "อีเมล / เบอร์โทรศัพท์",
+  identifierPlaceholder = "กรอกอีเมลหรือเบอร์โทรศัพท์",
+  identifierType = "text",
+  buttonText = "เข้าสู่ระบบ",
+  buttonVariant = "primary",
+  forgotPasswordHref = null,
+  onForgotPasswordClick = null,
+  footerText = null,
+  footerLinkText = null,
+  footerLinkHref = null,
+  onSubmit,
+}) => {
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({ role, phone, password }, setError);
+    if (onSubmit) {
+      onSubmit({ identifier, password });
+    }
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center px-6 bg-bg overflow-hidden">
-      {/* ฟองสบู่ตกแต่งพื้นหลัง */}
-      <div className="pointer-events-none absolute -top-24 -left-20 w-72 h-72 rounded-full bg-primary/20 blur-3xl animate-float-slow" />
-      <div className="pointer-events-none absolute -bottom-28 -right-16 w-80 h-80 rounded-full bg-accent/25 blur-3xl animate-float-slower" />
-      <div className="pointer-events-none absolute top-1/3 right-8 w-16 h-16 rounded-full bg-white/60 blur-xl animate-float-slow" />
+    <Card subtitle={subtitle}>
+      <form onSubmit={handleSubmit}>
+        <Input
+          label={identifierLabel}
+          type={identifierType}
+          placeholder={identifierPlaceholder}
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
+          required
+        />
 
-      <div className="relative z-10 max-w-sm w-full bg-white rounded-3xl shadow-xl shadow-primary/10 border border-ink/5 p-8">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-            <Icon className="text-primary" size={28} strokeWidth={2} />
-          </div>
-          <h1 className="font-display font-semibold text-2xl text-ink text-center">{title}</h1>
-          <p className="font-body text-sm text-ink-muted text-center mt-1">{subtitle}</p>
+        <Input
+          label="รหัสผ่าน"
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          autoComplete="current-password"
+        />
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px', marginBottom: '24px' }}>
+          <a
+            href={forgotPasswordHref || '#'}
+            onClick={onForgotPasswordClick}
+            style={{ fontSize: '13.5px', color: '#1d61f2', textDecoration: 'none', fontWeight: '500', cursor: 'pointer' }}
+          >
+            ลืมรหัสผ่าน?
+          </a>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <Input
-            label="เบอร์โทรศัพท์"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="0XX-XXX-XXXX"
-          />
-          <Input
-            label="รหัสผ่าน"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="กรอกรหัสผ่าน"
-          />
+        <Button type="submit" variant={buttonVariant}>
+          {buttonText}
+        </Button>
 
-          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-
-          <Button type="submit">เข้าสู่ระบบ</Button>
-        </form>
-
-        {footer && <div className="mt-5">{footer}</div>}
-      </div>
-    </div>
+        {footerText && (
+          <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '24px', marginBottom: '0' }}>
+            {footerText}
+            {footerLinkText && (
+              <a
+                href={footerLinkHref}
+                style={{ color: '#1d61f2', textDecoration: 'none', fontWeight: '600', marginLeft: '4px' }}
+              >
+                {footerLinkText}
+              </a>
+            )}
+          </p>
+        )}
+      </form>
+    </Card>
   );
-}
+};
+
+export default LoginForm;

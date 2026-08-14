@@ -1,20 +1,37 @@
-export default function Button({ children, onClick, type = 'button', variant = 'primary', disabled = false, className = '' }) {
-  const baseStyle = 'w-full py-3.5 rounded-xl font-display font-medium tracking-wide transition-all active:scale-[0.98]';
-  
-  const variants = {
-    primary: 'bg-primary text-white hover:bg-primary-dark shadow-md shadow-primary/20 disabled:bg-ink/20 disabled:shadow-none',
-    secondary: 'bg-bg text-ink hover:bg-ink/5 border border-ink/10',
-    outline: 'border-2 border-primary text-primary hover:bg-primary/5',
-  };
+import React from 'react';
+import styled from 'styled-components';
 
+const StyledButton = styled.button`
+  width: 100%;
+  height: 50px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: ${(props) => (props.$variant === 'admin' ? '#0f172a' : '#1d61f2')};
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: ${(props) =>
+    props.$variant === 'admin'
+      ? '0 4px 14px rgba(15, 23, 42, 0.25)'
+      : '0 4px 14px rgba(29, 97, 242, 0.35)'};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: ${(props) => (props.$variant === 'admin' ? '#1e293b' : '#144ecc')};
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
+`;
+
+const Button = ({ children, variant = 'primary', ...props }) => {
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className={`${baseStyle} ${variants[variant]} ${className}`}
-    >
+    <StyledButton $variant={variant} {...props}>
       {children}
-    </button>
+    </StyledButton>
   );
-}
+};
+
+export default Button;

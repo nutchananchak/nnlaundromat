@@ -1,22 +1,29 @@
-import { useNavigate } from 'react-router-dom';
-import { Bike } from 'lucide-react';
+import React from 'react';
 import LoginForm from '../../components/auth/LoginForm';
 
-export default function RiderLoginPage() {
-  const navigate = useNavigate();
+const RiderLoginPage = () => {
+  const handleRiderLogin = ({ identifier, password }) => {
+    console.log("Rider Login:", { identifier, password });
+  };
 
-  const handleLogin = (data, setError) => {
-    console.log('Rider login:', data);
-    navigate('/rider/tasks');
+  const handleForgotPassword = (e) => {
+    e.preventDefault();
+    alert(
+      "【สำหรับพนักงานขับรถ】\n\nหากลืมรหัสผ่าน กรุณาติดต่อฝ่ายจัดการ (Admin) เพื่อทำการรีเซ็ตรหัสผ่านใหม่\n\n📞 โทร: 02-XXX-XXXX\n💬 LINE ID: @nn_rider_support"
+    );
   };
 
   return (
     <LoginForm
-      role="rider"
-      icon={Bike}
-      title="N&N Rider"
-      subtitle="ระบบสำหรับพนักงานรับ-ส่งผ้า"
-      onSubmit={handleLogin}
+      subtitle="ระบบพนักงานรับ-ส่งผ้า"
+      identifierLabel="เบอร์โทรศัพท์ / รหัสคนขับ"
+      identifierPlaceholder="กรอกเบอร์โทรศัพท์หรือรหัสคนขับ"
+      identifierType="tel"
+      buttonText="เข้าสู่ระบบ"
+      onForgotPasswordClick={handleForgotPassword}
+      onSubmit={handleRiderLogin}
     />
   );
-}
+};
+
+export default RiderLoginPage;

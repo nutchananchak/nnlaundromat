@@ -1,22 +1,29 @@
-import { useNavigate } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
+import React from 'react';
 import LoginForm from '../../components/auth/LoginForm';
 
-export default function AdminLoginPage() {
-  const navigate = useNavigate();
+const AdminLoginPage = () => {
+  const handleAdminLogin = ({ identifier, password }) => {
+    console.log("Admin Login:", { identifier, password });
+  };
 
-  const handleLogin = (data, setError) => {
-    console.log('Admin login:', data);
-    navigate('/admin/dashboard');
+  const handleForgotPassword = (e) => {
+    e.preventDefault();
+    alert(
+      "【ความปลอดภัยระดับสูง - สำหรับเจ้าหน้าที่】\n\nระบบไม่รองรับการรีเซ็ตรหัสผ่านด้วยตนเอง\nกรุณายืนยันตัวตนโดยตรงกับ Super Admin เพื่อขอออกสิทธิ์เข้าถึงใหม่\n\n📧 อีเมล: superadmin@laundromat.com\n🔐 ติดต่อฝ่ายดูแลระบบความปลอดภัย"
+    );
   };
 
   return (
     <LoginForm
-      role="admin"
-      icon={ShieldCheck}
-      title="N&N Admin"
-      subtitle="ระบบจัดการหลังบ้าน"
-      onSubmit={handleLogin}
+      subtitle="ระบบบริหารจัดการสำหรับเจ้าหน้าที่ (Admin)"
+      identifierLabel="ชื่อผู้ใช้งานแอดมิน"
+      identifierPlaceholder="admin@laundromat.com"
+      buttonText="เข้าสู่ระบบ"
+      buttonVariant="admin"
+      onForgotPasswordClick={handleForgotPassword}
+      onSubmit={handleAdminLogin}
     />
   );
-}
+};
+
+export default AdminLoginPage;
