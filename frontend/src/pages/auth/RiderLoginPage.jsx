@@ -132,7 +132,7 @@ const RiderSupportModal = ({ isOpen, onClose }) => {
             cursor: 'pointer'
           }}
         >
-          ตกลง เข้าใจแล้ว
+          เข้าใจแล้ว
         </button>
       </div>
     </div>
@@ -160,11 +160,8 @@ const RiderLoginPage = () => {
         identifierLabel="เบอร์โทรศัพท์ / รหัสคนขับ"
         identifierPlaceholder="กรอกเบอร์โทรศัพท์หรือรหัสคนขับ"
         identifierType="tel"
-        buttonText="เข้าสู่ระบบพนักงาน"
+        buttonText="เข้าสู่ระบบพนักงานรับส่ง"
         onForgotPasswordClick={handleForgotPassword}
-        footerText="ต้องการร่วมงานกับเรา?"
-        footerLinkText="สมัครเป็นคนขับ"
-        footerLinkHref="/rider/register"
         onSubmit={handleRiderLogin}
       />
 
