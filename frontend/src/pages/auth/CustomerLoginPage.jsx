@@ -1,10 +1,13 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import LoginForm from '../../components/auth/LoginForm';
 
 const CustomerLoginPage = () => {
+  const navigate = useNavigate();
   const handleCustomerLogin = ({ identifier, password }) => {
     console.log("Customer Login:", { identifier, password });
     // TODO: เรียก API Login ฝั่งลูกค้า
+    navigate('/home');
   };
 
   return (

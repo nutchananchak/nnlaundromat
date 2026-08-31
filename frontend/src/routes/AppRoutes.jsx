@@ -5,6 +5,7 @@ import RiderLoginPage from '../pages/auth/RiderLoginPage';
 import AdminLoginPage from '../pages/auth/AdminLoginPage';
 import RegisterPage from '../pages/auth/RegisterPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import HomePage from '../pages/customer/HomePage'; 
 
 const AppRoutes = () => {
   return (
@@ -12,13 +13,15 @@ const AppRoutes = () => {
       <Route path="/" element={<Navigate to="/login/customer" replace />} />
       <Route path="/login" element={<Navigate to="/login/customer" replace />} />
 
-      {/* หน้า Login แต่ละ Role */}
+      {/* หน้า Login และ Register */}
       <Route path="/login/customer" element={<CustomerLoginPage />} />
       <Route path="/login/rider" element={<RiderLoginPage />} />
       <Route path="/login/admin" element={<AdminLoginPage />} />
-
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+      {/* หน้าหลักหลัง Login ของลูกค้า */}
+      <Route path="/home" element={<HomePage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login/customer" replace />} />

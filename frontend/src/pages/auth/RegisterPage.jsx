@@ -4,7 +4,7 @@ import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 
-// --- โลโก้ SVG กลาง Header ของ Modal ---
+//โลโก้
 const ModalHeaderLogo = () => (
   <svg
     viewBox="0 0 120 120"
@@ -70,7 +70,7 @@ const ModalHeaderLogo = () => (
   </svg>
 );
 
-// ไอคอนเครื่องหมายถูกนำหน้าข้อความ
+//ไอคอนเครื่องหมายถูกนำหน้าข้อความ
 const CheckItem = ({ children, isWarning = false }) => (
   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', textAlign: 'left', marginBottom: '8px' }}>
     <span style={{
