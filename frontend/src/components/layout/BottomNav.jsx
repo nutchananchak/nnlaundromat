@@ -13,7 +13,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-200 flex justify-around py-3 px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-50 font-sans">
+    <nav className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-200 flex justify-around py-3 px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-50 font-body">
       {menus.map((menu) => {
         const Icon = menu.icon;
         const isActive = location.pathname === menu.path;
@@ -21,7 +21,7 @@ export default function BottomNav() {
           <button
             key={menu.path}
             onClick={() => navigate(menu.path)}
-            className={`flex flex-col items-center gap-1 transition ${
+            className={`flex flex-col items-center gap-1 transition cursor-pointer ${
               isActive ? 'text-[#1d61f2]' : 'text-gray-400 hover:text-gray-600'
             }`}
           >

@@ -6,6 +6,7 @@ import AdminLoginPage from '../pages/auth/AdminLoginPage';
 import RegisterPage from '../pages/auth/RegisterPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import HomePage from '../pages/customer/HomePage'; 
+import NewOrderPage from '../pages/customer/NewOrderPage';
 
 const AppRoutes = () => {
   return (
@@ -22,6 +23,8 @@ const AppRoutes = () => {
 
       {/* หน้าหลักหลัง Login ของลูกค้า */}
       <Route path="/home" element={<HomePage />} />
+      {/* เพิ่มหน้าสร้างออเดอร์ไว้ตรงนี้ */}
+      <Route path="/order/new" element={<NewOrderPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login/customer" replace />} />

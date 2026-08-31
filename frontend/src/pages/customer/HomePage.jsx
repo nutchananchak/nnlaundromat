@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shirt, Layers, UserCircle2 } from 'lucide-react';
+import { Layers, BedDouble, UserCircle2 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { ORDER_STATUS, ORDER_STEPS } from '../../constants/orderStatus';
 import { useAuth } from '../../context/AuthContext';
@@ -12,14 +12,14 @@ const mockOrder = {
 };
 
 const SERVICES = [
-  { key: 'wash_dry', label: 'ซักอบ', icon: Shirt },
   { key: 'wash_dry_fold', label: 'ซักอบพับ', icon: Layers, badge: 'ยอดฮิต' },
+  { key: 'bedding', label: 'ชุดเครื่องนอน/ผ้านวม', icon: BedDouble },
 ];
 
 export default function HomePage() {
   const navigate = useNavigate();
   const auth = useAuth() || {};
-  const user = auth.user;
+  const user = auth.user || {};
   
   const [selectedService, setSelectedService] = useState('wash_dry_fold');
 
@@ -60,8 +60,7 @@ export default function HomePage() {
           boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
           flexShrink: 0
         }} className="rounded-b-3xl px-6 pt-8 pb-6">
-          <p className="text-white/80 text-sm font-medium">สวัสดี, คุณ{user?.name || 'ลูกค้า'}</p>
-          {/* ปรับฟอนต์ชื่อร้านให้ตรงกับหน้า Login */}
+          <p className="text-white/80 text-sm font-medium">สวัสดี, คุณ{user.name || 'ลูกค้า'}</p>
           <h1 className="font-display font-bold text-white text-2xl mt-0.5 tracking-tight font-sans">N&N Laundromat</h1>
 
           <div className="flex items-center gap-3 bg-white/15 rounded-2xl p-3 mt-5 backdrop-blur-sm border border-white/20">
@@ -70,10 +69,10 @@ export default function HomePage() {
             </div>
             <div className="min-w-0">
               <p className="font-semibold text-white text-sm truncate">
-                {user?.name || 'USERNAME'}
+                {user.name || 'USERNAME'}
               </p>
               <p className="text-white/70 text-xs truncate">
-                {user?.address || 'ยังไม่ได้ระบุที่อยู่รับ-ส่งผ้า'}
+                {user.address || 'ยังไม่ได้ระบุที่อยู่รับ-ส่งผ้า'}
               </p>
             </div>
           </div>
@@ -118,7 +117,7 @@ export default function HomePage() {
                     >
                       {Icon ? <Icon size={14} strokeWidth={2.4} /> : <span>{idx + 1}</span>}
                     </div>
-                    {/* คำอธิบายใต้ไอคอน ปรับสีสเต็ปที่เสร็จแล้วให้เป็นน้ำเงินเข้มแทนสีเขียว */}
+                    {/* คำอธิบายใต้ไอคอน */}
                     <span className={`text-[9px] mt-1.5 leading-tight ${
                       isActive ? 'text-[#1d61f2] font-bold' : isDone ? 'text-blue-900 font-semibold' : 'text-gray-400 font-medium'
                     }`}>
@@ -160,7 +159,7 @@ export default function HomePage() {
                   >
                     <Icon size={22} />
                   </div>
-                  <span className={`text-sm font-semibold ${active ? 'text-[#1d61f2]' : 'text-gray-800'}`}>
+                  <span className={`text-sm font-semibold text-center px-1 ${active ? 'text-[#1d61f2]' : 'text-gray-800'}`}>
                     {s.label}
                   </span>
                 </button>
@@ -168,8 +167,10 @@ export default function HomePage() {
             })}
           </div>
           <button
-            onClick={() => navigate('/order/new', { state: { service: selectedService } })}
-            className="w-full mt-4 py-3.5 rounded-xl bg-[#1d61f2] text-white font-display font-semibold tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition"
+            onClick={() => {
+              navigate('/order/new', { state: { service: selectedService } });
+            }}
+            className="w-full mt-4 py-3.5 rounded-xl bg-[#1d61f2] text-white font-display font-semibold tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
           >
             จองบริการนี้
           </button>
