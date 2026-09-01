@@ -10,6 +10,8 @@ import NewOrderPage from '../pages/customer/NewOrderPage';
 import PaymentPage from '../pages/customer/PaymentPage';
 import OrdersPage from '../pages/customer/OrdersPage';
 import OrderDetailPage from '../pages/customer/OrderDetailPage';
+import NotificationsPage from '../pages/customer/NotificationsPage';
+import ProfilePage from '../pages/customer/ProfilePage';
 
 const AppRoutes = () => {
   return (
@@ -30,9 +32,10 @@ const AppRoutes = () => {
       <Route path="/order/new" element={<NewOrderPage />} />
       <Route path="/new-order" element={<NewOrderPage />} />
       <Route path="/order/payment" element={<PaymentPage />} />
-
       <Route path="/orders" element={<OrdersPage />} />
       <Route path="/orders/:id" element={<OrderDetailPage />} />
+      <Route path="/notifications" element={<NotificationsPage />} />
+      <Route path="/profile" element={<ProfilePage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login/customer" replace />} />
