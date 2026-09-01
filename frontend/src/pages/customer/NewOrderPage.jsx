@@ -16,7 +16,7 @@ export default function NewOrderPage() {
   const [basketImage, setBasketImage] = useState(null);
   const [note, setNote] = useState('');
   const [agreed, setAgreed] = useState(false);
-  const [showTermsModal, setShowTermsModal] = useState(false); // State ควบคุมการเปิด Modal เงื่อนไข
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const packages = serviceType === 'bedding' ? [
     { id: '3.5ft', name: 'ไซส์ 3.5 ฟุต', price: 200, desc: 'สำหรับที่นอนขนาด 3.5 ฟุต' },
@@ -47,6 +47,7 @@ export default function NewOrderPage() {
   const currentPkg = packages.find(p => p.id === selectedPackage);
   const totalPrice = currentPkg ? currentPkg.price : 0;
 
+  // ฟังก์ชันส่งต่อไปหน้าชำระเงิน
   const handleCreateOrder = (e) => {
     e.preventDefault();
     if (!selectedPackage) {
@@ -57,8 +58,21 @@ export default function NewOrderPage() {
       alert('กรุณากดยอมรับเงื่อนไขการใช้บริการ');
       return;
     }
-    alert('สร้างออเดอร์สำเร็จ!');
-    navigate('/orders');
+
+    navigate('/order/payment', {
+      state: {
+        order: {
+          id: 'NN-' + Math.floor(100000 + Math.random() * 900000),
+          serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',
+          packageName: currentPkg?.name,
+          pickupTime: pickupTime,
+          address: user.address || 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
+          basketImage: basketImage,
+          note: note,
+          totalPrice: totalPrice,
+        }
+      }
+    });
   };
 
   return (
@@ -101,7 +115,7 @@ export default function NewOrderPage() {
           </button>
           <div>
             <p className="text-white/80 text-xs font-medium">N&N Laundromat</p>
-            <h1 className="font-display font-semibold text-white text-xl tracking-tight">
+            <h1 className="font-display font-medium text-white text-xl tracking-tight">
               {serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ'}
             </h1>
           </div>
@@ -133,7 +147,7 @@ export default function NewOrderPage() {
 
           {/* 2. เลือกแพ็กเกจ */}
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 mb-2">
               เลือกแพ็กเกจ{serviceType === 'bedding' ? 'ชุดเครื่องนอน' : 'ซัก อบ พับ'}
             </label>
             <div className="flex flex-col gap-3">
@@ -151,7 +165,7 @@ export default function NewOrderPage() {
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className={`font-display font-semibold text-base ${isSelected ? 'text-[#1d61f2]' : 'text-gray-900'}`}>
+                        <span className={`font-display font-medium text-base ${isSelected ? 'text-[#1d61f2]' : 'text-gray-900'}`}>
                           {pkg.name}
                         </span>
                         <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md font-medium">
@@ -161,7 +175,7 @@ export default function NewOrderPage() {
                       <p className="text-xs text-gray-500 mt-1 font-medium">ราคาบริการ</p>
                     </div>
                     <div className="text-right">
-                      <span className={`font-display font-semibold text-lg ${isSelected ? 'text-[#1d61f2]' : 'text-gray-900'}`}>
+                      <span className={`font-display font-medium text-lg ${isSelected ? 'text-[#1d61f2]' : 'text-gray-900'}`}>
                         {pkg.price}฿
                       </span>
                     </div>
@@ -224,7 +238,7 @@ export default function NewOrderPage() {
                 rows="2"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="เช่น วางไว้หน้าประตูห้อง, ผ้าสีตก..."
+                placeholder="เช่น เสื้อหนัง, ผ้าสีตก..."
                 className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none resize-none"
               ></textarea>
             </div>

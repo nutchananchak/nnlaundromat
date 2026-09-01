@@ -7,6 +7,7 @@ import RegisterPage from '../pages/auth/RegisterPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import HomePage from '../pages/customer/HomePage'; 
 import NewOrderPage from '../pages/customer/NewOrderPage';
+import PaymentPage from '../pages/customer/PaymentPage';
 
 const AppRoutes = () => {
   return (
@@ -25,6 +26,8 @@ const AppRoutes = () => {
       <Route path="/home" element={<HomePage />} />
       {/* เพิ่มหน้าสร้างออเดอร์ไว้ตรงนี้ */}
       <Route path="/order/new" element={<NewOrderPage />} />
+
+      <Route path="/order/payment" element={<PaymentPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login/customer" replace />} />
