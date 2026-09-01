@@ -1,22 +1,14 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Clock, Camera, FileText, CheckSquare, Square, ShoppingBag, X } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
 
 export default function NewOrderPage() {
   const navigate = useNavigate();
   const location = useLocation() || {};
-  const auth = useAuth() || {};
-  const user = auth.user || {};
+  const reorderData = location.state || {};
 
-  const serviceType = location.state?.service || 'wash_dry_fold';
-
-  const [selectedPackage, setSelectedPackage] = useState('');
-  const [pickupTime, setSelectedPickupTime] = useState('08:00 - 09:00 น.');
-  const [basketImage, setBasketImage] = useState(null);
-  const [note, setNote] = useState('');
-  const [agreed, setAgreed] = useState(false);
-  const [showTermsModal, setShowTermsModal] = useState(false);
+  // ป้องกัน auth เป็น undefined/null แล้วเด้งหลุด
+  const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
 
   const packages = serviceType === 'bedding' ? [
     { id: '3.5ft', name: 'ไซส์ 3.5 ฟุต', price: 200, desc: 'สำหรับที่นอนขนาด 3.5 ฟุต' },
@@ -27,6 +19,18 @@ export default function NewOrderPage() {
     { id: 'M', name: 'ไซส์ M', price: 180, desc: 'ผ้าไม่เกิน 35 ชิ้น' },
     { id: 'L', name: 'ไซส์ L', price: 240, desc: 'ผ้าไม่เกิน 65 ชิ้น' },
   ];
+
+  // หา ID แพ็กเกจเดิมที่ส่งมาจากหน้าใบเสร็จ
+  const initialPkgId = serviceType === 'bedding'
+    ? (reorderData.packageSize?.includes('3.5') ? '3.5ft' : reorderData.packageSize?.includes('5') ? '5ft' : reorderData.packageSize?.includes('6') ? '6ft' : '')
+    : (reorderData.packageSize?.includes('S') ? 'S' : reorderData.packageSize?.includes('M') ? 'M' : reorderData.packageSize?.includes('L') ? 'L' : '');
+
+  const [selectedPackage, setSelectedPackage] = useState(initialPkgId);
+  const [pickupTime, setSelectedPickupTime] = useState('08:00 - 09:00 น.');
+  const [basketImage, setBasketImage] = useState(null);
+  const [note, setNote] = useState(reorderData.note || '');
+  const [agreed, setAgreed] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const timeSlots = [
     '08:00 - 09:00 น.',
@@ -47,7 +51,6 @@ export default function NewOrderPage() {
   const currentPkg = packages.find(p => p.id === selectedPackage);
   const totalPrice = currentPkg ? currentPkg.price : 0;
 
-  // ฟังก์ชันส่งต่อไปหน้าชำระเงิน
   const handleCreateOrder = (e) => {
     e.preventDefault();
     if (!selectedPackage) {
@@ -66,7 +69,7 @@ export default function NewOrderPage() {
           serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',
           packageName: currentPkg?.name,
           pickupTime: pickupTime,
-          address: user.address || 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
+          address: reorderData.address || 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
           basketImage: basketImage,
           note: note,
           totalPrice: totalPrice,
@@ -86,7 +89,6 @@ export default function NewOrderPage() {
       margin: 0,
       padding: 0,
     }}>
-      {/* Container มือถือหลัก */}
       <div style={{
         width: '100vw',
         maxWidth: '430px',
@@ -108,6 +110,7 @@ export default function NewOrderPage() {
           flexShrink: 0
         }} className="rounded-b-3xl px-6 pt-6 pb-6 flex items-center gap-3 z-20">
           <button 
+            type="button"
             onClick={() => navigate('/home')}
             className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition cursor-pointer"
           >
@@ -121,7 +124,7 @@ export default function NewOrderPage() {
           </div>
         </div>
 
-        {/* ส่วนเนื้อหาที่สามารถ Scroll ได้ */}
+        {/* ส่วนเนื้อหา Scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-6 pb-32 flex flex-col gap-6">
           
           {/* 1. สถานที่รับ-ส่งผ้า */}
@@ -130,9 +133,9 @@ export default function NewOrderPage() {
             <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-start gap-3 shadow-sm">
               <MapPin className="text-[#1d61f2] shrink-0 mt-0.5" size={20} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-400 font-medium">ที่อยู่ปัจจุบันตามโปรไฟล์</p>
+                <p className="text-xs text-gray-400 font-medium">ที่อยู่จัดส่ง</p>
                 <p className="text-sm font-semibold text-gray-800 truncate mt-0.5">
-                  {user.address || 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)'}
+                  {reorderData.address || 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)'}
                 </p>
               </div>
               <button 
@@ -268,7 +271,7 @@ export default function NewOrderPage() {
 
         </div>
 
-        {/* ================= ส่วนสรุปราคาและปุ่มยืนยัน ================= */}
+        {/* ส่วนสรุปราคาและปุ่มยืนยัน */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3.5 shadow-[0_-6px_20px_rgba(0,0,0,0.08)] flex flex-col gap-2.5 z-30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-gray-600">
@@ -290,13 +293,14 @@ export default function NewOrderPage() {
           </button>
         </div>
 
-        {/* ================= Modal แสดงเงื่อนไขการใช้บริการ ================= */}
+        {/* Modal แสดงเงื่อนไข */}
         {showTermsModal && (
           <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col max-h-[80vh]">
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <h3 className="font-display font-bold text-lg text-gray-900">เงื่อนไขการใช้บริการ</h3>
                 <button 
+                  type="button"
                   onClick={() => setShowTermsModal(false)}
                   className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition cursor-pointer"
                 >
@@ -312,6 +316,7 @@ export default function NewOrderPage() {
               </div>
 
               <button
+                type="button"
                 onClick={() => {
                   setAgreed(true);
                   setShowTermsModal(false);
