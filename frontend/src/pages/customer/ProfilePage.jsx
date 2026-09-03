@@ -21,8 +21,7 @@ import { useApp } from '../../context/AppContext';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { userProfile, setUserProfile, addresses, setAddresses, logoutUser } = useApp();
-
+  const { userProfile, setUserProfile, addresses, setAddresses, setSelectedAddressId, logoutUser } = useApp();
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editName, setEditName] = useState(userProfile?.fullName || userProfile?.name || '');
   const [editPhone, setEditPhone] = useState(userProfile?.phone || '');
@@ -149,6 +148,12 @@ export default function ProfilePage() {
   };
 
   const handleSetDefaultAddress = (id) => {
+    // 1. อัปเดต selectedAddressId ทันทีเพื่อให้ currentAddress เปลี่ยนตาม
+    if (setSelectedAddressId) {
+      setSelectedAddressId(id);
+    }
+    
+    // 2. อัปเดต flag isDefault ในลิสต์
     setAddresses(prev => prev.map(a => ({
       ...a,
       isDefault: a.id === id

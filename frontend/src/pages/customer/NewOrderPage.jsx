@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, Camera, FileText, CheckSquare, Square, ShoppingBag, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Camera, FileText, CheckSquare, Square, ShoppingBag, X, Plus, Minus, Sparkles } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export default function NewOrderPage() {
@@ -11,8 +11,8 @@ export default function NewOrderPage() {
 
   const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
 
-  // ใช้ที่อยู่ปัจจุบันจาก AppContext เป็นหลัก หากไม่มีจึงใช้ข้อมูลจากการสั่งซ้ำหรือข้อความสำรอง
-  const displayAddress = reorderData.address || currentAddress?.detail || 'ยังไม่ได้ระบุที่อยู่จัดส่ง';
+  // เปลี่ยนจากเดิม ให้ใช้ currentAddress?.detail ก่อน
+  const displayAddress = currentAddress?.detail || reorderData.address || 'ยังไม่ได้ระบุที่อยู่จัดส่ง';
 
   const packages = serviceType === 'bedding' ? [
     { id: '3.5ft', name: 'ไซส์ 3.5 ฟุต', price: 200, desc: 'สำหรับที่นอนขนาด 3.5 ฟุต' },
@@ -30,10 +30,50 @@ export default function NewOrderPage() {
 
   const [selectedPackage, setSelectedPackage] = useState(initialPkgId);
   const [pickupTime, setSelectedPickupTime] = useState('08:00 - 09:00 น.');
+  const [deliveryTime, setSelectedDeliveryTime] = useState('10:00 - 11:00 น.');
   const [basketImage, setBasketImage] = useState(null);
   const [note, setNote] = useState(reorderData.note || '');
   const [agreed, setAgreed] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+
+  // รายการตัวเลือกพิเศษแยกตามประเภทบริการ
+  const washDrySpecialOptions = [
+    { id: 'silk', name: 'ผ้าไหม', price: 150, unit: 'ตัว' },
+    { id: 'leather', name: 'เสื้อหนัง', price: 200, unit: 'ตัว' },
+    { id: 'fur', name: 'ขนสัตว์', price: 200, unit: 'ตัว' },
+    { id: 'evening_dress', name: 'ชุดราตรี', price: 200, unit: 'ตัว' },
+    { id: 'suit', name: 'สูท', price: 200, unit: 'ตัว' },
+    { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 200, unit: 'ตัว' },
+    { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 200, unit: 'ตัว' },
+    { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "Dry Clean Only"', price: 250, unit: 'ตัว' },
+  ];
+
+  const beddingSpecialOptions = [
+    { id: 'bed_sheet', name: 'ผ้าปู', price: 50, unit: 'ชิ้น' },
+    { id: 'pillow_case', name: 'ปลอกหมอน', price: 10, unit: 'ชิ้น' },
+    { id: 'bolster_case', name: 'ปลอกหมอนข้าง', price: 10, unit: 'ชิ้น' },
+    { id: 'duvet_3_5', name: 'ผ้านวม 3.5 ฟุต', price: 130, unit: 'ผืน' },
+    { id: 'duvet_5', name: 'ผ้านวม 5 ฟุต', price: 160, unit: 'ผืน' },
+    { id: 'duvet_6', name: 'ผ้านวม 6 ฟุต', price: 180, unit: 'ผืน' },
+  ];
+
+  const currentSpecialOptions = serviceType === 'bedding' ? beddingSpecialOptions : washDrySpecialOptions;
+
+  // เก็บจำนวนที่เลือกของแต่ละรายการพิเศษ เช่น { silk: 2, suit: 1 }
+  const [specialItemCounts, setSpecialItemCounts] = useState({});
+
+  const handleUpdateCount = (id, delta) => {
+    setSpecialItemCounts(prev => {
+      const current = prev[id] || 0;
+      const updated = Math.max(0, current + delta);
+      if (updated === 0) {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      return { ...prev, [id]: updated };
+    });
+  };
 
   const timeSlots = [
     '08:00 - 09:00 น.',
@@ -45,6 +85,16 @@ export default function NewOrderPage() {
     '20:00 - 21:00 น.',
   ];
 
+  const deliveryTimeSlots = [
+    '10:00 - 11:00 น.',
+    '12:00 - 13:00 น.',
+    '14:00 - 15:00 น.',
+    '16:00 - 17:00 น.',
+    '18:00 - 19:00 น.',
+    '20:00 - 21:00 น.',
+    '21:00 - 22:00 น.',
+  ];
+
   const handleImageChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setBasketImage(URL.createObjectURL(e.target.files[0]));
@@ -52,7 +102,29 @@ export default function NewOrderPage() {
   };
 
   const currentPkg = packages.find(p => p.id === selectedPackage);
-  const totalPrice = currentPkg ? currentPkg.price : 0;
+  const basePrice = currentPkg ? currentPkg.price : 0;
+
+  // คำนวณราคารายการพิเศษทั้งหมด
+  const specialTotal = Object.entries(specialItemCounts).reduce((sum, [id, count]) => {
+    const item = currentSpecialOptions.find(opt => opt.id === id);
+    return sum + (item ? item.price * count : 0);
+  }, 0);
+
+  const totalPrice = basePrice + specialTotal;
+
+  // รวบรวมสรุปรายการพิเศษที่เลือกไว้
+  const selectedSpecialItems = Object.entries(specialItemCounts)
+    .filter(([_, count]) => count > 0)
+    .map(([id, count]) => {
+      const item = currentSpecialOptions.find(opt => opt.id === id);
+      return {
+        id,
+        name: item.name,
+        price: item.price,
+        count,
+        total: item.price * count
+      };
+    });
 
   const handleCreateOrder = (e) => {
     e.preventDefault();
@@ -74,6 +146,8 @@ export default function NewOrderPage() {
           serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',
           packageName: currentPkg?.name,
           pickupTime: pickupTime,
+          deliveryTime: deliveryTime,
+          specialItems: selectedSpecialItems,
           address: displayAddress,
           basketImage: basketImage,
           note: note,
@@ -149,44 +223,46 @@ export default function NewOrderPage() {
                 type="button" 
                 onClick={() => navigate('/profile')}
                 className="text-xs text-[#1d61f2] font-semibold self-center shrink-0 hover:underline cursor-pointer"
-              >
+             >
                 เปลี่ยน
-              </button>
+             </button>
             </div>
           </div>
 
-          {/* 2. เลือกแพ็กเกจ */}
+         {/* 2. เลือกแพ็กเกจ */}
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
-              เลือกแพ็กเกจ{serviceType === 'bedding' ? 'ชุดเครื่องนอน' : 'ซัก อบ พับ'}
+            <label className="block text-sm font-bold text-gray-900 mb-2">
+              เลือกแพ็กเกจ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ'})
             </label>
-            <div className="flex flex-col gap-3">
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
               {packages.map((pkg) => {
                 const isSelected = selectedPackage === pkg.id;
                 return (
                   <div
                     key={pkg.id}
-                    onClick={() => setSelectedPackage(pkg.id)}
-                    className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
+                    onClick={() => setSelectedPackage(prev => prev === pkg.id ? '' : pkg.id)}
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition ${
                       isSelected
-                        ? 'bg-blue-50/60 border-[#1d61f2] shadow-sm'
-                        : 'bg-white border-gray-100 hover:border-blue-200'
+                        ? 'bg-blue-50/40 border-blue-200'
+                        : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`font-display font-medium text-base ${isSelected ? 'text-[#1d61f2]' : 'text-gray-900'}`}>
-                          {pkg.name}
-                        </span>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md font-medium">
-                          {pkg.desc}
-                        </span>
+                    <div className="min-w-0 flex-1">
+                      <div className={`font-bold text-xs leading-tight truncate ${isSelected ? 'text-[#1d61f2]' : 'text-gray-800'}`}>
+                        {pkg.name}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1 font-medium">ราคาบริการ</p>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        {pkg.price}฿ • {pkg.desc}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`font-display font-medium text-lg ${isSelected ? 'text-[#1d61f2]' : 'text-gray-900'}`}>
-                        {pkg.price}฿
+
+                    <div className="shrink-0">
+                      <span className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                        isSelected 
+                          ? 'bg-[#1d61f2] text-white shadow-xs' 
+                          : 'bg-white border border-gray-200 text-gray-400'
+                      }`}>
+                        {isSelected ? 'เลือกแล้ว' : 'เลือก'}
                       </span>
                     </div>
                   </div>
@@ -195,7 +271,65 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 3. รอบเวลารับผ้า */}
+          {/* 3. ความต้องการพิเศษ (Special Requests) */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-900">
+                ความต้องการพิเศษ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ'})
+              </label>
+              {specialTotal > 0 && (
+                <span className="text-xs font-bold text-[#1d61f2]">
+                  + {specialTotal}฿
+                </span>
+              )}
+            </div>
+            
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
+              {currentSpecialOptions.map((item) => {
+                const count = specialItemCounts[item.id] || 0;
+                return (
+                  <div 
+                    key={item.id}
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-2 transition ${
+                      count > 0 ? 'bg-blue-50/40 border-blue-200' : 'bg-gray-50/50 border-gray-100'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-xs text-gray-800 leading-normal pt-0.5 truncate">
+                        {item.name}
+                      </div>
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        {item.price}฿ ต่อ 1 {item.unit}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateCount(item.id, -1)}
+                        disabled={count === 0}
+                        className="w-7 h-7 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs transition active:scale-95"
+                      >
+                        <Minus size={13} />
+                      </button>
+                      <span className="w-6 text-center font-bold text-xs text-gray-900">
+                        {count}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateCount(item.id, 1)}
+                        className="w-7 h-7 rounded-lg bg-[#1d61f2] text-white flex items-center justify-center hover:bg-blue-700 cursor-pointer shadow-xs transition active:scale-95"
+                      >
+                        <Plus size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 4. รอบเวลารับผ้า */}
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-2">รอบเวลารับผ้า</label>
             <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -215,7 +349,27 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 4. ถ่ายรูปตะกร้าผ้า */}
+          {/* 5. รอบเวลาส่งผ้าคืน (10:00 - 22:00 น.) */}
+          <div>
+            <label className="block text-sm font-bold text-gray-900 mb-2">รอบเวลาส่งผ้าคืน</label>
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-3 text-gray-700">
+                <Clock size={18} className="text-emerald-600" />
+                <span className="text-xs font-semibold">เลือกรอบเวลาส่งผ้าคืน (10:00 - 22:00 น.)</span>
+              </div>
+              <select
+                value={deliveryTime}
+                onChange={(e) => setSelectedDeliveryTime(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm font-semibold text-gray-800 outline-none cursor-pointer focus:border-[#1d61f2]"
+              >
+                {deliveryTimeSlots.map((slot) => (
+                  <option key={slot} value={slot}>{slot}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* 6. ถ่ายรูปตะกร้าผ้า */}
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-1">ถ่ายรูปตะกร้าผ้า</label>
             <p className="text-xs text-gray-500 mb-2">ถ่ายรูปจุดที่วางตะกร้าเพื่อให้ไรเดอร์เข้ารับได้ถูกจุด</p>
@@ -239,7 +393,7 @@ export default function NewOrderPage() {
             </label>
           </div>
 
-          {/* 5. หมายเหตุ */}
+          {/* 7. หมายเหตุ */}
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-2">หมายเหตุถึงพนักงาน (ถ้ามี)</label>
             <div className="bg-white p-3 rounded-2xl border border-gray-100 flex items-start gap-3 shadow-sm">
@@ -254,7 +408,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 6. ยอมรับเงื่อนไขการใช้บริการ */}
+          {/* 8. ยอมรับเงื่อนไขการใช้บริการ */}
           <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
             <div onClick={() => setAgreed(!agreed)} className="cursor-pointer shrink-0">
               {agreed ? (
