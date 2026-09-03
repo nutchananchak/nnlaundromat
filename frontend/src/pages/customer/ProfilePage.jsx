@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -21,11 +21,19 @@ import { useApp } from '../../context/AppContext';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { userProfile, setUserProfile, addresses, setAddresses } = useApp();
+  const { userProfile, setUserProfile, addresses, setAddresses, logoutUser } = useApp();
 
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  const [editName, setEditName] = useState(userProfile.name);
-  const [editPhone, setEditPhone] = useState(userProfile.phone);
+  const [editName, setEditName] = useState(userProfile?.fullName || userProfile?.name || '');
+  const [editPhone, setEditPhone] = useState(userProfile?.phone || '');
+
+  // ซิงค์ฟอร์มแก้ไขเมื่อ userProfile ใน AppContext เปลี่ยนแปลง
+  useEffect(() => {
+    if (userProfile) {
+      setEditName(userProfile.fullName || userProfile.name || '');
+      setEditPhone(userProfile.phone || '');
+    }
+  }, [userProfile]);
 
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
@@ -39,20 +47,60 @@ export default function ProfilePage() {
   const [reportDetail, setReportDetail] = useState('');
   const [reportSuccess, setReportSuccess] = useState(false);
 
+  // เปลี่ยนรูปโปรไฟล์ + บันทึกลง localStorage ให้ซิงค์ข้ามหน้า
   const handleAvatarChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const imageUrl = URL.createObjectURL(e.target.files[0]);
-      setUserProfile(prev => ({ ...prev, avatar: imageUrl }));
+      setUserProfile(prev => {
+        const updated = { ...prev, avatar: imageUrl };
+        localStorage.setItem('currentUser', JSON.stringify(updated));
+        return updated;
+      });
     }
   };
 
+  // บันทึกแก้ไขโปรไฟล์ (ซิงค์ทั้ง AppContext, currentUser และตาราง users)
   const handleSaveProfile = (e) => {
     e.preventDefault();
-    setUserProfile(prev => ({
-      ...prev,
-      name: editName,
+
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      alert('กรุณากรอกชื่อ - นามสกุล');
+      return;
+    }
+
+    const updatedUser = {
+      ...userProfile,
+      name: trimmedName,
+      fullName: trimmedName,
       phone: editPhone
-    }));
+    };
+
+    // 1. อัปเดต AppContext ทันที (ทำให้หน้า Home และหน้าอื่นเปลี่ยนชื่อทันที)
+    setUserProfile(updatedUser);
+
+    // 2. อัปเดต currentUser ใน localStorage กันข้อมูลหายเวลารีเฟรช
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+
+    // 3. ซิงค์กลับไปยังตาราง users รวม เพื่อให้การล็อกอินครั้งถัดไปเป็นชื่อใหม่
+    try {
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      const updatedUsers = users.map(u => {
+        if (u.phone === userProfile?.phone) {
+          return {
+            ...u,
+            fullName: trimmedName,
+            name: trimmedName,
+            phone: editPhone
+          };
+        }
+        return u;
+      });
+      localStorage.setItem('users', JSON.stringify(updatedUsers));
+    } catch (err) {
+      console.error(err);
+    }
+
     setShowEditProfileModal(false);
   };
 
@@ -146,9 +194,17 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     if (window.confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
+      if (logoutUser) {
+        logoutUser();
+      } else {
+        localStorage.removeItem('currentUser');
+      }
       navigate('/login/customer');
     }
   };
+
+  // แสดงชื่อผู้ใช้ (รองรับทั้ง fullName และ name)
+  const displayName = userProfile?.fullName || userProfile?.name || 'ผู้ใช้งาน';
 
   return (
     <div style={{
@@ -181,7 +237,7 @@ export default function ProfilePage() {
           flexShrink: 0
         }} className="rounded-b-3xl px-6 pt-6 pb-6 flex items-center justify-between z-20">
           <div>
-            <p style={{ color: 'rgba(255, 255, 255, 0.8)' }} className="text-xs font-medium">N&N Laundromat</p>
+            <p style={{ color: 'rgba(255, 255, 255, 0.8)' }} className="text-xs font-medium">N&amp;N Laundromat</p>
             <h1 style={{ color: '#ffffff' }} className="font-bold text-xl tracking-tight">โปรไฟล์และการตั้งค่า</h1>
           </div>
         </div>
@@ -191,7 +247,7 @@ export default function ProfilePage() {
           {/* การ์ดโปรไฟล์ส่วนตัว */}
           <div style={{ backgroundColor: '#ffffff', color: '#0f172a' }} className="rounded-3xl p-5 border border-gray-100 shadow-sm flex flex-col items-center text-center relative">
             <div className="relative mb-3">
-              {userProfile.avatar ? (
+              {userProfile?.avatar ? (
                 <img
                   src={userProfile.avatar}
                   alt="Profile"
@@ -217,9 +273,9 @@ export default function ProfilePage() {
               </label>
             </div>
 
-            <h2 style={{ color: '#0f172a' }} className="font-bold text-lg">{userProfile.name}</h2>
+            <h2 style={{ color: '#0f172a' }} className="font-bold text-lg">{displayName}</h2>
             <p style={{ color: '#64748b' }} className="text-xs mt-1 flex items-center justify-center gap-1.5 font-medium">
-              <Phone size={13} className="text-[#1d61f2]" /> {userProfile.phone}
+              <Phone size={13} className="text-[#1d61f2]" /> {userProfile?.phone || '-'}
             </p>
 
             <div style={{ backgroundColor: '#eff6ff', color: '#1d61f2' }} className="mt-3 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border border-blue-100">
@@ -232,8 +288,8 @@ export default function ProfilePage() {
             <button
               type="button"
               onClick={() => {
-                setEditName(userProfile.name);
-                setEditPhone(userProfile.phone);
+                setEditName(userProfile?.fullName || userProfile?.name || '');
+                setEditPhone(userProfile?.phone || '');
                 setShowEditProfileModal(true);
               }}
               className="flex items-center justify-between p-3.5 hover:bg-gray-50 rounded-2xl transition cursor-pointer text-left w-full"

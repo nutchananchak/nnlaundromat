@@ -1,21 +1,61 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-  // 1. ข้อมูลผู้ใช้ส่วนกลาง
-  const [userProfile, setUserProfile] = useState({
-    name: 'สมศรี มีความสุข',
-    phone: '081-234-5678',
-    avatar: null,
+  // 1. ข้อมูลผู้ใช้ส่วนกลาง (ดึงจาก currentUser ใน localStorage อัตโนมัติถ้ามีการล็อกอินไว้)
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('currentUser');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        return {
+          name: parsed.fullName || parsed.name || 'ซักผ้า สะอาดดี',
+          fullName: parsed.fullName || parsed.name || 'ซักผ้า สะอาดดี',
+          phone: parsed.phone || '081-234-5678',
+          avatar: parsed.avatar || null,
+        };
+      }
+    } catch (e) {
+      // กรณี JSON parse ผิดพลาด
+    }
+    return {
+      name: 'ซักผ้า สะอาดดี',
+      fullName: 'ซักผ้า สะอาดดี',
+      phone: '081-234-5678',
+      avatar: null,
+    };
   });
+
+  // ฟังก์ชันสำหรับเรียกใช้ตอนล็อกอินสำเร็จ
+  const loginUser = (userData) => {
+    const formattedUser = {
+      name: userData.fullName || userData.name,
+      fullName: userData.fullName || userData.name,
+      phone: userData.phone,
+      avatar: userData.avatar || null,
+    };
+    setUserProfile(formattedUser);
+    localStorage.setItem('currentUser', JSON.stringify(formattedUser));
+  };
+
+  // ฟังก์ชันออกจากระบบ
+  const logoutUser = () => {
+    localStorage.removeItem('currentUser');
+    setUserProfile({
+      name: 'ซักผ้า สะอาดดี',
+      fullName: 'ซักผ้า สะอาดดี',
+      phone: '081-234-5678',
+      avatar: null,
+    });
+  };
 
   // 2. หมุดที่อยู่สูงสุด 3 แห่ง (ใช้ร่วมกันทั้งหน้า Home, Profile, NewOrder)
   const [addresses, setAddresses] = useState([
     {
       id: 'addr-1',
       title: 'หอพัก (ค่าเริ่มต้น)',
-      detail: 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
+      detail: 'หอพักปิยมนต์ ห้อง 204 (ซอยอ่อนนุช 30)',
       lat: 13.8415,
       lng: 100.5789,
       isDefault: true,
@@ -45,7 +85,7 @@ export function AppProvider({ children }) {
       price: 180,
       createdAt: 'วันนี้ 10:30 น.',
       pickupTime: '10:00 - 11:00 น.',
-      address: 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
+      address: 'หอพักใจดี ห้อง 204 (ซอยอ่อนนุช 30)',
       note: 'ผ้าสีแยกถุงไว้ให้แล้วค่ะ',
       stepsHistory: [
         { title: 'สั่งบริการเรียบร้อย', time: '10:30 น.', done: true },
@@ -67,7 +107,7 @@ export function AppProvider({ children }) {
       price: 230,
       createdAt: '28 ส.ค. 2026',
       pickupTime: '14:00 - 15:00 น.',
-      address: 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
+      address: 'หอพักใจดี ห้อง 204 (ซอยอ่อนนุช 30)',
       note: 'ผ้านวมสีฟ้า',
     }
   ]);
@@ -82,6 +122,8 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       userProfile,
       setUserProfile,
+      loginUser,
+      logoutUser,
       addresses,
       setAddresses,
       selectedAddressId,

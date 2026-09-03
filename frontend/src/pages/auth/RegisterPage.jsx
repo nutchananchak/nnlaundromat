@@ -4,7 +4,7 @@ import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 
-//โลโก้
+// โลโก้
 const ModalHeaderLogo = () => (
   <svg
     viewBox="0 0 120 120"
@@ -70,7 +70,43 @@ const ModalHeaderLogo = () => (
   </svg>
 );
 
-//ไอคอนเครื่องหมายถูกนำหน้าข้อความ
+// ไอคอนแจ้งเตือนเตือนภัย (แทน ⚠️)
+const AlertTriangleIcon = ({ size = 16, color = '#1e40af' }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0 }}
+  >
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+// ไอคอนโล่ความปลอดภัย (แทน 🛡️)
+const ShieldIcon = ({ size = 16, color = '#1e40af' }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{ flexShrink: 0 }}
+  >
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+);
+
+// ไอคอนเครื่องหมายถูกนำหน้าข้อความ
 const CheckItem = ({ children, isWarning = false }) => (
   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', textAlign: 'left', marginBottom: '8px' }}>
     <span style={{
@@ -201,7 +237,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
           ×
         </button>
 
-        {/* 1. Header: โลโก้ ชื่อร้าน และบริการ จัดอยู่ตรงกลางทั้งหมด */}
+        {/* 1. Header */}
         <div style={{
           padding: '24px 20px 18px 20px',
           borderBottom: '1px solid #f1f5f9',
@@ -232,7 +268,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
             margin: '0 0 4px 0',
             letterSpacing: '-0.3px'
           }}>
-            N&N Laundromat
+            N&amp;N Laundromat
           </h2>
 
           <p style={{
@@ -283,7 +319,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
           </button>
         </div>
 
-        {/* 2. Body: จัดระเบียบข้อความชิดซ้าย มีไอคอนติ๊กถูกแยกบรรทัด */}
+        {/* 2. Body */}
         <div style={{
           padding: '18px 20px',
           overflowY: 'auto',
@@ -307,7 +343,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 lineHeight: '1.4',
                 textAlign: 'center'
               }}>
-                <span>⚠️</span>
+                <AlertTriangleIcon size={16} color="#1e40af" />
                 <span>เพื่อการให้บริการที่ดีที่สุดและสิทธิประโยชน์ของลูกค้า กรุณาอ่านและทำความเข้าใจก่อนใช้บริการ</span>
               </div>
 
@@ -338,8 +374,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>เสื้อผ้าแบรนด์เนม</CheckItem>
                 <CheckItem>เสื้อผ้าติดเลื่อม/เพชรประดับ</CheckItem>
                 <CheckItem>เสื้อผ้าที่มีป้ายกำกับ "Dry Clean Only" (ซักแห้งเท่านั้น)</CheckItem>
-                <CheckItem isWarning={true}>
-                  หากส่งมาโดยไม่แจ้ง ร้านขอสงวนสิทธิ์ไม่รับผิดชอบต่อความเสียหายที่เกิดขึ้น</CheckItem>
+                <CheckItem isWarning={true}>หากส่งมาโดยไม่แจ้ง ร้านขอสงวนสิทธิ์ไม่รับผิดชอบต่อความเสียหายที่เกิดขึ้น</CheckItem>
               </div>
 
               {/* ข้อ 4 */}
@@ -405,7 +440,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 lineHeight: '1.4',
                 textAlign: 'center'
               }}>
-                <span>🛡️</span>
+                <ShieldIcon size={16} color="#1e40af" />
                 <span>N&amp;N Laundromat ให้ความสำคัญและคุ้มครองข้อมูลส่วนบุคคลของท่านตามมาตรฐาน พ.ร.บ. PDPA</span>
               </div>
 
@@ -461,7 +496,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
           gap: '10px',
           background: '#f8fafc'
         }}>
-         
           <button
             type="button"
             onClick={handleAgree}
@@ -502,6 +536,28 @@ const RegisterPage = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    // เงื่อนไข 1: ชื่อ-นามสกุล อนุญาตเฉพาะภาษาไทย ภาษาอังกฤษ และเว้นวรรค
+    if (name === 'fullName') {
+      const filteredValue = value.replace(/[^a-zA-Z\u0E00-\u0E7F\s]/g, '');
+      setFormData((prev) => ({ ...prev, fullName: filteredValue }));
+      return;
+    }
+
+    // เงื่อนไข 2: เบอร์โทรศัพท์ อนุญาตเฉพาะตัวเลข และไม่เกิน 10 หลัก
+    if (name === 'phone') {
+      const numericValue = value.replace(/\D/g, '').slice(0, 10);
+      setFormData((prev) => ({ ...prev, phone: numericValue }));
+      return;
+    }
+
+    // เงื่อนไข 3: รหัสผ่าน จำกัดไม่เกิน 10 ตัวอักษร
+    if (name === 'password' || name === 'confirmPassword') {
+      const truncatedValue = value.slice(0, 10);
+      setFormData((prev) => ({ ...prev, [name]: truncatedValue }));
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -512,20 +568,49 @@ const RegisterPage = () => {
     e.preventDefault();
     setErrorMsg('');
 
+    // ตรวจสอบเงื่อนไข 1: ชื่อ-นามสกุล
+    const nameRegex = /^[a-zA-Z\u0E00-\u0E7F\s]+$/;
+    if (!nameRegex.test(formData.fullName.trim())) {
+      setErrorMsg('ชื่อ - นามสกุล ต้องเป็นภาษาไทยหรือภาษาอังกฤษเท่านั้น');
+      return;
+    }
+
+    // ตรวจสอบเงื่อนไข 2: เบอร์โทรศัพท์ 10 หลักพอดี
+    if (formData.phone.length !== 10) {
+      setErrorMsg('เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลักเท่านั้น');
+      return;
+    }
+
+    // ตรวจสอบเงื่อนไข 3: รหัสผ่าน 6 - 10 ตัวอักษร
+    if (formData.password.length < 6 || formData.password.length > 10) {
+      setErrorMsg('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร และไม่เกิน 10 ตัวอักษร');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setErrorMsg('รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน');
       return;
     }
 
-    if (formData.password.length < 6) {
-      setErrorMsg('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+    if (!formData.acceptTerms) {
+      setErrorMsg('กรุณายอมรับเงื่อนไขการให้บริการและนโยบายความเป็นส่วนตัว');
       return;
     }
 
-    if (!formData.acceptTerms) {
-      setErrorMsg('กรุณายอมรับเงื่อนไขและข้อตกลงการให้บริการ');
+    // บันทึกข้อมูลลง localStorage
+    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
+    const isDuplicate = existingUsers.some((u) => u.phone === formData.phone);
+    if (isDuplicate) {
+      setErrorMsg('เบอร์โทรศัพท์นี้ถูกใช้งานแล้ว');
       return;
     }
+
+    existingUsers.push({
+      fullName: formData.fullName,
+      phone: formData.phone,
+      password: formData.password
+    });
+    localStorage.setItem('users', JSON.stringify(existingUsers));
 
     console.log('ข้อมูลลงทะเบียนสำเร็จ:', formData);
     alert('สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ');
@@ -544,9 +629,13 @@ const RegisterPage = () => {
             fontSize: '13.5px',
             marginBottom: '16px',
             textAlign: 'left',
-            border: '1px solid #fee2e2'
+            border: '1px solid #fee2e2',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            ⚠️ {errorMsg}
+            <AlertTriangleIcon size={16} color="#dc2626" />
+            <span>{errorMsg}</span>
           </div>
         )}
 
@@ -575,7 +664,7 @@ const RegisterPage = () => {
           label="รหัสผ่าน"
           name="password"
           type="password"
-          placeholder="ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร"
+          placeholder="ตั้งรหัสผ่าน 6 - 10 ตัวอักษร"
           value={formData.password}
           onChange={handleChange}
           required
@@ -593,7 +682,6 @@ const RegisterPage = () => {
           autoComplete="new-password"
         />
 
-        {/* จุดกดเปิด Modal */}
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',

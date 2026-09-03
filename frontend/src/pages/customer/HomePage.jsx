@@ -28,6 +28,9 @@ export default function HomePage() {
   const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [selectedService, setSelectedService] = useState('wash_dry_fold');
 
+  // ดึงชื่อผู้ใช้ที่ล็อกอิน (รองรับทั้ง fullName และ name)
+  const displayName = userProfile?.fullName || userProfile?.name || 'คุณลูกค้า';
+
   const steps = [
     { step: 1, label: 'ตรวจสอบยอด', icon: ShieldCheck },
     { step: 2, label: 'รอรับงาน', icon: Clock },
@@ -86,12 +89,15 @@ export default function HomePage() {
         }} className="rounded-b-3xl px-5 pt-6 pb-6 z-20 flex flex-col gap-3">
           
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/80 text-xs font-medium">สวัสดีคุณลูกค้า 👋</p>
-              <h1 className="font-display font-bold text-white text-lg tracking-tight">N&N Laundromat</h1>
+            <div className="min-w-0 pr-2">
+              {/* ทักทายด้วยชื่อผู้ใช้งานจริง */}
+              <p className="text-white/80 text-xs font-medium truncate">
+                สวัสดีคุณ, {displayName}
+              </p>
+              <h1 className="font-display font-bold text-white text-lg tracking-tight">N&amp;N Laundromat</h1>
             </div>
-            <span className="text-[10px] bg-white/20 text-white font-bold px-2.5 py-1 rounded-full border border-white/30 backdrop-blur-sm">
-              เปิดบริการ 08:00 - 21:00 น.
+            <span className="text-[10px] bg-white/20 text-white font-bold px-2.5 py-1 rounded-full border border-white/30 backdrop-blur-sm shrink-0">
+              เปิดบริการ 08:00 - 22:00 น.
             </span>
           </div>
 
@@ -102,15 +108,16 @@ export default function HomePage() {
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 flex items-center justify-center shrink-0">
-                {userProfile.avatar ? (
+                {userProfile?.avatar ? (
                   <img src={userProfile.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <User size={20} className="text-white" />
                 )}
               </div>
               <div className="min-w-0">
+                {/* แสดงชื่อผู้ใช้งานตรงกับการล็อกอิน */}
                 <h2 className="font-bold text-xs text-white truncate leading-tight">
-                  {userProfile.name}
+                  {displayName}
                 </h2>
                 <div className="flex items-center gap-1 mt-0.5 text-white/80">
                   <MapPin size={11} className="shrink-0 text-white" />

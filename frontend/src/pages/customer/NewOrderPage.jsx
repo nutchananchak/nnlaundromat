@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, Clock, Camera, FileText, CheckSquare, Square, ShoppingBag, X } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 export default function NewOrderPage() {
   const navigate = useNavigate();
   const location = useLocation() || {};
   const reorderData = location.state || {};
+  const { currentAddress, userProfile } = useApp();
 
-  // ป้องกัน auth เป็น undefined/null แล้วเด้งหลุด
   const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
+
+  // ใช้ที่อยู่ปัจจุบันจาก AppContext เป็นหลัก หากไม่มีจึงใช้ข้อมูลจากการสั่งซ้ำหรือข้อความสำรอง
+  const displayAddress = reorderData.address || currentAddress?.detail || 'ยังไม่ได้ระบุที่อยู่จัดส่ง';
 
   const packages = serviceType === 'bedding' ? [
     { id: '3.5ft', name: 'ไซส์ 3.5 ฟุต', price: 200, desc: 'สำหรับที่นอนขนาด 3.5 ฟุต' },
@@ -20,7 +24,6 @@ export default function NewOrderPage() {
     { id: 'L', name: 'ไซส์ L', price: 240, desc: 'ผ้าไม่เกิน 65 ชิ้น' },
   ];
 
-  // หา ID แพ็กเกจเดิมที่ส่งมาจากหน้าใบเสร็จ
   const initialPkgId = serviceType === 'bedding'
     ? (reorderData.packageSize?.includes('3.5') ? '3.5ft' : reorderData.packageSize?.includes('5') ? '5ft' : reorderData.packageSize?.includes('6') ? '6ft' : '')
     : (reorderData.packageSize?.includes('S') ? 'S' : reorderData.packageSize?.includes('M') ? 'M' : reorderData.packageSize?.includes('L') ? 'L' : '');
@@ -66,10 +69,12 @@ export default function NewOrderPage() {
       state: {
         order: {
           id: 'NN-' + Math.floor(100000 + Math.random() * 900000),
+          customerName: userProfile?.fullName || userProfile?.name || 'คุณลูกค้า',
+          customerPhone: userProfile?.phone || '',
           serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',
           packageName: currentPkg?.name,
           pickupTime: pickupTime,
-          address: reorderData.address || 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
+          address: displayAddress,
           basketImage: basketImage,
           note: note,
           totalPrice: totalPrice,
@@ -117,7 +122,7 @@ export default function NewOrderPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <p className="text-white/80 text-xs font-medium">N&N Laundromat</p>
+            <p className="text-white/80 text-xs font-medium">N&amp;N Laundromat</p>
             <h1 className="font-display font-medium text-white text-xl tracking-tight">
               {serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ'}
             </h1>
@@ -133,9 +138,11 @@ export default function NewOrderPage() {
             <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-start gap-3 shadow-sm">
               <MapPin className="text-[#1d61f2] shrink-0 mt-0.5" size={20} />
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-400 font-medium">ที่อยู่จัดส่ง</p>
+                <p className="text-xs text-gray-400 font-medium">
+                  {currentAddress?.title ? `ที่อยู่จัดส่ง (${currentAddress.title})` : 'ที่อยู่จัดส่ง'}
+                </p>
                 <p className="text-sm font-semibold text-gray-800 truncate mt-0.5">
-                  {reorderData.address || 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)'}
+                  {displayAddress}
                 </p>
               </div>
               <button 
@@ -309,7 +316,7 @@ export default function NewOrderPage() {
               </div>
 
               <div className="flex-1 overflow-y-auto py-4 text-xs text-gray-600 leading-relaxed flex flex-col gap-3 font-body">
-                <p>1. ทางร้าน N&N Laundromat จะให้บริการรับ-ส่งผ้าตามรอบเวลาที่ลูกค้าได้เลือกไว้</p>
+                <p>1. ทางร้าน N&amp;N Laundromat จะให้บริการรับ-ส่งผ้าตามรอบเวลาที่ลูกค้าได้เลือกไว้</p>
                 <p>2. ลูกค้าโปรดตรวจสอบสิ่งของมีค่าหรือเงินที่ติดมากับกระเป๋าเสื้อผ้า ทางร้านจะไม่รับผิดชอบต่อความเสียหายหากมิได้แจ้งล่วงหน้า</p>
                 <p>3. กรณีผ้าสีตกหรือชำรุดเนื่องจากสภาพเนื้อผ้า ทางร้านขอสงวนสิทธิ์ในการรับผิดชอบความเสียหายที่เกิดขึ้นจากตัวเนื้อผ้าเอง</p>
                 <p>4. การชำระเงินสามารถทำได้ผ่านช่องทางที่ทางร้านกำหนดหลังจากคำสั่งซื้อได้รับการยืนยัน</p>

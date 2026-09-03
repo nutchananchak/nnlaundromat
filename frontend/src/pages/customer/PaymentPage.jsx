@@ -11,18 +11,25 @@ import {
   FileCheck2, 
   ShieldCheck,
   ShoppingBag,
-  Clock
+  Clock,
+  User
 } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 export default function PaymentPage() {
   const navigate = useNavigate();
   const location = useLocation() || {};
+  const { userProfile, orders, setOrders } = useApp();
+
+  // ดึงชื่อผู้ใช้ปัจจุบัน
+  const customerName = userProfile?.fullName || userProfile?.name || 'คุณลูกค้า';
+  const customerPhone = userProfile?.phone || '08X-XXX-XXXX';
 
   const orderData = location.state?.order || {
-    id: 'NN-20260901',
+    id: `NN-${Math.floor(100000 + Math.random() * 900000)}`,
     serviceName: 'ซัก อบ พับ',
     packageName: 'ไซส์ M (ผ้าไม่เกิน 35 ชิ้น)',
-    pickupTime: '08:00 - 10:00 น.',
+    pickupTime: '14:00 - 16:00 น.',
     address: 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
     totalPrice: 180,
   };
@@ -70,9 +77,59 @@ export default function PaymentPage() {
     }
 
     setIsSubmitting(true);
+
     setTimeout(() => {
+      // สร้าง Object ออเดอร์ใหม่ที่ผูกกับชื่อผู้ใช้ที่กำลังล็อกอินอยู่
+      const newOrder = {
+        id: orderData.id,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        status: 'in_progress',
+        statusStep: 1, // ขั้นตอนที่ 1: ตรวจสอบยอดเงิน
+        statusTitle: 'ตรวจสอบยอดเงิน',
+        estimatedTime: 'รอเจ้าหน้าที่ยืนยันยอดเงิน',
+        serviceName: orderData.serviceName,
+        packageName: orderData.packageName,
+        price: orderData.totalPrice,
+        createdAt: 'วันนี้ เพิ่งสร้าง',
+        pickupTime: orderData.pickupTime,
+        address: orderData.address,
+        note: orderData.note || 'ไม่มีหมายเหตุเพิ่มเติม',
+        paymentStatus: 'รอตรวจสอบยอด',
+        slipImage: slipImage,
+        rider: {
+          name: 'กำลังจัดสรรไรเดอร์',
+          phone: '-',
+          vehicle: '-'
+        },
+        stepsHistory: [
+          { title: 'สั่งบริการเรียบร้อย', time: 'เมื่อสักครู่', done: true },
+          { title: 'ตรวจสอบยอดเงิน', time: 'กำลังตรวจสอบ', done: true, current: true },
+          { title: 'ไรเดอร์รับงาน', time: 'รอดำเนินการ', done: false },
+          { title: 'รับผ้าเข้าสู่ร้าน', time: 'รอดำเนินการ', done: false },
+          { title: 'กำลังดำเนินการซัก-อบ', time: 'รอดำเนินการ', done: false },
+          { title: 'ไรเดอร์นำส่งคืน', time: 'รอดำเนินการ', done: false },
+          { title: 'ส่งมอบผ้าสำเร็จ', time: 'รอดำเนินการ', done: false },
+        ]
+      };
+
+      // บันทึกออเดอร์ใหม่เข้าสู่ AppContext (ให้อยู่รายการแรกสุด)
+      setOrders([newOrder, ...orders.filter(o => o.id !== newOrder.id)]);
+
+      console.log(
+        `%c [N&N LAUNDROMAT] ORDER CREATED %c\n` +
+        `+--------------------------------------------------------+\n` +
+        `| รหัสออเดอร์      : ${newOrder.id.padEnd(36)}|\n` +
+        `| ลูกค้าผู้สั่งซื้อ : ${newOrder.customerName.padEnd(36)}|\n` +
+        `| ยอดชำระ        : ${(newOrder.price + ' บาท').padEnd(36)}|\n` +
+        `| สถานะ          : ${newOrder.statusTitle.padEnd(36)}|\n` +
+        `+--------------------------------------------------------+`,
+        'background: #1d61f2; color: #ffffff; font-weight: bold; padding: 4px 10px; border-radius: 4px; font-size: 11px;',
+        'color: #0c4a7e; font-family: monospace; font-size: 12px; line-height: 1.5;'
+      );
+
       setIsSubmitting(false);
-      setIsSuccessModalOpen(true); // เปิด Modal แจ้งว่ากำลังรอตรวจสอบ
+      setIsSuccessModalOpen(true);
     }, 800);
   };
 
@@ -133,6 +190,12 @@ export default function PaymentPage() {
             </div>
 
             <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500 font-medium">ผู้สั่งบริการ</span>
+                <span className="text-gray-800 font-bold flex items-center gap-1">
+                  <User size={13} className="text-[#1d61f2]" /> {customerName}
+                </span>
+              </div>
               <div className="flex justify-between">
                 <span className="text-gray-500 font-medium">บริการ</span>
                 <span className="text-gray-800 font-bold">{orderData.serviceName}</span>
@@ -296,7 +359,7 @@ export default function PaymentPage() {
           </button>
         </div>
 
-        {/* Modal แจ้งเตือนส่งสลิปสำเร็จ (นำทางกลับหน้า Home) */}
+        {/* Modal แจ้งเตือนส่งสลิปสำเร็จ */}
         {isSuccessModalOpen && (
           <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl flex flex-col items-center">
