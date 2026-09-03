@@ -42,7 +42,8 @@ export default function NewOrderPage() {
     { id: 'leather', name: 'เสื้อหนัง', price: 200, unit: 'ตัว' },
     { id: 'fur', name: 'ขนสัตว์', price: 200, unit: 'ตัว' },
     { id: 'evening_dress', name: 'ชุดราตรี', price: 200, unit: 'ตัว' },
-    { id: 'suit', name: 'สูท', price: 200, unit: 'ตัว' },
+    { id: 'suit', name: 'สูท (เฉพาะเสื้อ)', price: 150, unit: 'ตัว' },
+    { id: 'suit', name: 'สูท (เสื้อและกางเกง)', price: 200, unit: 'ชุด' },
     { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 200, unit: 'ตัว' },
     { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 200, unit: 'ตัว' },
     { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "Dry Clean Only"', price: 250, unit: 'ตัว' },
@@ -128,15 +129,31 @@ export default function NewOrderPage() {
 
   const handleCreateOrder = (e) => {
     e.preventDefault();
-    if (!selectedPackage) {
-      alert('กรุณาเลือกแพ็กเกจที่ต้องการใช้งาน');
-      return;
+
+    // 1. ตรวจสอบเงื่อนไขการเลือกสินค้าแยกตามประเภทบริการ
+    const hasSpecialItems = Object.values(specialItemCounts).some(count => count > 0);
+
+    if (serviceType === 'bedding') {
+      // สำหรับชุดเครื่องนอน: ต้องมีแพ็กเกจ หรือ มีรายการพิเศษอย่างน้อย 1 อย่าง
+      if (!selectedPackage && !hasSpecialItems) {
+        alert('กรุณาเลือกแพ็กเกจ หรือเลือกความต้องการพิเศษอย่างน้อย 1 รายการ');
+        return;
+      }
+    } else {
+      // สำหรับซัก อบ พับ: ต้องเลือกแพ็กเกจหลักเสมอ
+      if (!selectedPackage) {
+        alert('กรุณาเลือกแพ็กเกจที่ต้องการใช้งาน');
+        return;
+      }
     }
+
+    // 2. ตรวจสอบการยอมรับเงื่อนไข
     if (!agreed) {
       alert('กรุณากดยอมรับเงื่อนไขการใช้บริการ');
       return;
     }
 
+    // นำทางไปยังหน้าชำระเงิน
     navigate('/order/payment', {
       state: {
         order: {
@@ -144,7 +161,7 @@ export default function NewOrderPage() {
           customerName: userProfile?.fullName || userProfile?.name || 'คุณลูกค้า',
           customerPhone: userProfile?.phone || '',
           serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',
-          packageName: currentPkg?.name,
+          packageName: currentPkg ? currentPkg.name : 'เฉพาะรายการพิเศษ',
           pickupTime: pickupTime,
           deliveryTime: deliveryTime,
           specialItems: selectedSpecialItems,
@@ -331,41 +348,65 @@ export default function NewOrderPage() {
 
           {/* 4. รอบเวลารับผ้า */}
           <div>
-            <label className="block text-sm font-bold text-gray-900 mb-2">รอบเวลารับผ้า</label>
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-2 mb-3 text-gray-700">
-                <Clock size={18} className="text-[#1d61f2]" />
-                <span className="text-xs font-semibold">เลือกรอบเวลาเข้ารับผ้า</span>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-900">รอบเวลารับผ้า</label>
+              <span className="text-xs text-[#1d61f2] font-semibold flex items-center gap-1">
+                <Clock size={13} /> {pickupTime}
+              </span>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {timeSlots.map((slot) => {
+                  const isSelected = pickupTime === slot;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setSelectedPickupTime(slot)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer active:scale-95 ${
+                        isSelected
+                          ? 'bg-[#1d61f2] text-white border-[#1d61f2] shadow-xs'
+                          : 'bg-gray-50/70 text-gray-700 border-gray-100 hover:bg-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
               </div>
-              <select
-                value={pickupTime}
-                onChange={(e) => setSelectedPickupTime(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm font-semibold text-gray-800 outline-none cursor-pointer focus:border-[#1d61f2]"
-              >
-                {timeSlots.map((slot) => (
-                  <option key={slot} value={slot}>{slot}</option>
-                ))}
-              </select>
             </div>
           </div>
 
-          {/* 5. รอบเวลาส่งผ้าคืน (10:00 - 22:00 น.) */}
+{         /* 5. รอบเวลาส่งผ้าคืน */}
           <div>
-            <label className="block text-sm font-bold text-gray-900 mb-2">รอบเวลาส่งผ้าคืน</label>
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-2 mb-3 text-gray-700">
-                <Clock size={18} className="text-emerald-600" />
-                <span className="text-xs font-semibold">เลือกรอบเวลาส่งผ้าคืน (10:00 - 22:00 น.)</span>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-900">รอบเวลาส่งผ้าคืน</label>
+              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+                <Clock size={13} /> {deliveryTime}
+              </span>
+            </div>
+
+            <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {deliveryTimeSlots.map((slot) => {
+                  const isSelected = deliveryTime === slot;
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => setSelectedDeliveryTime(slot)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer active:scale-95 ${
+                        isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                          : 'bg-gray-50/70 text-gray-700 border-gray-100 hover:bg-gray-100 hover:border-gray-200'
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
               </div>
-              <select
-                value={deliveryTime}
-                onChange={(e) => setSelectedDeliveryTime(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm font-semibold text-gray-800 outline-none cursor-pointer focus:border-[#1d61f2]"
-              >
-                {deliveryTimeSlots.map((slot) => (
-                  <option key={slot} value={slot}>{slot}</option>
-                ))}
-              </select>
             </div>
           </div>
 
