@@ -179,7 +179,7 @@ const RiderLoginPage = () => {
     );
 
     alert(`ยินดีต้อนรับคุณ ${rider.name}`);
-    navigate('/rider/dashboard');
+    navigate('/rider/tasks');
   };
 
   const handleForgotPassword = (e) => {
@@ -216,7 +216,7 @@ const RiderLoginPage = () => {
       <LoginForm
         subtitle="ระบบพนักงานรับ-ส่งผ้า"
         identifierLabel="เบอร์โทรศัพท์ / รหัสคนขับ"
-        identifierPlaceholder="กรอกเบอร์โทรหรือรหัสคนขับ"
+        identifierPlaceholder="กรอกเบอร์โทรศัพท์หรือรหัสคนขับ"
         identifierType="text"
         buttonText="เข้าสู่ระบบพนักงานรับส่ง"
         buttonVariant="primary"

@@ -1,9 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-  // 1. ข้อมูลผู้ใช้ส่วนกลาง (ดึงจาก currentUser ใน localStorage อัตโนมัติถ้ามีการล็อกอินไว้)
+  // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer)
   const [userProfile, setUserProfile] = useState(() => {
     try {
       const savedUser = localStorage.getItem('currentUser');
@@ -17,7 +17,7 @@ export function AppProvider({ children }) {
         };
       }
     } catch (e) {
-      // กรณี JSON parse ผิดพลาด
+      // JSON parse error handling
     }
     return {
       name: 'ซักผ้า สะอาดดี',
@@ -27,7 +27,6 @@ export function AppProvider({ children }) {
     };
   });
 
-  // ฟังก์ชันสำหรับเรียกใช้ตอนล็อกอินสำเร็จ
   const loginUser = (userData) => {
     const formattedUser = {
       name: userData.fullName || userData.name,
@@ -39,7 +38,6 @@ export function AppProvider({ children }) {
     localStorage.setItem('currentUser', JSON.stringify(formattedUser));
   };
 
-  // ฟังก์ชันออกจากระบบ
   const logoutUser = () => {
     localStorage.removeItem('currentUser');
     setUserProfile({
@@ -50,7 +48,28 @@ export function AppProvider({ children }) {
     });
   };
 
-  // 2. หมุดที่อยู่สูงสุด 3 แห่ง (ใช้ร่วมกันทั้งหน้า Home, Profile, NewOrder)
+  // 2. ข้อมูลพนักงานรับ-ส่งผ้า (Rider Session)
+  const [currentRider, setCurrentRider] = useState(() => {
+    try {
+      const savedRider = localStorage.getItem('currentRider');
+      return savedRider ? JSON.parse(savedRider) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  const loginRider = (riderData) => {
+    setCurrentRider(riderData);
+    localStorage.setItem('currentRider', JSON.stringify(riderData));
+  };
+
+  const logoutRider = () => {
+    setCurrentRider(null);
+    localStorage.removeItem('currentRider');
+    localStorage.removeItem('rememberRider');
+  };
+
+  // 3. หมุดที่อยู่ลูกค้า
   const [addresses, setAddresses] = useState([
     {
       id: 'addr-1',
@@ -72,11 +91,11 @@ export function AppProvider({ children }) {
 
   const [selectedAddressId, setSelectedAddressId] = useState('addr-1');
 
-  // 3. รายการออเดอร์ทั้งหมด (เชื่อมระหว่างหน้า Home, OrdersPage, OrderDetailPage)
+  // 4. รายการออเดอร์
   const [orders, setOrders] = useState([
     {
       id: 'NN-1024',
-      status: 'in_progress', // กำลังดำเนินการ
+      status: 'in_progress',
       statusStep: 5,
       statusTitle: 'กำลังซักอบ',
       estimatedTime: 'คาดว่าจะส่งคืน วันนี้ 18:00 น.',
@@ -99,7 +118,7 @@ export function AppProvider({ children }) {
     },
     {
       id: 'NN-739182',
-      status: 'completed', // เสร็จสิ้นแล้ว
+      status: 'completed',
       statusStep: 7,
       statusTitle: 'ส่งคืนผ้าสำเร็จ',
       serviceName: 'ชุดเครื่องนอน / ผ้านวม',
@@ -112,10 +131,7 @@ export function AppProvider({ children }) {
     }
   ]);
 
-  // ค้นหาออเดอร์ที่กำลังดำเนินการอยู่ (สำหรับนำไปแสดงหน้า Home)
   const activeOrder = orders.find(o => o.status === 'in_progress');
-
-  // ที่อยู่ที่เลือกไว้ปัจจุบัน
   const currentAddress = addresses.find(a => a.id === selectedAddressId) || addresses[0];
 
   return (
@@ -124,6 +140,9 @@ export function AppProvider({ children }) {
       setUserProfile,
       loginUser,
       logoutUser,
+      currentRider,
+      loginRider,
+      logoutRider,
       addresses,
       setAddresses,
       selectedAddressId,
