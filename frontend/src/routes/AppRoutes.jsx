@@ -37,11 +37,11 @@ const AppRoutes = () => {
       <Route path="/orders/:id" element={<OrderDetailPage />} />
       <Route path="/notifications" element={<NotificationsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+
       {/* Route ระบบพนักงานส่งผ้า (Rider) */}  
       <Route path="/login/rider" element={<RiderLoginPage />} />
       <Route path="/rider/tasks" element={<TaskPage />} />
       <Route path="/rider/tasks/:id" element={<TaskDetailPage />} />
-
 
       {/* Route ระบบ Admin */}  
       <Route path="/login/admin" element={<AdminLoginPage />} />

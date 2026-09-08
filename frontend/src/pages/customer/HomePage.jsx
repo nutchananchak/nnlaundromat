@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, 
@@ -16,7 +16,9 @@ import {
   ChevronRight,
   Plus,
   Check,
-  X
+  X,
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
@@ -27,6 +29,41 @@ export default function HomePage() {
   
   const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [selectedService, setSelectedService] = useState('wash_dry_fold');
+
+  // ดึงสถานะเปิด-ปิดร้าน และรายการวันหยุดที่ Admin ตั้งค่าไว้
+  const [isStoreOpen, setIsStoreOpen] = useState(true);
+  const [closedDates, setClosedDates] = useState([]);
+
+  useEffect(() => {
+    const savedStoreStatus = localStorage.getItem('storeServiceStatus');
+    if (savedStoreStatus !== null) {
+      setIsStoreOpen(JSON.parse(savedStoreStatus));
+    }
+
+    const savedClosedDates = localStorage.getItem('closedDates');
+    if (savedClosedDates) {
+      try {
+        setClosedDates(JSON.parse(savedClosedDates));
+      } catch (e) {
+        setClosedDates([]);
+      }
+    }
+  }, []);
+
+  // หาวันนี้ และวันพรุ่งนี้
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+  // ตรวจสอบเงื่อนไขวันหยุด
+  const isTodayClosed = closedDates.includes(todayStr);
+  const isTomorrowClosed = closedDates.includes(tomorrowStr);
+
+  // เงื่อนไขในการอนุญาตให้กดสั่งบริการ
+  const canBook = isStoreOpen && !isTodayClosed;
 
   // ดึงชื่อผู้ใช้ที่ล็อกอิน (รองรับทั้ง fullName และ name)
   const displayName = userProfile?.fullName || userProfile?.name || 'คุณลูกค้า';
@@ -48,6 +85,15 @@ export default function HomePage() {
   };
 
   const handleBookService = () => {
+    if (!isStoreOpen) {
+      alert('ขออภัย ขณะนี้ระบบปิดให้บริการชั่วคราว ไม่สามารถสร้างคำสั่งซื้อได้');
+      return;
+    }
+    if (isTodayClosed) {
+      alert('ขออภัย วันนี้เป็นวันหยุดประจำของทางร้าน งดให้บริการรับ-ส่งผ้า');
+      return;
+    }
+
     navigate('/order/new', {
       state: {
         service: selectedService,
@@ -90,7 +136,6 @@ export default function HomePage() {
           
           <div className="flex items-center justify-between">
             <div className="min-w-0 pr-2">
-              {/* ทักทายด้วยชื่อผู้ใช้งานจริง */}
               <p className="text-white/80 text-xs font-medium truncate">
                 สวัสดีคุณ, {displayName}
               </p>
@@ -115,7 +160,6 @@ export default function HomePage() {
                 )}
               </div>
               <div className="min-w-0">
-                {/* แสดงชื่อผู้ใช้งานตรงกับการล็อกอิน */}
                 <h2 className="font-bold text-xs text-white truncate leading-tight">
                   {displayName}
                 </h2>
@@ -134,6 +178,45 @@ export default function HomePage() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-5 py-5 pb-40 flex flex-col gap-5">
+
+          {/* แจ้งเตือน 1: กรณีร้านปิดให้บริการชั่วคราว (Master Switch) */}
+          {!isStoreOpen && (
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-3xl flex items-start gap-3 shadow-xs">
+              <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-red-800 block">ร้านปิดให้บริการชั่วคราว</span>
+                <span className="text-[11px] text-red-600 block mt-0.5 leading-normal">
+                  ขณะนี้ระบบปิดรับออเดอร์ใหม่ชั่วคราวตามประกาศของผู้ดูแลระบบ ขออภัยในความไม่สะดวก
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* แจ้งเตือน 2: กรณีวันนี้ตรงกับวันหยุดร้าน (งดรับออเดอร์วันนี้) */}
+          {isTodayClosed && isStoreOpen && (
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-3xl flex items-start gap-3 shadow-xs">
+              <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-red-800 block">วันนี้ร้านหยุดให้บริการ</span>
+                <span className="text-[11px] text-red-600 block mt-0.5 leading-normal">
+                  วันนี้ ({todayStr}) ร้านปิดให้บริการรับ-ส่งผ้าประจำวัน ขออภัยในความไม่สะดวก
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* แจ้งเตือน 3: เตือนล่วงหน้า 1 วัน (วันพรุ่งนี้ร้านหยุด) */}
+          {isTomorrowClosed && isStoreOpen && (
+            <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-3xl flex items-start gap-3 shadow-xs">
+              <Calendar size={18} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-amber-800 block">แจ้งเตือนวันหยุดบริการล่วงหน้า</span>
+                <span className="text-[11px] text-amber-700 block mt-0.5 leading-normal">
+                  วันพรุ่งนี้ ({tomorrowStr}) ร้านจะหยุดให้บริการรับ-ส่งผ้า 1 วัน ขอแนะนำให้สั่งซักและรับผ้าคืนภายในวันนี้ก่อนเวลา 22:00 น.
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* 1. ติดตามสถานะผ้า */}
           {activeOrder ? (
@@ -253,9 +336,18 @@ export default function HomePage() {
           <button
             type="button"
             onClick={handleBookService}
-            className="w-full py-3.5 rounded-2xl bg-[#1d61f2] text-white font-bold text-sm shadow-md shadow-blue-500/25 active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2 mt-1"
+            disabled={!canBook}
+            className={`w-full py-3.5 rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 mt-1 ${
+              canBook
+                ? 'bg-[#1d61f2] text-white shadow-blue-500/25 active:scale-[0.98] cursor-pointer'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+            }`}
           >
-            จองบริการนี้
+            {!isStoreOpen 
+              ? 'ร้านปิดให้บริการชั่วคราว' 
+              : isTodayClosed 
+              ? 'วันนี้เป็นวันหยุดของทางร้าน' 
+              : 'จองบริการนี้'}
           </button>
 
         </div>
