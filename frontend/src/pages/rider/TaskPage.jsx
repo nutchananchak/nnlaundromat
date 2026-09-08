@@ -30,7 +30,6 @@ const TaskPage = () => {
 
   useEffect(() => {
     if (!activeRider) {
-      // แก้เป็น /login/rider ให้ตรงกับ AppRoutes
       navigate('/login/rider', { replace: true });
     }
   }, [activeRider, navigate]);
@@ -43,7 +42,6 @@ const TaskPage = () => {
       localStorage.removeItem('currentRider');
       localStorage.removeItem('rememberRider');
       setActiveRider(null);
-      // แก้เป็น /login/rider ให้ตรงกับ AppRoutes
       navigate('/login/rider', { replace: true });
     }
   };
@@ -182,6 +180,7 @@ const TaskPage = () => {
         {/* เนื้อหารายการงาน */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
 
+          {/* แท็บ 1: งานใหม่ (Available) */}
           {activeTab === 'available' && (
             <>
               {availableOrders.length === 0 ? (
@@ -228,6 +227,7 @@ const TaskPage = () => {
             </>
           )}
 
+          {/* แท็บ 2: งานที่กำลังทำ (Active) */}
           {activeTab === 'active' && (
             <>
               {myActiveOrders.length === 0 ? (
@@ -268,6 +268,16 @@ const TaskPage = () => {
                       )}
                     </div>
 
+                    {/* ปุ่มเปิดหน้ารายละเอียดงานและแผนที่นำทาง GPS */}
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/rider/tasks/${order.id}`)}
+                      className="w-full py-2 bg-blue-50/60 hover:bg-blue-100/60 text-[#1d61f2] font-bold text-xs rounded-xl border border-blue-100 transition cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <FileText size={14} className="text-[#1d61f2]" /> ดูรายละเอียดและแผนที่นำทาง
+                    </button>
+
+                    {/* ปุ่มอัปเดตขั้นตอนงาน */}
                     {order.statusStep === 3 && (
                       <button
                         type="button"
@@ -303,6 +313,7 @@ const TaskPage = () => {
             </>
           )}
 
+          {/* แท็บ 3: สำเร็จแล้ว (History) */}
           {activeTab === 'history' && (
             <>
               {completedOrders.length === 0 ? (
@@ -312,13 +323,20 @@ const TaskPage = () => {
                 </div>
               ) : (
                 completedOrders.map(order => (
-                  <div key={order.id} className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
+                  <div 
+                    key={order.id} 
+                    onClick={() => navigate(`/rider/tasks/${order.id}`)}
+                    className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between cursor-pointer hover:border-blue-200 transition"
+                  >
                     <div className="space-y-0.5">
                       <span className="font-bold text-xs text-gray-800 block">#{order.id} - {order.serviceName}</span>
                       <span className="text-[11px] text-[#1d61f2] font-semibold block leading-normal">ส่งมอบสำเร็จแล้ว</span>
                       <span className="text-[10px] text-gray-400 block leading-normal">{order.customerName}</span>
                     </div>
-                    <CheckCircle2 size={22} className="text-[#1d61f2] shrink-0" />
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 size={20} className="text-[#1d61f2] shrink-0" />
+                      <ChevronRight size={16} className="text-gray-400" />
+                    </div>
                   </div>
                 ))
               )}

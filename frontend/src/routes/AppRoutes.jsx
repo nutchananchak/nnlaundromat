@@ -12,7 +12,10 @@ import NotificationsPage from '../pages/customer/NotificationsPage';
 import ProfilePage from '../pages/customer/ProfilePage';
 import RiderLoginPage from '../pages/auth/RiderLoginPage';
 import TaskPage from '../pages/rider/TaskPage';
+import TaskDetailPage from '../pages/rider/TaskDetailPage';
 import AdminLoginPage from '../pages/auth/AdminLoginPage';
+import DashboardPage from '../pages/admin/DashboardPage';
+
 
 
 const AppRoutes = () => {
@@ -37,10 +40,12 @@ const AppRoutes = () => {
       {/* Route ระบบพนักงานส่งผ้า (Rider) */}  
       <Route path="/login/rider" element={<RiderLoginPage />} />
       <Route path="/rider/tasks" element={<TaskPage />} />
+      <Route path="/rider/tasks/:id" element={<TaskDetailPage />} />
 
 
       {/* Route ระบบ Admin */}  
       <Route path="/login/admin" element={<AdminLoginPage />} />
+      <Route path="/admin/dashboard" element={<DashboardPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/login/customer" replace />} />
