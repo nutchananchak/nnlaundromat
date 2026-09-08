@@ -5,13 +5,14 @@ import Button from '../common/Button';
 
 const LoginForm = ({
   subtitle = "บริการรับ-ส่งผ้าถึงหน้าบ้านคุณ",
-  identifierLabel = "อีเมล / เบอร์โทรศัพท์",
-  identifierPlaceholder = "กรอกอีเมลหรือเบอร์โทรศัพท์",
+  identifierLabel = "เบอร์โทรศัพท์",
+  identifierPlaceholder = "กรอกเบอร์โทรศัพท์",
   identifierType = "text",
   buttonText = "เข้าสู่ระบบ",
   buttonVariant = "primary",
   forgotPasswordHref = null,
   onForgotPasswordClick = null,
+  customFooter = null,
   footerText = null,
   footerLinkText = null,
   footerLinkHref = null,
@@ -26,6 +27,8 @@ const LoginForm = ({
       onSubmit({ identifier, password });
     }
   };
+
+  const hasForgotPassword = Boolean(onForgotPasswordClick || forgotPasswordHref);
 
   return (
     <Card subtitle={subtitle}>
@@ -49,20 +52,30 @@ const LoginForm = ({
           autoComplete="current-password"
         />
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px', marginBottom: '24px' }}>
-          <a
-            href={forgotPasswordHref || '#'}
-            onClick={onForgotPasswordClick}
-            style={{ fontSize: '13.5px', color: '#1d61f2', textDecoration: 'none', fontWeight: '500', cursor: 'pointer' }}
-          >
-            ลืมรหัสผ่าน?
-          </a>
-        </div>
+        {/* แถบลิงก์ลืมรหัสผ่าน */}
+        {hasForgotPassword && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px', marginBottom: '24px' }}>
+            <a
+              href={forgotPasswordHref || '#'}
+              onClick={onForgotPasswordClick}
+              style={{ fontSize: '13.5px', color: '#1d61f2', textDecoration: 'none', fontWeight: '500', cursor: 'pointer' }}
+            >
+              ลืมรหัสผ่าน?
+            </a>
+          </div>
+        )}
 
+        {!hasForgotPassword && <div style={{ marginBottom: '20px' }} />}
+
+        {/* ปุ่ม Submit */}
         <Button type="submit" variant={buttonVariant}>
           {buttonText}
         </Button>
 
+        {/* ส่วนขยายใต้ปุ่ม เช่น แถบจดจำบัญชี */}
+        {customFooter}
+
+        {/* ฟุตเตอร์ลิงก์สมัครสมาชิกของลูกค้า (ถ้ามี) */}
         {footerText && (
           <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '24px', marginBottom: '0' }}>
             {footerText}
