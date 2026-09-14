@@ -68,7 +68,7 @@ const ForgotPasswordPage = () => {
   };
 
   return (
-    <Card subtitle="รีเซ็ตรหัสผ่าน (สำหรับลูกค้า)">
+    <Card subtitle="รีเซ็ตรหัสผ่าน">
       {/* กล่องแจ้งเตือน Error */}
       {errorMsg && (
         <div style={{
@@ -88,7 +88,7 @@ const ForgotPasswordPage = () => {
       {/* STEP 1: กรอกเบอร์มือถือ */}
       {step === 1 && (
         <form onSubmit={handleRequestOtp}>
-          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px', textAlign: 'left', lineHeight: '1.5' }}>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px', textAlign: 'center', lineHeight: '1.5' }}>
             กรุณากรอกเบอร์โทรศัพท์ที่ลงทะเบียนไว้ ระบบจะส่งรหัส OTP ทาง SMS เพื่อยืนยันตัวตน
           </p>
 
@@ -171,7 +171,7 @@ const ForgotPasswordPage = () => {
       {/* STEP 3: ตั้งรหัสผ่านใหม่ */}
       {step === 3 && (
         <form onSubmit={handleResetPassword}>
-          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px', textAlign: 'left' }}>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '20px', textAlign: 'center' }}>
             กรุณาตั้งรหัสผ่านใหม่สำหรับเข้าใช้งาน
           </p>
 

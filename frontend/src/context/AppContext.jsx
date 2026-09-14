@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const AppContext = createContext();
 
@@ -91,47 +91,45 @@ export function AppProvider({ children }) {
 
   const [selectedAddressId, setSelectedAddressId] = useState('addr-1');
 
-  // 4. รายการออเดอร์
-  const [orders, setOrders] = useState([
-    {
-      id: 'NN-1024',
-      status: 'in_progress',
-      statusStep: 5,
-      statusTitle: 'กำลังซักอบ',
-      estimatedTime: 'คาดว่าจะส่งคืน วันนี้ 18:00 น.',
-      serviceName: 'ซัก อบ พับ',
-      packageName: 'ไซส์ M',
-      price: 180,
-      createdAt: 'วันนี้ 10:30 น.',
-      pickupTime: '10:00 - 11:00 น.',
-      address: 'หอพักใจดี ห้อง 204 (ซอยอ่อนนุช 30)',
-      note: 'ผ้าสีแยกถุงไว้ให้แล้วค่ะ',
-      stepsHistory: [
-        { title: 'สั่งบริการเรียบร้อย', time: '10:30 น.', done: true },
-        { title: 'ตรวจสอบยอดเงิน', time: '10:35 น.', done: true },
-        { title: 'ไรเดอร์รับงาน', time: '10:45 น.', done: true },
-        { title: 'รับผ้าเข้าสู่ร้าน', time: '11:15 น.', done: true },
-        { title: 'กำลังดำเนินการซัก-อบ', time: '11:30 น.', done: true, current: true },
-        { title: 'ไรเดอร์นำส่งคืน', time: 'รอเวลา 17:30 น.', done: false },
-        { title: 'ส่งมอบผ้าสำเร็จ', time: 'รอเวลา 18:00 น.', done: false },
-      ]
-    },
-    {
-      id: 'NN-739182',
-      status: 'completed',
-      statusStep: 7,
-      statusTitle: 'ส่งคืนผ้าสำเร็จ',
-      serviceName: 'ชุดเครื่องนอน / ผ้านวม',
-      packageName: 'ไซส์ 5 ฟุต',
-      price: 230,
-      createdAt: '28 ส.ค. 2026',
-      pickupTime: '14:00 - 15:00 น.',
-      address: 'หอพักใจดี ห้อง 204 (ซอยอ่อนนุช 30)',
-      note: 'ผ้านวมสีฟ้า',
+  // 4. รายการออเดอร์ (ดึงจาก localStorage ก่อน ถ้าไม่มีให้ใช้รายการที่ส่งเสร็จแล้วเท่านั้น)
+  const [orders, setOrders] = useState(() => {
+    try {
+      const savedOrders = localStorage.getItem('orders');
+      if (savedOrders) {
+        return JSON.parse(savedOrders);
+      }
+    } catch (e) {
+      // JSON parse error handling
     }
-  ]);
+    // ค่าเริ่มต้น: มีเฉพาะออเดอร์เก่าที่สำเร็จแล้ว (status: 'completed', statusStep: 7)
+    return [
+      {
+        id: 'NN-739182',
+        status: 'completed',
+        statusStep: 7,
+        statusTitle: 'ส่งคืนผ้าสำเร็จ',
+        serviceName: 'ชุดเครื่องนอน / ผ้านวม',
+        packageName: 'ไซส์ 5 ฟุต',
+        price: 230,
+        createdAt: '28 ส.ค. 2026',
+        pickupTime: '14:00 - 15:00 น.',
+        address: 'หอพักใจดี ห้อง 204 (ซอยอ่อนนุช 30)',
+        note: 'ผ้านวมสีฟ้า',
+      }
+    ];
+  });
 
-  const activeOrder = orders.find(o => o.status === 'in_progress');
+  // ซิงค์ orders ลง localStorage เมื่อมีการเปลี่ยนแปลง
+  useEffect(() => {
+    try {
+      localStorage.setItem('orders', JSON.stringify(orders));
+    } catch (e) {
+      // Storage error handling
+    }
+  }, [orders]);
+
+  // หาออเดอร์ที่กำลังดำเนินงานจริง (ยังไม่เสร็จ)
+  const activeOrder = orders.find(o => o.status === 'in_progress' || (o.statusStep >= 1 && o.statusStep < 7));
   const currentAddress = addresses.find(a => a.id === selectedAddressId) || addresses[0];
 
   return (

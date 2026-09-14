@@ -19,9 +19,9 @@ export default function NewOrderPage() {
     { id: '5ft', name: 'ไซส์ 5 ฟุต', price: 230, desc: 'สำหรับที่นอนขนาด 5 ฟุต' },
     { id: '6ft', name: 'ไซส์ 6 ฟุต', price: 250, desc: 'สำหรับที่นอนขนาด 6 ฟุต' },
   ] : [
-    { id: 'S', name: 'ไซส์ S', price: 160, desc: 'ผ้าไม่เกิน 15 ชิ้น' },
-    { id: 'M', name: 'ไซส์ M', price: 180, desc: 'ผ้าไม่เกิน 35 ชิ้น' },
-    { id: 'L', name: 'ไซส์ L', price: 240, desc: 'ผ้าไม่เกิน 65 ชิ้น' },
+    { id: 'S', name: 'ตะกร้า S', price: 160, desc: 'ผ้าไม่เกิน 15 ชิ้น' },
+    { id: 'M', name: 'ตะกร้า M', price: 180, desc: 'ผ้าไม่เกิน 35 ชิ้น' },
+    { id: 'L', name: 'ตะกร้า L', price: 240, desc: 'ผ้าไม่เกิน 65 ชิ้น' },
   ];
 
   const initialPkgId = serviceType === 'bedding'
@@ -38,15 +38,15 @@ export default function NewOrderPage() {
 
   // รายการตัวเลือกพิเศษแยกตามประเภทบริการ
   const washDrySpecialOptions = [
-    { id: 'silk', name: 'ผ้าไหม', price: 150, unit: 'ตัว' },
-    { id: 'leather', name: 'เสื้อหนัง', price: 200, unit: 'ตัว' },
-    { id: 'fur', name: 'ขนสัตว์', price: 200, unit: 'ตัว' },
-    { id: 'evening_dress', name: 'ชุดราตรี', price: 200, unit: 'ตัว' },
-    { id: 'suit', name: 'สูท (เฉพาะเสื้อ)', price: 150, unit: 'ตัว' },
-    { id: 'suit', name: 'สูท (เสื้อและกางเกง)', price: 200, unit: 'ชุด' },
-    { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 200, unit: 'ตัว' },
-    { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 200, unit: 'ตัว' },
-    { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "Dry Clean Only"', price: 250, unit: 'ตัว' },
+    { id: 'silk', name: 'ผ้าไหม', price: 100, unit: 'ตัว' },
+    { id: 'leather', name: 'เสื้อหนัง', price: 80, unit: 'ตัว' },
+    { id: 'fur', name: 'ขนสัตว์', price: 100, unit: 'ตัว' },
+    { id: 'evening_dress', name: 'ชุดราตรี', price: 150, unit: 'ตัว' },
+    { id: 'suit', name: 'สูท (เฉพาะเสื้อ)', price: 100, unit: 'ตัว' },
+    { id: 'suit', name: 'สูท (เสื้อและกางเกง)', price: 150, unit: 'ชุด' },
+    { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 100, unit: 'ตัว' },
+    { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 80, unit: 'ตัว' },
+    { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "Dry Clean Only"', price: 120, unit: 'ตัว' },
   ];
 
   const beddingSpecialOptions = [

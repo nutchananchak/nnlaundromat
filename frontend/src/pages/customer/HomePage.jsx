@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  User, 
   MapPin, 
   ChevronDown, 
   Layers, 
@@ -13,12 +12,18 @@ import {
   Sparkles, 
   Truck, 
   CheckCircle2, 
-  ChevronRight,
-  Plus,
-  Check,
-  X,
-  AlertTriangle,
-  Calendar
+  ChevronRight, 
+  Plus, 
+  Check, 
+  X, 
+  AlertTriangle, 
+  Calendar,
+  Bell,
+  LogOut,
+  PackageCheck,
+  Flame,
+  BadgeCheck,
+  Star
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
@@ -33,6 +38,17 @@ export default function HomePage() {
   // ดึงสถานะเปิด-ปิดร้าน และรายการวันหยุดที่ Admin ตั้งค่าไว้
   const [isStoreOpen, setIsStoreOpen] = useState(true);
   const [closedDates, setClosedDates] = useState([]);
+
+  // State สำหรับแบนเนอร์สลับหมุนเวียนอัตโนมัติทุก 30 วินาที (Index 0, 1, 2)
+  const [bannerIndex, setBannerIndex] = useState(0);
+
+  // ตรวจสอบว่ามีออเดอร์ที่กำลังดำเนินงานอยู่จริงหรือไม่ (1-6 ถือว่ากำลังทำ, 7 จบแล้ว)
+  const hasOngoingOrder = Boolean(
+    activeOrder && 
+    Number(activeOrder.statusStep) >= 1 && 
+    Number(activeOrder.statusStep) < 7 &&
+    !activeOrder.isCompleted
+  );
 
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
@@ -50,7 +66,17 @@ export default function HomePage() {
     }
   }, []);
 
-  // หาวันนี้ และวันพรุ่งนี้
+  // Timer สลับแบนเนอร์ทุก 30 วินาที (ทำงานเฉพาะตอนที่ไม่มีออเดอร์ค้าง)
+  useEffect(() => {
+    if (hasOngoingOrder) return;
+
+    const timer = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % 3);
+    }, 30000); 
+
+    return () => clearInterval(timer);
+  }, [hasOngoingOrder]);
+
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
 
@@ -58,14 +84,10 @@ export default function HomePage() {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
-  // ตรวจสอบเงื่อนไขวันหยุด
   const isTodayClosed = closedDates.includes(todayStr);
   const isTomorrowClosed = closedDates.includes(tomorrowStr);
-
-  // เงื่อนไขในการอนุญาตให้กดสั่งบริการ
   const canBook = isStoreOpen && !isTodayClosed;
 
-  // ดึงชื่อผู้ใช้ที่ล็อกอิน (รองรับทั้ง fullName และ name)
   const displayName = userProfile?.fullName || userProfile?.name || 'คุณลูกค้า';
 
   const steps = [
@@ -102,6 +124,14 @@ export default function HomePage() {
     });
   };
 
+  const handleLogout = () => {
+    if (window.confirm('คุณต้องการออกจากระบบหรือไม่?')) {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('userProfile');
+      navigate('/login/customer', { replace: true });
+    }
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -124,132 +154,151 @@ export default function HomePage() {
         position: 'relative',
         overflowX: 'hidden',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-      }} className="font-body">
+      }} className="font-body text-base">
 
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
-          color: '#ffffff',
-          boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
-          flexShrink: 0
-        }} className="rounded-b-3xl px-5 pt-6 pb-6 z-20 flex flex-col gap-3">
-          
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 pr-2">
-              <p className="text-white/80 text-xs font-medium truncate">
-                สวัสดีคุณ, {displayName}
-              </p>
-              <h1 className="font-display font-bold text-white text-lg tracking-tight">N&amp;N Laundromat</h1>
-            </div>
-            <span className="text-[10px] bg-white/20 text-white font-bold px-2.5 py-1 rounded-full border border-white/30 backdrop-blur-sm shrink-0">
-              เปิดบริการ 08:00 - 22:00 น.
-            </span>
-          </div>
-
-          {/* สลับที่อยู่จากส่วนกลาง */}
+        <div 
+          style={{
+            background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
+            boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
+          }}
+          className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
+        >
+          {/* หมุดเลือกที่อยู่ */}
           <div 
             onClick={() => setShowAddressPicker(true)}
-            className="bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20 flex items-center justify-between cursor-pointer hover:bg-white/20 transition active:scale-[0.99]"
+            className="flex items-center gap-2.5 cursor-pointer max-w-[270px] group"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-white/20 border border-white/40 flex items-center justify-center shrink-0">
-                {userProfile?.avatar ? (
-                  <img src={userProfile.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <User size={20} className="text-white" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <h2 className="font-bold text-xs text-white truncate leading-tight">
-                  {displayName}
-                </h2>
-                <div className="flex items-center gap-1 mt-0.5 text-white/80">
-                  <MapPin size={11} className="shrink-0 text-white" />
-                  <span className="text-[11px] font-medium truncate max-w-[210px]">
-                    {currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : 'ยังไม่ได้ระบุที่อยู่'}
-                  </span>
-                </div>
+            <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/30 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <MapPin size={20} />
+            </div>
+            <div className="min-w-0">
+              <span className="text-xs text-blue-200 font-bold tracking-wide uppercase block leading-none">
+                ส่งผ้าที่
+              </span>
+              <div className="flex items-center gap-1 mt-1">
+                <span className="text-sm font-bold text-white truncate">
+                  {currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : 'เลือกสถานที่รับ-ส่งผ้า'}
+                </span>
+                <ChevronDown size={16} className="text-blue-200 group-hover:text-white transition shrink-0" />
               </div>
             </div>
+          </div>
 
-            <ChevronDown size={16} className="text-white/80 shrink-0 ml-2" />
+          {/* ปุ่มแจ้งเตือน & ล็อกเอาท์ */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/notifications')}
+              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+              title="การแจ้งเตือน"
+            >
+              <Bell size={18} />
+            </button>
+            <button 
+              type="button"
+              onClick={handleLogout}
+              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-red-500/90 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+              title="ออกจากระบบ"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 pb-40 flex flex-col gap-5">
+        {/* 2. Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 pb-40 flex flex-col gap-4">
 
-          {/* แจ้งเตือน 1: กรณีร้านปิดให้บริการชั่วคราว (Master Switch) */}
-          {!isStoreOpen && (
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-3xl flex items-start gap-3 shadow-xs">
-              <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="text-xs font-bold text-red-800 block">ร้านปิดให้บริการชั่วคราว</span>
-                <span className="text-[11px] text-red-600 block mt-0.5 leading-normal">
-                  ขณะนี้ระบบปิดรับออเดอร์ใหม่ชั่วคราวตามประกาศของผู้ดูแลระบบ ขออภัยในความไม่สะดวก
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* แจ้งเตือน 2: กรณีวันนี้ตรงกับวันหยุดร้าน (งดรับออเดอร์วันนี้) */}
-          {isTodayClosed && isStoreOpen && (
-            <div className="p-3.5 bg-red-50 border border-red-200 rounded-3xl flex items-start gap-3 shadow-xs">
-              <AlertTriangle size={18} className="text-red-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="text-xs font-bold text-red-800 block">วันนี้ร้านหยุดให้บริการ</span>
-                <span className="text-[11px] text-red-600 block mt-0.5 leading-normal">
-                  วันนี้ ({todayStr}) ร้านปิดให้บริการรับ-ส่งผ้าประจำวัน ขออภัยในความไม่สะดวก
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* แจ้งเตือน 3: เตือนล่วงหน้า 1 วัน (วันพรุ่งนี้ร้านหยุด) */}
-          {isTomorrowClosed && isStoreOpen && (
-            <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-3xl flex items-start gap-3 shadow-xs">
-              <Calendar size={18} className="text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="text-xs font-bold text-amber-800 block">แจ้งเตือนวันหยุดบริการล่วงหน้า</span>
-                <span className="text-[11px] text-amber-700 block mt-0.5 leading-normal">
-                  วันพรุ่งนี้ ({tomorrowStr}) ร้านจะหยุดให้บริการรับ-ส่งผ้า 1 วัน ขอแนะนำให้สั่งซักและรับผ้าคืนภายในวันนี้ก่อนเวลา 22:00 น.
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* 1. ติดตามสถานะผ้า */}
-          {activeOrder ? (
+          {/* การ์ดทักทาย & เวลาบริการ */}
+          <div className="bg-gradient-to-br from-[#1d61f2] to-[#1447b8] rounded-3xl p-5 text-white shadow-lg shadow-blue-600/15 flex items-center justify-between">
             <div>
-              <div className="flex items-center justify-between mb-2.5">
-                <h2 className="font-bold text-base text-gray-900">ติดตามสถานะผ้า</h2>
-                <span className="text-xs font-bold text-[#1d61f2] bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
-                  ออเดอร์ #{activeOrder.id}
+              <span className="text-xs text-blue-200 font-medium block">ยินดีต้อนรับ</span>
+              <h2 className="text-xl font-bold text-white tracking-tight mt-0.5">
+                คุณ {displayName}
+              </h2>
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-sm text-xs text-blue-100 font-bold mt-2.5">
+                <Clock size={14} className="text-sky-300" />
+                บริการรับ-ส่งผ้าในวันเดียว เวลา 08:00 - 22:00 น.
+              </span>
+            </div>
+            <div className="w-13 h-13 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 ml-2 shadow-xs">
+              <Sparkles size={28} className="text-blue-100" />
+            </div>
+          </div>
+
+          {/* แจ้งเตือนร้านปิดชั่วคราว */}
+          {!isStoreOpen && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 shadow-xs">
+              <AlertTriangle size={22} className="text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-sm font-bold text-red-800 block">ร้านปิดให้บริการชั่วคราว</span>
+                <span className="text-xs text-red-600 block mt-1 leading-relaxed">
+                  ขณะนี้ระบบปิดรับออเดอร์ใหม่ชั่วคราว ขออภัยในความไม่สะดวก
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* แจ้งเตือนวันนี้เป็นวันหยุด */}
+          {isTodayClosed && isStoreOpen && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 shadow-xs">
+              <AlertTriangle size={22} className="text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-sm font-bold text-red-800 block">วันนี้ร้านหยุดให้บริการ</span>
+                <span className="text-xs text-red-600 block mt-1 leading-relaxed">
+                  วันนี้ ({todayStr}) ปิดให้บริการเนื่องจากวันหยุดนักขัตฤกษ์ ขออภัยในความไม่สะดวก
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* แจ้งเตือนล่วงหน้า 1 วัน */}
+          {isTomorrowClosed && isStoreOpen && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 shadow-xs">
+              <Calendar size={22} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-sm font-bold text-amber-800 block">แจ้งเตือนวันหยุดบริการล่วงหน้า</span>
+                <span className="text-xs text-amber-700 block mt-1 leading-relaxed">
+                  วันพรุ่งนี้ ({tomorrowStr}) ร้านจะหยุดให้บริการ 1 วัน โปรดสั่งซักและรับผ้าคืนภายในวันนี้ก่อน 22:00 น.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* ส่วนสลับ: มีออเดอร์ที่กำลังดำเนินงาน (1-6) -> โชว์ติดตามสถานะผ้า              */}
+          {/*          ยังไม่มีออเดอร์ / งานจบแล้ว (7) -> โชว์ Smart Banner สลับทุก 30 วินาที   */}
+          {/* ========================================================================= */}
+          {hasOngoingOrder ? (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-bold text-base text-slate-800">ติดตามสถานะผ้า</span>
+                <span className="text-xs font-bold text-[#1d61f2] bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                  #{activeOrder.id}
                 </span>
               </div>
 
               <div
                 onClick={handleViewOrderStatus}
-                className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm hover:border-blue-300 hover:shadow-md transition-all active:scale-[0.98] cursor-pointer flex flex-col gap-3 group"
+                className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs hover:border-blue-200 transition cursor-pointer flex flex-col gap-3.5"
               >
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1.5">
-                    <h3 className="font-extrabold text-base text-[#1d61f2] group-hover:underline">
+                    <h3 className="font-bold text-base text-[#1d61f2]">
                       {activeOrder.statusTitle}
                     </h3>
-                    <ChevronRight size={16} className="text-[#1d61f2] group-hover:translate-x-0.5 transition" />
+                    <ChevronRight size={18} className="text-[#1d61f2]" />
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-0.5 font-medium">
+                  <span className="text-xs text-slate-500 block mt-1 font-medium">
                     ขั้นตอนที่ {activeOrder.statusStep} จาก {steps.length} • {activeOrder.estimatedTime}
-                  </p>
+                  </span>
                 </div>
 
                 <div className="flex items-start justify-between relative mt-2 px-1">
-                  <div className="absolute top-4 left-4 right-4 h-0.5 bg-gray-100 -z-0">
+                  <div className="absolute top-4 left-4 right-4 h-1 bg-slate-100 -z-0">
                     <div 
                       className="h-full bg-[#1d61f2] transition-all duration-500"
                       style={{ width: `${((activeOrder.statusStep - 1) / (steps.length - 1)) * 100}%` }}
-                    ></div>
+                    />
                   </div>
 
                   {steps.map((item) => {
@@ -258,20 +307,20 @@ export default function HomePage() {
                     const isCurrent = item.step === activeOrder.statusStep;
 
                     return (
-                      <div key={item.step} className="flex flex-col items-center z-10 w-8 text-center">
+                      <div key={item.step} className="flex flex-col items-center z-10 w-9 text-center">
                         <div 
-                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                             isCurrent
                               ? 'bg-[#1d61f2] text-white ring-4 ring-blue-100 scale-110 shadow-sm'
                               : isPassed
                               ? 'bg-[#1d61f2] text-white'
-                              : 'bg-white text-gray-300 border border-gray-200'
+                              : 'bg-white text-slate-400 border border-slate-200'
                           }`}
                         >
-                          <Icon size={13} />
+                          <Icon size={14} />
                         </div>
-                        <span className={`text-[7.5px] mt-1 leading-tight font-medium ${
-                          isCurrent ? 'text-[#1d61f2] font-bold' : isPassed ? 'text-gray-700' : 'text-gray-400'
+                        <span className={`text-[9px] mt-1.5 font-bold ${
+                          isCurrent ? 'text-[#1d61f2]' : isPassed ? 'text-slate-700' : 'text-slate-400'
                         }`}>
                           {item.label}
                         </span>
@@ -282,65 +331,187 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white p-4 rounded-3xl border border-gray-100 text-center py-6 shadow-sm">
-              <Sparkles size={28} className="text-[#1d61f2] mx-auto mb-2" />
-              <p className="text-xs font-bold text-gray-800">ไม่มีผ้าที่กำลังดำเนินการในขณะนี้</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">เลือกแพ็กเกจบริการด้านล่างเพื่อส่งซักได้เลย</p>
+            /* แบนเนอร์สลับหมุนเวียน 3 หน้า - ปรับ Padding พอดีจอ ไม่แหว่ง */
+            <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
+              
+              {/* หน้าที่ 1: ขั้นตอนส่งผ้าง่ายๆ ใน 3 ขั้นตอน */}
+              {bannerIndex === 0 && (
+                <div className="w-full">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
+                      <Sparkles size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-800 leading-tight">ใช้บริการง่ายๆ ใน 3 ขั้นตอน</h3>
+                      <span className="text-[11px] text-slate-400 font-medium">สะดวก รวดเร็ว ไม่ต้องเดินทาง</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center w-full">
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-blue-50/60 border border-blue-100/60">
+                      <div className="w-7 h-7 rounded-lg bg-white shadow-xs text-[#1d61f2] flex items-center justify-center font-black text-xs mb-1">
+                        1
+                      </div>
+                      <span className="font-bold text-xs text-slate-800">จองบริการ</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">เลือกบริการ</span>
+                    </div>
+
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-blue-50/60 border border-blue-100/60">
+                      <div className="w-7 h-7 rounded-lg bg-white shadow-xs text-[#1d61f2] flex items-center justify-center font-black text-xs mb-1">
+                        2
+                      </div>
+                      <span className="font-bold text-xs text-slate-800">ไรเดอร์รับ</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">ถึงหน้าที่พัก</span>
+                    </div>
+
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-blue-50/60 border border-blue-100/60">
+                      <div className="w-7 h-7 rounded-lg bg-white shadow-xs text-[#1d61f2] flex items-center justify-center font-black text-xs mb-1">
+                        3
+                      </div>
+                      <span className="font-bold text-xs text-slate-800">รับผ้าสะอาด</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">พับหอมพร้อมใส่</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* หน้าที่ 2: มาตรฐานสุขอนามัยและความสะอาด ไม่ซักปนกับใคร */}
+              {bannerIndex === 1 && (
+                <div className="w-full">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-800 leading-tight">มาตรฐานความสะอาดสูงสุด</h3>
+                      <span className="text-[11px] text-slate-400 font-medium">มั่นใจได้ทุกครั้งที่ส่งซักกับ N&amp;N Laundromat</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center w-full">
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-emerald-50/60 border border-emerald-100/60">
+                      <PackageCheck size={20} className="text-emerald-600 mb-1" />
+                      <span className="font-bold text-xs text-slate-800">1 ตู้ ต่อ 1 คน</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">ไม่ซักปนใคร</span>
+                    </div>
+
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-emerald-50/60 border border-emerald-100/60">
+                      <Flame size={20} className="text-emerald-600 mb-1" />
+                      <span className="font-bold text-xs text-slate-800">อบฆ่าเชื้อ</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">กำจัดไรฝุ่น</span>
+                    </div>
+
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-emerald-50/60 border border-emerald-100/60">
+                      <BadgeCheck size={20} className="text-emerald-600 mb-1" />
+                      <span className="font-bold text-xs text-slate-800">พับแพ็กดี</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">ถุงกันฝุ่น</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* หน้าที่ 3: รับประกันส่งคืนวันเดียวกัน & ส่งรวดเร็ว */}
+              {bannerIndex === 2 && (
+                <div className="w-full">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                      <Truck size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-800 leading-tight">Same-Day Delivery</h3>
+                      <span className="text-[11px] text-slate-400 font-medium">ส่งคืนผ้าสะอาดภายในวันเดียว</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-purple-50/60 border border-purple-100/70 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-white text-purple-600 flex items-center justify-center shadow-xs shrink-0">
+                        <Clock size={18} />
+                      </div>
+                        <div className="min-w-0 pr-1">
+                        <span className="text-xs font-bold text-slate-800 block">สั่งซักวันนี้ รับคืนวันนี้ทันที</span>
+                        <span className="text-[10.5px] text-slate-500 block mt-0.5">ไม่ต้องรอนานหลายวัน ผ้าแห้งสนิท</span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-purple-700 bg-white px-2 py-1 rounded-lg shadow-2xs shrink-0">
+                      วันเดียวจบ
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* จุด Dot Indicators แสดงสถานะสไลด์ & กดเลือกดูได้ */}
+              <div className="flex items-center justify-center gap-1.5 pt-2.5 mt-2 border-t border-slate-100">
+                {[0, 1, 2].map((idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setBannerIndex(idx)}
+                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                      bannerIndex === idx ? 'w-6 bg-[#1d61f2]' : 'w-2 bg-slate-200 hover:bg-slate-300'
+                    }`}
+                    title={`ไปที่ข้อมูลหน้า ${idx + 1}`}
+                  />
+                ))}
+              </div>
+
             </div>
           )}
 
-          {/* 2. เลือกบริการใหม่ */}
+          {/* เลือกแพ็กเกจบริการ */}
           <div>
-            <h2 className="font-bold text-base text-gray-900 mb-2.5">เลือกบริการใหม่</h2>
+            <span className="font-bold text-base text-slate-800 block mb-3">เลือกแพ็กเกจบริการ</span>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3.5">
               <div
                 onClick={() => setSelectedService('wash_dry_fold')}
-                className={`p-4 rounded-3xl border flex flex-col items-center justify-center text-center cursor-pointer transition relative ${
+                className={`p-5 rounded-3xl border flex flex-col items-center justify-center text-center cursor-pointer transition relative ${
                   selectedService === 'wash_dry_fold'
-                    ? 'bg-blue-50/60 border-[#1d61f2] shadow-sm ring-1 ring-[#1d61f2]'
-                    : 'bg-white border-gray-100 hover:border-blue-200'
+                    ? 'bg-blue-50/70 border-[#1d61f2] shadow-sm'
+                    : 'bg-white border-slate-100 hover:border-slate-200'
                 }`}
               >
-                <div className="absolute -top-2.5 right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
-                  ยอดฮิต
+                <div className="absolute -top-2.5 right-3 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                  <Star size={11} className="fill-amber-200 text-amber-200" />
+                  <span>ยอดฮิต</span>
                 </div>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${
+                <div className={`w-13 h-13 rounded-2xl flex items-center justify-center mb-2.5 ${
                   selectedService === 'wash_dry_fold' ? 'bg-[#1d61f2] text-white' : 'bg-blue-50 text-[#1d61f2]'
                 }`}>
-                  <Layers size={24} />
+                  <Layers size={26} />
                 </div>
-                <span className="font-bold text-xs text-gray-900">ซัก อบ พับ</span>
-                <span className="text-[10px] text-gray-500 mt-0.5">เริ่มต้น 160฿</span>
+                <span className="font-bold text-sm text-slate-900">ซัก อบ พับ</span>
+                <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 160฿</span>
               </div>
 
               <div
                 onClick={() => setSelectedService('bedding')}
-                className={`p-4 rounded-3xl border flex flex-col items-center justify-center text-center cursor-pointer transition relative ${
+                className={`p-5 rounded-3xl border flex flex-col items-center justify-center text-center cursor-pointer transition relative ${
                   selectedService === 'bedding'
-                    ? 'bg-blue-50/60 border-[#1d61f2] shadow-sm ring-1 ring-[#1d61f2]'
-                    : 'bg-white border-gray-100 hover:border-blue-200'
+                    ? 'bg-blue-50/70 border-[#1d61f2] shadow-sm'
+                    : 'bg-white border-slate-100 hover:border-slate-200'
                 }`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 ${
+                <div className={`w-13 h-13 rounded-2xl flex items-center justify-center mb-2.5 ${
                   selectedService === 'bedding' ? 'bg-[#1d61f2] text-white' : 'bg-blue-50 text-[#1d61f2]'
                 }`}>
-                  <BedDouble size={24} />
+                  <BedDouble size={26} />
                 </div>
-                <span className="font-bold text-xs text-gray-900">ชุดเครื่องนอน/ผ้านวม</span>
-                <span className="text-[10px] text-gray-500 mt-0.5">เริ่มต้น 200฿</span>
+                <span className="font-bold text-sm text-slate-900">ชุดเครื่องนอน/ผ้านวม</span>
+                <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 200฿</span>
               </div>
             </div>
           </div>
 
+          {/* ปุ่มจองบริการ */}
           <button
             type="button"
             onClick={handleBookService}
             disabled={!canBook}
-            className={`w-full py-3.5 rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 mt-1 ${
+            className={`w-full py-4 rounded-2xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer ${
               canBook
-                ? 'bg-[#1d61f2] text-white shadow-blue-500/25 active:scale-[0.98] cursor-pointer'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                ? 'bg-[#1d61f2] text-white hover:bg-blue-700 active:scale-[0.99] shadow-blue-500/20'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
             }`}
           >
             {!isStoreOpen 
@@ -354,20 +525,19 @@ export default function HomePage() {
 
         {/* Modal เลือกที่อยู่ */}
         {showAddressPicker && (
-          <div className="absolute inset-0 bg-black/50 z-50 flex items-end justify-center backdrop-blur-sm">
+          <div className="absolute inset-0 bg-slate-900/50 z-50 flex items-end justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
-              
-              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <MapPin size={18} className="text-[#1d61f2]" />
-                  <h3 className="font-bold text-sm text-gray-900">เลือกที่อยู่สำหรับรับ-ส่งผ้า</h3>
+                  <span className="font-bold text-base text-slate-800">เลือกสถานที่รับ-ส่งผ้า</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowAddressPicker(false)}
-                  className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200"
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               </div>
 
@@ -381,19 +551,19 @@ export default function HomePage() {
                         setSelectedAddressId(addr.id);
                         setShowAddressPicker(false);
                       }}
-                      className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
+                      className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
                         isSelected
                           ? 'bg-blue-50/70 border-[#1d61f2]'
-                          : 'bg-white border-gray-100 hover:border-blue-100'
+                          : 'bg-white border-slate-100 hover:border-slate-200'
                       }`}
                     >
                       <div className="min-w-0 pr-3">
-                        <span className="font-bold text-xs text-gray-900 block">{addr.title}</span>
-                        <span className="text-[11px] text-gray-500 truncate block mt-0.5">{addr.detail}</span>
+                        <span className="font-bold text-sm text-slate-800 block">{addr.title}</span>
+                        <span className="text-xs text-slate-500 truncate block mt-1">{addr.detail}</span>
                       </div>
                       {isSelected && (
-                        <div className="w-5 h-5 rounded-full bg-[#1d61f2] text-white flex items-center justify-center shrink-0">
-                          <Check size={12} />
+                        <div className="w-6 h-6 rounded-full bg-[#1d61f2] text-white flex items-center justify-center shrink-0">
+                          <Check size={14} />
                         </div>
                       )}
                     </div>
@@ -407,9 +577,9 @@ export default function HomePage() {
                   setShowAddressPicker(false);
                   navigate('/profile');
                 }}
-                className="w-full py-2.5 rounded-xl border border-dashed border-gray-300 text-gray-600 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-gray-50 transition"
+                className="w-full py-3 rounded-xl border border-dashed border-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 transition cursor-pointer"
               >
-                <Plus size={14} /> จัดการ / เพิ่มหมุดที่อยู่ใหม่ในโปรไฟล์
+                <Plus size={16} /> จัดการ / เพิ่มหมุดที่อยู่ใหม่ในโปรไฟล์
               </button>
             </div>
           </div>
