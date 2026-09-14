@@ -9,8 +9,8 @@ import {
   CheckCircle2, 
   Clock, 
   FileText, 
-  Image as ImageIcon,
-  Trash2
+  Trash2,
+  Truck
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -20,7 +20,6 @@ const TaskDetailPage = () => {
   const { orders, setOrders } = useApp ? useApp() : {};
   const fileInputRef = useRef(null);
 
-  // Authentication Guard
   const [activeRider] = useState(() => {
     try {
       const saved = localStorage.getItem('currentRider');
@@ -63,7 +62,6 @@ const TaskDetailPage = () => {
     );
   }
 
-  // ฟังก์ชันเปิด Google Maps นำทาง
   const handleOpenGoogleMaps = () => {
     let mapsUrl = '';
     if (order.lat && order.lng) {
@@ -74,7 +72,6 @@ const TaskDetailPage = () => {
     window.open(mapsUrl, '_blank');
   };
 
-  // จัดการอัปโหลดหรือถ่ายรูปหลักฐาน
   const handleImageCapture = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -93,7 +90,6 @@ const TaskDetailPage = () => {
     }
   };
 
-  // ดำเนินการขั้นตอนถัดไปพร้อมบันทึกรูปหลักฐาน
   const handleAdvanceStep = (nextStep, nextTitle) => {
     if (!setOrders) return;
     setOrders((prev) =>
@@ -158,9 +154,8 @@ const TaskDetailPage = () => {
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 pb-24">
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 pb-28">
           
-          {/* สถานะปัจจุบัน */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
             <div>
               <span className="text-[11px] text-gray-400 block font-medium">สถานะออเดอร์</span>
@@ -173,7 +168,6 @@ const TaskDetailPage = () => {
             </span>
           </div>
 
-          {/* ข้อมูลลูกค้าและปุ่มโทร */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
               <div>
@@ -185,7 +179,7 @@ const TaskDetailPage = () => {
               {order.customerPhone && (
                 <a
                   href={`tel:${order.customerPhone}`}
-                  className="flex items-center gap-1.5 bg-blue-50 text-[#1d61f2] px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-blue-100 transition no-underline"
+                  className="flex items-center gap-1.5 bg-blue-50 text-[#1d61f2] px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-blue-100"
                 >
                   <Phone size={13} /> โทรออก
                 </a>
@@ -197,13 +191,12 @@ const TaskDetailPage = () => {
               <span>เวลานัดรับผ้า: {order.pickupTime || '-'}</span>
             </div>
             {order.note && (
-              <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100 leading-normal">
+              <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100">
                 <span className="font-bold">หมายเหตุลูกค้า: </span>{order.note}
               </div>
             )}
           </div>
 
-          {/* แผนที่และปุ่มนำทาง GPS (Google Maps) */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <span className="text-xs font-bold text-gray-800">สถานที่รับ-ส่งผ้า</span>
             <div className="flex items-start gap-2 text-xs text-gray-600">
@@ -221,10 +214,10 @@ const TaskDetailPage = () => {
             </button>
           </div>
 
-          {/* แนบรูปถ่ายหลักฐานการรับ-ส่งผ้า (Proof of Pickup / Delivery) */}
+          {/* อัปโหลดรูปภาพหลักฐาน */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-800">รูปถ่ายยืนยันการรับ-ส่งผ้า</span>
+              <span className="text-xs font-bold text-gray-800">รูปถ่ายยืนยันการรับหรือส่งคืนผ้า</span>
               {proofImage && (
                 <button
                   type="button"
@@ -260,22 +253,22 @@ const TaskDetailPage = () => {
                 className="w-full h-28 border-2 border-dashed border-gray-200 hover:border-[#1d61f2] rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-[#1d61f2] transition cursor-pointer bg-gray-50/50"
               >
                 <Camera size={26} />
-                <span className="text-xs font-medium">กดเพื่อถ่ายภาพหรืออัปโหลดหลักฐาน</span>
+                <span className="text-xs font-medium">กดเพื่อถ่ายภาพหรือแนบรูปหลักฐาน</span>
               </button>
             )}
           </div>
 
         </div>
 
-        {/* Bottom Action Footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex flex-col gap-2 z-20">
+        {/* Footer Actions ตาม Step */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex flex-col gap-2 z-20 shadow-lg">
           {order.statusStep === 3 && (
             <button
               type="button"
               onClick={() => handleAdvanceStep(4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
-              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md hover:bg-blue-700 transition cursor-pointer"
+              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md hover:bg-blue-700"
             >
-              ยืนยันรับผ้าจากลูกค้า (ส่งต่อเข้าร้าน)
+              ยืนยันรับผ้าจากลูกค้า (กำลังนำส่งร้าน)
             </button>
           )}
 
@@ -283,7 +276,7 @@ const TaskDetailPage = () => {
             <button
               type="button"
               onClick={() => handleAdvanceStep(5, 'ร้านกำลังดำเนินการซักอบ')}
-              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 transition cursor-pointer"
+              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900"
             >
               ผ้าถึงร้านแล้ว (ส่งมอบแผนกซักอบ)
             </button>
@@ -293,15 +286,15 @@ const TaskDetailPage = () => {
             <button
               type="button"
               onClick={() => handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ')}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700 transition cursor-pointer"
+              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700"
             >
-              ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย
+              ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย (จบงาน)
             </button>
           )}
 
           {order.statusStep === 7 && (
             <div className="w-full py-3 text-center text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl">
-              ออเดอร์นี้เสร็จสิ้นการส่งมอบแล้ว
+              ออเดอร์นี้เสร็จสิ้นกระบวนการเรียบร้อยแล้ว
             </div>
           )}
         </div>

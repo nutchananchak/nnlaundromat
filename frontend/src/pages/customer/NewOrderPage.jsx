@@ -15,9 +15,9 @@ export default function NewOrderPage() {
   const displayAddress = currentAddress?.detail || reorderData.address || 'ยังไม่ได้ระบุที่อยู่จัดส่ง';
 
   const packages = serviceType === 'bedding' ? [
-    { id: '3.5ft', name: 'ไซส์ 3.5 ฟุต', price: 200, desc: 'สำหรับที่นอนขนาด 3.5 ฟุต' },
-    { id: '5ft', name: 'ไซส์ 5 ฟุต', price: 230, desc: 'สำหรับที่นอนขนาด 5 ฟุต' },
-    { id: '6ft', name: 'ไซส์ 6 ฟุต', price: 250, desc: 'สำหรับที่นอนขนาด 6 ฟุต' },
+    { id: '3.5ft', name: 'ชุดเครื่องนอน 3.5 ฟุต', price: 200, desc: 'สำหรับที่นอนขนาด 3.5 ฟุต' },
+    { id: '5ft', name: 'ชุดเครื่องนอน 5 ฟุต', price: 230, desc: 'สำหรับที่นอนขนาด 5 ฟุต' },
+    { id: '6ft', name: 'ชุดเครื่องนอน 6 ฟุต', price: 250, desc: 'สำหรับที่นอนขนาด 6 ฟุต' },
   ] : [
     { id: 'S', name: 'ตะกร้า S', price: 160, desc: 'ผ้าไม่เกิน 15 ชิ้น' },
     { id: 'M', name: 'ตะกร้า M', price: 180, desc: 'ผ้าไม่เกิน 35 ชิ้น' },
@@ -292,7 +292,7 @@ export default function NewOrderPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">
-                ความต้องการพิเศษ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ'})
+                ความต้องการพิเศษ (แยกชิ้น)
               </label>
               {specialTotal > 0 && (
                 <span className="text-xs font-bold text-[#1d61f2]">
