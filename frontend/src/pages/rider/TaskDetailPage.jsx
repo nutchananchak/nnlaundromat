@@ -53,7 +53,7 @@ const TaskDetailPage = () => {
           <p className="text-gray-700 font-bold text-sm mb-4">ไม่พบข้อมูลออเดอร์นี้ในระบบ</p>
           <button
             onClick={() => navigate('/rider/tasks')}
-            className="w-full py-2.5 bg-[#1d61f2] text-white text-xs font-bold rounded-xl"
+            className="w-full py-2.5 bg-[#1d61f2] text-white text-xs font-bold rounded-xl cursor-pointer"
           >
             กลับหน้ารายการงาน
           </button>
@@ -90,22 +90,55 @@ const TaskDetailPage = () => {
     }
   };
 
+  // ฟังก์ชันเลื่อนสถานะงาน พร้อมบันทึกเวลาจริง
   const handleAdvanceStep = (nextStep, nextTitle) => {
     if (!setOrders) return;
+
+    const now = new Date();
+    const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
+    const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+    const realNowTimestamp = `${d}, ${t} น.`;
+
     setOrders((prev) =>
       prev.map((item) => {
-        if (item.id === order.id) {
+        if (String(item.id) === String(order.id)) {
+          const isDone = nextStep === 7;
           return {
             ...item,
             statusStep: nextStep,
             statusTitle: nextTitle,
-            status: nextStep === 7 ? 'completed' : item.status,
-            proofImage: proofImage || item.proofImage
+            status: isDone ? 'completed' : item.status,
+            isCompleted: isDone,
+            proofImage: proofImage || item.proofImage,
+            // เมื่อไรเดอร์กดยืนยันส่งผ้า (Step 7) ให้บันทึกเวลาที่ส่งมอบสำเร็จจริง
+            deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
+            deliveryRiderName: activeRider?.name || item.rider?.name || 'ไรเดอร์ประจำร้าน'
           };
         }
         return item;
       })
     );
+
+    // หากเป็นการส่งผ้าสำเร็จ (Step 7) ให้ส่งข้อความแจ้งเตือนไปยังฝั่งลูกค้า
+    if (nextStep === 7) {
+      try {
+        const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+        const finishNotice = {
+          id: Date.now(),
+          orderId: order.id,
+          title: 'ส่งมอบผ้าสะอาดเรียบร้อยแล้ว',
+          message: `ออเดอร์ #${order.id} ได้รับการส่งมอบโดยคุณ ${activeRider?.name || 'ไรเดอร์'} เรียบร้อยแล้วเมื่อ ${realNowTimestamp}`,
+          time: realNowTimestamp,
+          type: 'success',
+          isRead: false
+        };
+        localStorage.setItem('customerNotifications', JSON.stringify([finishNotice, ...currentNotices]));
+      } catch (e) {
+        // Storage fallback
+      }
+    }
+
+    alert(`อัปเดตสถานะเป็น "${nextTitle}" เรียบร้อยแล้ว`);
     navigate('/rider/tasks');
   };
 
@@ -266,7 +299,7 @@ const TaskDetailPage = () => {
             <button
               type="button"
               onClick={() => handleAdvanceStep(4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
-              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md hover:bg-blue-700"
+              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md hover:bg-blue-700 cursor-pointer"
             >
               ยืนยันรับผ้าจากลูกค้า (กำลังนำส่งร้าน)
             </button>
@@ -276,7 +309,7 @@ const TaskDetailPage = () => {
             <button
               type="button"
               onClick={() => handleAdvanceStep(5, 'ร้านกำลังดำเนินการซักอบ')}
-              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900"
+              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 cursor-pointer"
             >
               ผ้าถึงร้านแล้ว (ส่งมอบแผนกซักอบ)
             </button>
@@ -286,7 +319,7 @@ const TaskDetailPage = () => {
             <button
               type="button"
               onClick={() => handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ')}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700"
+              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700 cursor-pointer"
             >
               ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย (จบงาน)
             </button>
@@ -294,7 +327,7 @@ const TaskDetailPage = () => {
 
           {order.statusStep === 7 && (
             <div className="w-full py-3 text-center text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl">
-              ออเดอร์นี้เสร็จสิ้นกระบวนการเรียบร้อยแล้ว
+              ออเดอร์นี้เสร็จสิ้นกระบวนการเรียบร้อยแล้ว {order.deliveredAt ? `(${order.deliveredAt})` : ''}
             </div>
           )}
         </div>

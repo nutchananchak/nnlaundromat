@@ -1,6 +1,20 @@
-import { useState } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, MapPin, Clock, Camera, FileText, CheckSquare, Square, ShoppingBag, X, Plus, Minus, Sparkles } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  MapPin, 
+  Clock, 
+  Camera, 
+  FileText, 
+  CheckSquare, 
+  Square, 
+  ShoppingBag, 
+  X, 
+  Plus, 
+  Minus, 
+  Upload, 
+  Package
+} from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export default function NewOrderPage() {
@@ -9,9 +23,10 @@ export default function NewOrderPage() {
   const reorderData = location.state || {};
   const { currentAddress, userProfile } = useApp();
 
-  const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
 
-  // เปลี่ยนจากเดิม ให้ใช้ currentAddress?.detail ก่อน
+  const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
   const displayAddress = currentAddress?.detail || reorderData.address || 'ยังไม่ได้ระบุที่อยู่จัดส่ง';
 
   const packages = serviceType === 'bedding' ? [
@@ -29,21 +44,84 @@ export default function NewOrderPage() {
     : (reorderData.packageSize?.includes('S') ? 'S' : reorderData.packageSize?.includes('M') ? 'M' : reorderData.packageSize?.includes('L') ? 'L' : '');
 
   const [selectedPackage, setSelectedPackage] = useState(initialPkgId);
-  const [pickupTime, setSelectedPickupTime] = useState('08:00 - 09:00 น.');
-  const [deliveryTime, setSelectedDeliveryTime] = useState('10:00 - 11:00 น.');
   const [basketImage, setBasketImage] = useState(null);
   const [note, setNote] = useState(reorderData.note || '');
   const [agreed, setAgreed] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [plasticBagCount, setPlasticBagCount] = useState(0);
 
-  // รายการตัวเลือกพิเศษแยกตามประเภทบริการ
+  // ข้อมูลรอบเวลาพร้อมระบุเวลาเริ่มต้น (ชั่วโมง)
+  const timeSlotsConfig = [
+    { label: '08:00 - 09:00 น.', startHour: 8 },
+    { label: '10:00 - 11:00 น.', startHour: 10 },
+    { label: '12:00 - 13:00 น.', startHour: 12 },
+    { label: '14:00 - 15:00 น.', startHour: 14 },
+    { label: '16:00 - 17:00 น.', startHour: 16 },
+    { label: '18:00 - 19:00 น.', startHour: 18 },
+    { label: '20:00 - 21:00 น.', startHour: 20 },
+  ];
+
+  const deliveryTimeSlotsConfig = [
+    { label: '10:00 - 11:00 น.', startHour: 10 },
+    { label: '12:00 - 13:00 น.', startHour: 12 },
+    { label: '14:00 - 15:00 น.', startHour: 14 },
+    { label: '16:00 - 17:00 น.', startHour: 16 },
+    { label: '18:00 - 19:00 น.', startHour: 18 },
+    { label: '20:00 - 21:00 น.', startHour: 20 },
+    { label: '21:00 - 22:00 น.', startHour: 21 },
+  ];
+
+  // คำนวณชั่วโมงปัจจุบัน (เช่น 15:20 = 15.33)
+  const now = new Date();
+  const currentDecimalHour = now.getHours() + now.getMinutes() / 60;
+
+  // รอบเวลารับผ้าที่ผ่านเวลาไปแล้ว
+  const availablePickupSlots = useMemo(() => {
+    return timeSlotsConfig.map(slot => ({
+      ...slot,
+      isExpired: slot.startHour <= currentDecimalHour
+    }));
+  }, [currentDecimalHour]);
+
+  const defaultPickup = availablePickupSlots.find(s => !s.isExpired)?.label || '';
+  const [pickupTime, setSelectedPickupTime] = useState(defaultPickup);
+
+  // รอบเวลาส่งผ้าคืนต้องอยู่หลังรอบรับผ้าอย่างน้อย 2 ชม. และยังไม่หมดเวลา
+  const selectedPickupConfig = timeSlotsConfig.find(s => s.label === pickupTime);
+  const minDeliveryHour = selectedPickupConfig ? selectedPickupConfig.startHour + 2 : currentDecimalHour + 2;
+
+  const availableDeliverySlots = useMemo(() => {
+    return deliveryTimeSlotsConfig.map(slot => ({
+      ...slot,
+      isExpired: slot.startHour < minDeliveryHour || slot.startHour <= currentDecimalHour
+    }));
+  }, [minDeliveryHour, currentDecimalHour]);
+
+  const defaultDelivery = availableDeliverySlots.find(s => !s.isExpired)?.label || '';
+  const [deliveryTime, setSelectedDeliveryTime] = useState(defaultDelivery);
+
+  const handleSelectPickup = (slotLabel) => {
+    setSelectedPickupTime(slotLabel);
+    const chosenSlot = timeSlotsConfig.find(s => s.label === slotLabel);
+    const requiredMinDelivery = chosenSlot ? chosenSlot.startHour + 2 : 0;
+    const currentDeliveryConfig = deliveryTimeSlotsConfig.find(s => s.label === deliveryTime);
+
+    if (!currentDeliveryConfig || currentDeliveryConfig.startHour < requiredMinDelivery) {
+      const nextValidDelivery = deliveryTimeSlotsConfig.find(s => s.startHour >= requiredMinDelivery && s.startHour > currentDecimalHour);
+      if (nextValidDelivery) {
+        setSelectedDeliveryTime(nextValidDelivery.label);
+      }
+    }
+  };
+
+  // รายการตัวเลือกพิเศษ
   const washDrySpecialOptions = [
     { id: 'silk', name: 'ผ้าไหม', price: 100, unit: 'ตัว' },
     { id: 'leather', name: 'เสื้อหนัง', price: 80, unit: 'ตัว' },
     { id: 'fur', name: 'ขนสัตว์', price: 100, unit: 'ตัว' },
     { id: 'evening_dress', name: 'ชุดราตรี', price: 150, unit: 'ตัว' },
-    { id: 'suit', name: 'สูท (เฉพาะเสื้อ)', price: 100, unit: 'ตัว' },
-    { id: 'suit', name: 'สูท (เสื้อและกางเกง)', price: 150, unit: 'ชุด' },
+    { id: 'suit_top', name: 'สูท (เฉพาะเสื้อ)', price: 100, unit: 'ตัว' },
+    { id: 'suit_full', name: 'สูท (เสื้อและกางเกง)', price: 150, unit: 'ชุด' },
     { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 100, unit: 'ตัว' },
     { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 80, unit: 'ตัว' },
     { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "Dry Clean Only"', price: 120, unit: 'ตัว' },
@@ -59,8 +137,6 @@ export default function NewOrderPage() {
   ];
 
   const currentSpecialOptions = serviceType === 'bedding' ? beddingSpecialOptions : washDrySpecialOptions;
-
-  // เก็บจำนวนที่เลือกของแต่ละรายการพิเศษ เช่น { silk: 2, suit: 1 }
   const [specialItemCounts, setSpecialItemCounts] = useState({});
 
   const handleUpdateCount = (id, delta) => {
@@ -76,27 +152,7 @@ export default function NewOrderPage() {
     });
   };
 
-  const timeSlots = [
-    '08:00 - 09:00 น.',
-    '10:00 - 11:00 น.',
-    '12:00 - 13:00 น.',
-    '14:00 - 15:00 น.',
-    '16:00 - 17:00 น.',
-    '18:00 - 19:00 น.',
-    '20:00 - 21:00 น.',
-  ];
-
-  const deliveryTimeSlots = [
-    '10:00 - 11:00 น.',
-    '12:00 - 13:00 น.',
-    '14:00 - 15:00 น.',
-    '16:00 - 17:00 น.',
-    '18:00 - 19:00 น.',
-    '20:00 - 21:00 น.',
-    '21:00 - 22:00 น.',
-  ];
-
-  const handleImageChange = (e) => {
+  const handleImageFile = (e) => {
     if (e.target.files && e.target.files[0]) {
       setBasketImage(URL.createObjectURL(e.target.files[0]));
     }
@@ -104,16 +160,14 @@ export default function NewOrderPage() {
 
   const currentPkg = packages.find(p => p.id === selectedPackage);
   const basePrice = currentPkg ? currentPkg.price : 0;
-
-  // คำนวณราคารายการพิเศษทั้งหมด
   const specialTotal = Object.entries(specialItemCounts).reduce((sum, [id, count]) => {
     const item = currentSpecialOptions.find(opt => opt.id === id);
     return sum + (item ? item.price * count : 0);
   }, 0);
 
-  const totalPrice = basePrice + specialTotal;
+  const plasticBagPrice = plasticBagCount * 5;
+  const totalPrice = basePrice + specialTotal + plasticBagPrice;
 
-  // รวบรวมสรุปรายการพิเศษที่เลือกไว้
   const selectedSpecialItems = Object.entries(specialItemCounts)
     .filter(([_, count]) => count > 0)
     .map(([id, count]) => {
@@ -130,30 +184,39 @@ export default function NewOrderPage() {
   const handleCreateOrder = (e) => {
     e.preventDefault();
 
-    // 1. ตรวจสอบเงื่อนไขการเลือกสินค้าแยกตามประเภทบริการ
+    if (!pickupTime) {
+      alert('รอบเวลารับผ้าสำหรับวันนี้หมดแล้ว โปรดเลือกบริการในวันถัดไป');
+      return;
+    }
+
+    if (!deliveryTime) {
+      alert('กรุณาเลือกรอบเวลาส่งผ้าคืนที่ยังสามารถให้บริการได้');
+      return;
+    }
+
     const hasSpecialItems = Object.values(specialItemCounts).some(count => count > 0);
 
     if (serviceType === 'bedding') {
-      // สำหรับชุดเครื่องนอน: ต้องมีแพ็กเกจ หรือ มีรายการพิเศษอย่างน้อย 1 อย่าง
       if (!selectedPackage && !hasSpecialItems) {
         alert('กรุณาเลือกแพ็กเกจ หรือเลือกความต้องการพิเศษอย่างน้อย 1 รายการ');
         return;
       }
     } else {
-      // สำหรับซัก อบ พับ: ต้องเลือกแพ็กเกจหลักเสมอ
       if (!selectedPackage) {
         alert('กรุณาเลือกแพ็กเกจที่ต้องการใช้งาน');
         return;
       }
     }
 
-    // 2. ตรวจสอบการยอมรับเงื่อนไข
     if (!agreed) {
       alert('กรุณากดยอมรับเงื่อนไขการใช้บริการ');
       return;
     }
 
-    // นำทางไปยังหน้าชำระเงิน
+    const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date());
+    const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+    const orderCreatedAt = `${d}, ${t} น.`;
+
     navigate('/order/payment', {
       state: {
         order: {
@@ -162,13 +225,16 @@ export default function NewOrderPage() {
           customerPhone: userProfile?.phone || '',
           serviceName: serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ',
           packageName: currentPkg ? currentPkg.name : 'เฉพาะรายการพิเศษ',
-          pickupTime: pickupTime,
-          deliveryTime: deliveryTime,
+          pickupTime,
+          deliveryTime,
           specialItems: selectedSpecialItems,
+          plasticBagCount,
+          plasticBagPrice,
           address: displayAddress,
-          basketImage: basketImage,
-          note: note,
-          totalPrice: totalPrice,
+          basketImage,
+          note,
+          totalPrice,
+          createdAt: orderCreatedAt,
         }
       }
     });
@@ -213,7 +279,7 @@ export default function NewOrderPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <p className="font-display font-medium text-white text-xl tracking-tight">
+            <p className="font-bold text-white text-xl leading-tight tracking-tight">
               {serviceType === 'bedding' ? 'ชุดเครื่องนอน / แยกชิ้น' : 'ซัก อบ พับ'}
             </p>
           </div>
@@ -239,13 +305,13 @@ export default function NewOrderPage() {
                 type="button" 
                 onClick={() => navigate('/profile')}
                 className="text-xs text-[#1d61f2] font-semibold self-center shrink-0 hover:underline cursor-pointer"
-             >
+              >
                 เปลี่ยน
-             </button>
+              </button>
             </div>
           </div>
 
-         {/* 2. เลือกแพ็กเกจ */}
+          {/* 2. เลือกแพ็กเกจ */}
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-2">
               เลือกแพ็กเกจ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน' : 'ซัก อบ พับ'})
@@ -345,31 +411,81 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 4. รอบเวลารับผ้า */}
+          {/* 3.1 ตัวเลือกรับถุงพลาสติกใส่ผ้า (5 บาท/ใบ) */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-900">
+                อุปกรณ์เสริม
+              </label>
+              {plasticBagPrice > 0 && (
+                <span className="text-xs font-bold text-[#1d61f2]">
+                  + {plasticBagPrice}฿
+                </span>
+              )}
+            </div>
+
+            <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
+                  <Package size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-xs text-gray-900">ถุงพลาสติกใส่ผ้ากันฝุ่น</h4>
+                  <p className="text-[11px] text-gray-500 mt-0.5">ราคา 5 บาท / 1 ใบ</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setPlasticBagCount(prev => Math.max(0, prev - 1))}
+                  disabled={plasticBagCount === 0}
+                  className="w-7 h-7 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs transition active:scale-95"
+                >
+                  <Minus size={13} />
+                </button>
+                <span className="w-6 text-center font-bold text-xs text-gray-900">
+                  {plasticBagCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPlasticBagCount(prev => prev + 1)}
+                  className="w-7 h-7 rounded-lg bg-[#1d61f2] text-white flex items-center justify-center hover:bg-blue-700 cursor-pointer shadow-xs transition active:scale-95"
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. รอบเวลารับผ้า (คัดกรองเวลาปัจจุบัน ไม่ขีดฆ่า แค่กดไม่ได้) */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">รอบเวลารับผ้า</label>
               <span className="text-xs text-[#1d61f2] font-semibold flex items-center gap-1">
-                <Clock size={13} /> {pickupTime}
+                <Clock size={13} /> {pickupTime || 'โปรดเลือกรอบเวลา'}
               </span>
             </div>
 
             <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {timeSlots.map((slot) => {
-                  const isSelected = pickupTime === slot;
+                {availablePickupSlots.map((slot) => {
+                  const isSelected = pickupTime === slot.label;
                   return (
                     <button
-                      key={slot}
+                      key={slot.label}
                       type="button"
-                      onClick={() => setSelectedPickupTime(slot)}
-                      className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer active:scale-95 ${
-                        isSelected
-                          ? 'bg-[#1d61f2] text-white border-[#1d61f2] shadow-xs'
-                          : 'bg-gray-50/70 text-gray-700 border-gray-100 hover:bg-gray-100 hover:border-gray-200'
+                      disabled={slot.isExpired}
+                      onClick={() => handleSelectPickup(slot.label)}
+                      className={`py-2.5 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
+                        slot.isExpired
+                          ? 'bg-gray-100 text-gray-400 border-gray-200/50 opacity-40 cursor-not-allowed shadow-none'
+                          : isSelected
+                          ? 'bg-[#1d61f2] text-white border-[#1d61f2] shadow-xs cursor-pointer active:scale-95'
+                          : 'bg-gray-50/70 text-gray-700 border-gray-100 hover:bg-gray-100 hover:border-gray-200 cursor-pointer active:scale-95'
                       }`}
                     >
-                      {slot}
+                      {slot.label}
                     </button>
                   );
                 })}
@@ -377,31 +493,34 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-{         /* 5. รอบเวลาส่งผ้าคืน */}
+          {/* 5. รอบเวลาส่งผ้าคืน (คัดกรองให้อยู่หลังรอบรับผ้า ไม่ขีดฆ่า แค่กดไม่ได้) */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">รอบเวลาส่งผ้าคืน</label>
               <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
-                <Clock size={13} /> {deliveryTime}
+                <Clock size={13} /> {deliveryTime || 'โปรดเลือกรอบเวลา'}
               </span>
             </div>
 
             <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {deliveryTimeSlots.map((slot) => {
-                  const isSelected = deliveryTime === slot;
+                {availableDeliverySlots.map((slot) => {
+                  const isSelected = deliveryTime === slot.label;
                   return (
                     <button
-                      key={slot}
+                      key={slot.label}
                       type="button"
-                      onClick={() => setSelectedDeliveryTime(slot)}
-                      className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer active:scale-95 ${
-                        isSelected
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                          : 'bg-gray-50/70 text-gray-700 border-gray-100 hover:bg-gray-100 hover:border-gray-200'
+                      disabled={slot.isExpired}
+                      onClick={() => setSelectedDeliveryTime(slot.label)}
+                      className={`py-2.5 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${
+                        slot.isExpired
+                          ? 'bg-gray-100 text-gray-400 border-gray-200/50 opacity-40 cursor-not-allowed shadow-none'
+                          : isSelected
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs cursor-pointer active:scale-95'
+                          : 'bg-gray-50/70 text-gray-700 border-gray-100 hover:bg-gray-100 hover:border-gray-200 cursor-pointer active:scale-95'
                       }`}
                     >
-                      {slot}
+                      {slot.label}
                     </button>
                   );
                 })}
@@ -411,39 +530,77 @@ export default function NewOrderPage() {
 
           {/* 6. ถ่ายรูปตะกร้าผ้า */}
           <div>
-            <label className="block text-sm font-bold text-gray-900 mb-1">ถ่ายรูปตะกร้าผ้า</label>
-            <p className="text-xs text-gray-500 mb-2">ถ่ายรูปจุดที่วางตะกร้าเพื่อให้ไรเดอร์เข้ารับได้ถูกจุด</p>
+            <label className="block text-sm font-bold text-gray-900 mb-1">รูปถ่ายตะกร้าผ้า / จุดวางผ้า</label>
+            <p className="text-xs text-gray-500 mb-2.5">เลือกถ่ายจากกล้อง หรืออัปโหลดภาพเพื่อให้ไรเดอร์หาจุดรับผ้าได้ถูกต้อง</p>
             
-            <label className="border-2 border-dashed border-gray-200 rounded-2xl p-5 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-[#1d61f2] transition group">
-              {basketImage ? (
-                <div className="relative w-full h-40">
-                  <img src={basketImage} alt="Basket" className="w-full h-full object-cover rounded-xl" />
-                  <span className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-lg">เปลี่ยนรูป</span>
-                </div>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-full bg-blue-50 text-[#1d61f2] flex items-center justify-center mb-2 group-hover:scale-105 transition">
-                    <Camera size={24} />
+            <input 
+              ref={cameraInputRef}
+              type="file" 
+              accept="image/*;capture=camera" 
+              capture="environment" 
+              onChange={handleImageFile} 
+              className="hidden" 
+            />
+
+            <input 
+              ref={galleryInputRef}
+              type="file" 
+              accept="image/*" 
+              onChange={handleImageFile} 
+              className="hidden" 
+            />
+
+            {basketImage ? (
+              <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-xs">
+                <img src={basketImage} alt="Basket Preview" className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setBasketImage(null)}
+                  className="absolute top-2 right-2 px-2.5 py-1 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+                >
+                  เปลี่ยนรูป
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="py-4 px-3 rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#1d61f2] bg-white flex flex-col items-center justify-center gap-1.5 transition cursor-pointer group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1d61f2] flex items-center justify-center group-hover:scale-105 transition">
+                    <Camera size={20} />
                   </div>
-                  <span className="text-sm font-semibold text-gray-700">แตะเพื่อถ่ายรูปหรืออัปโหลดรูปภาพ</span>
-                  <span className="text-xs text-gray-400 mt-1">รองรับไฟล์ JPG, PNG</span>
-                </>
-              )}
-              <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-            </label>
+                  <span className="text-xs font-bold text-gray-800">ถ่ายรูปจากกล้อง</span>
+                  <span className="text-[10px] text-gray-400">เปิดกล้องทันที</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="py-4 px-3 rounded-2xl border-2 border-dashed border-gray-200 hover:border-[#1d61f2] bg-white flex flex-col items-center justify-center gap-1.5 transition cursor-pointer group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center group-hover:scale-105 transition">
+                    <Upload size={20} />
+                  </div>
+                  <span className="text-xs font-bold text-gray-800">อัปโหลดจากเครื่อง</span>
+                  <span className="text-[10px] text-gray-400">เลือกไฟล์รูปภาพ</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 7. หมายเหตุ */}
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-2">หมายเหตุถึงพนักงาน (ถ้ามี)</label>
-            <div className="bg-white p-3 rounded-2xl border border-gray-100 flex items-start gap-3 shadow-sm">
-              <FileText className="text-gray-400 shrink-0 mt-1" size={18} />
+            <div className="bg-white p-3.5 rounded-2xl border border-gray-100 flex items-start gap-2.5 shadow-sm">
+              <FileText className="text-gray-400 shrink-0 mt-0.5" size={18} />
               <textarea
                 rows="2"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="เช่น เสื้อหนัง, ผ้าสีตก..."
-                className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none resize-none"
+                placeholder="เช่น เสื้อหนัง, ผ้าสีตก, แขวนไว้หน้าห้อง..."
+                className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none resize-none leading-normal p-0 m-0"
               ></textarea>
             </div>
           </div>
@@ -480,7 +637,7 @@ export default function NewOrderPage() {
               <span className="text-xs font-semibold">ยอดรวมทั้งสิ้น</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="font-display font-bold text-xl text-[#1d61f2]">{totalPrice}</span>
+              <span className="font-bold text-xl text-[#1d61f2]">{totalPrice}</span>
               <span className="text-xs font-bold text-gray-500">บาท</span>
             </div>
           </div>
@@ -488,7 +645,7 @@ export default function NewOrderPage() {
           <button
             type="button"
             onClick={handleCreateOrder}
-            className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-display font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
+            className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
           >
             ยืนยันการสั่งบริการ
           </button>
@@ -499,7 +656,7 @@ export default function NewOrderPage() {
           <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col max-h-[80vh]">
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                <h3 className="font-display font-bold text-lg text-gray-900">เงื่อนไขการใช้บริการ</h3>
+                <h3 className="font-bold text-lg text-gray-900">เงื่อนไขการใช้บริการ</h3>
                 <button 
                   type="button"
                   onClick={() => setShowTermsModal(false)}
@@ -522,7 +679,7 @@ export default function NewOrderPage() {
                   setAgreed(true);
                   setShowTermsModal(false);
                 }}
-                className="w-full py-3 mt-2 rounded-xl bg-[#1d61f2] text-white font-display font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
+                className="w-full py-3 mt-2 rounded-xl bg-[#1d61f2] text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
               >
                 เข้าใจและยอมรับเงื่อนไข
               </button>

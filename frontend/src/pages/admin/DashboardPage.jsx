@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ClipboardCheck, 
@@ -6,23 +6,23 @@ import {
   Calendar as CalendarIcon, 
   LogOut, 
   CheckCircle2, 
-  XCircle, 
   DollarSign, 
-  Eye, 
   Power, 
   Search, 
   Clock, 
   Trash2, 
-  AlertTriangle,
-  Sparkles,
-  Bike,
-  Truck,
-  UserCheck,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Menu,
-  Image as ImageIcon
+  Sparkles, 
+  Bike, 
+  Truck, 
+  ChevronDown, 
+  ChevronLeft, 
+  ChevronRight, 
+  Menu, 
+  Image as ImageIcon, 
+  CheckCheck,
+  Package,
+  BarChart3,
+  CalendarDays
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -71,14 +71,27 @@ const BrandLogo = ({ size = 48 }) => (
   </svg>
 );
 
+const thaiMonths = [
+  { value: 0, label: 'มกราคม', short: 'ม.ค.' },
+  { value: 1, label: 'กุมภาพันธ์', short: 'ก.พ.' },
+  { value: 2, label: 'มีนาคม', short: 'มี.ค.' },
+  { value: 3, label: 'เมษายน', short: 'เม.ย.' },
+  { value: 4, label: 'พฤษภาคม', short: 'พ.ค.' },
+  { value: 5, label: 'มิถุนายน', short: 'มิ.ย.' },
+  { value: 6, label: 'กรกฎาคม', short: 'ก.ค.' },
+  { value: 7, label: 'สิงหาคม', short: 'ส.ค.' },
+  { value: 8, label: 'กันยายน', short: 'ก.ย.' },
+  { value: 9, label: 'ตุลาคม', short: 'ต.ค.' },
+  { value: 10, label: 'พฤศจิกายน', short: 'พ.ย.' },
+  { value: 11, label: 'ธันวาคม', short: 'ธ.ค.' },
+];
+
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { orders, setOrders } = useApp ? useApp() : {};
 
-  // State ย่อ-ขยาย Sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // ตรวจสอบสิทธิ์การเข้าใช้งาน Admin
   const [activeAdmin] = useState(() => {
     try {
       const saved = localStorage.getItem('currentAdmin');
@@ -98,7 +111,12 @@ const DashboardPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSlipModal, setSelectedSlipModal] = useState(null);
 
-  // รายชื่อไรเดอร์ประจำร้าน
+  // ตัวเลือกกราฟ: 'daily' | 'weekly' | 'by_month'
+  const [chartViewMode, setChartViewMode] = useState('daily');
+  
+  // State เลือกเดือนที่ต้องการดูข้อมูล (ค่าเริ่มต้นเป็นเดือนปัจจุบัน)
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+
   const riderList = [
     { id: 'RD-01', name: 'วรรณา สีดา', phone: '089-111-2233' },
     { id: 'RD-02', name: 'วันดี ทองอ่อน', phone: '081-444-5566' },
@@ -107,13 +125,11 @@ const DashboardPage = () => {
 
   const [selectedRiders, setSelectedRiders] = useState({});
 
-  // จัดการสถานะเปิด-ปิดร้าน
   const [isStoreOpen, setIsStoreOpen] = useState(() => {
     const saved = localStorage.getItem('storeServiceStatus');
     return saved !== null ? JSON.parse(saved) : true;
   });
 
-  // รายการวันหยุดของร้าน
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [closedDates, setClosedDates] = useState(() => {
     try {
@@ -126,7 +142,6 @@ const DashboardPage = () => {
 
   if (!activeAdmin) return null;
 
-  // ฟังก์ชันตัวช่วยดึงวันเวลาจริงตามเวลาไทย
   const getThaiRealTimestamp = () => {
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
@@ -134,22 +149,110 @@ const DashboardPage = () => {
     return `${d}, ${t} น.`;
   };
 
-  // กรองรายการออเดอร์รอตรวจสอบสลิป (Step 1)
   const pendingSlipOrders = (orders || []).filter(o => 
-    o.statusStep === 1 && 
+    Number(o.statusStep) === 1 && 
     (String(o.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
      (o.customerName && o.customerName.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
-  // กรองรายการที่กำลังซักอบอยู่ที่ร้าน (Step 5)
-  const washingOrders = (orders || []).filter(o => o.statusStep === 5);
+  const washingOrders = (orders || []).filter(o => Number(o.statusStep) === 5);
+  const deliveredOrders = (orders || []).filter(o => Number(o.statusStep) === 7 || o.status === 'completed');
 
-  const allOrdersList = (orders || []).filter(o =>
-    String(o.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (o.customerName && o.customerName.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // =========================================================================
+  // คำนวณสรุปรายรับและข้อมูลเดือนที่เลือก
+  // =========================================================================
+  const { 
+    dailyRevenue, 
+    weeklyRevenue, 
+    selectedMonthRevenue, 
+    totalRevenue, 
+    revenueOrders,
+    chartData
+  } = useMemo(() => {
+    const now = new Date();
+    const currentDay = now.getDate();
+    const currentMonthShort = new Intl.DateTimeFormat('th-TH', { month: 'short' }).format(now);
 
-  // อนุมัติสลิปพร้อมระบุไรเดอร์และเวลาจริง
+    const chosenMonthObj = thaiMonths.find(m => m.value === Number(selectedMonth)) || thaiMonths[now.getMonth()];
+    const chosenMonthShort = chosenMonthObj.short;
+
+    const validOrders = (orders || []).filter(o => 
+      !o.paymentRejected && 
+      (o.paymentVerified === true || Number(o.statusStep) >= 3 || Number(o.statusStep) === 7 || o.status === 'completed')
+    );
+
+    let daily = 0;
+    let weekly = 0;
+    let chosenMonthTotal = 0;
+    let total = 0;
+
+    const hourlyMap = {
+      '08:00': 0, '10:00': 0, '12:00': 0, '14:00': 0, '16:00': 0, '18:00': 0, '20:00': 0, '22:00': 0
+    };
+
+    const weekDays = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+    const weeklyMap = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(now.getDate() - i);
+      weeklyMap[weekDays[d.getDay()]] = 0;
+    }
+
+    const monthWeeksMap = {
+      'สัปดาห์ 1': 0,
+      'สัปดาห์ 2': 0,
+      'สัปดาห์ 3': 0,
+      'สัปดาห์ 4': 0
+    };
+
+    validOrders.forEach((o) => {
+      const amount = Number(o.totalPrice || o.price || 0);
+      total += amount;
+
+      const dateStr = String(o.deliveredAt || o.verifiedAt || o.createdAt || '').replace(/[\s\u00A0\u202F]+/g, ' ');
+
+      // 1. ตรวจสอบวันนี้
+      const isToday = dateStr.includes(`${currentDay} ${currentMonthShort}`) || dateStr.includes('วันนี้');
+      if (isToday) {
+        daily += amount;
+        const hourMatched = Object.keys(hourlyMap).find(h => dateStr.includes(h.slice(0, 2))) || '14:00';
+        hourlyMap[hourMatched] += amount;
+      }
+
+      // 2. ตรวจสอบว่าตรงกับเดือนที่เลือกดูหรือไม่
+      if (dateStr.includes(chosenMonthShort)) {
+        chosenMonthTotal += amount;
+        
+        // แยกตามสัปดาห์ของเดือนที่เลือก (อิงจากวันที่สั่ง)
+        const dayMatch = dateStr.match(/\b(\d{1,2})\b/);
+        const dayNum = dayMatch ? parseInt(dayMatch[1], 10) : 15;
+
+        if (dayNum <= 7) monthWeeksMap['สัปดาห์ 1'] += amount;
+        else if (dayNum <= 14) monthWeeksMap['สัปดาห์ 2'] += amount;
+        else if (dayNum <= 21) monthWeeksMap['สัปดาห์ 3'] += amount;
+        else monthWeeksMap['สัปดาห์ 4'] += amount;
+      }
+
+      // 3. รอบสัปดาห์ล่าสุด
+      weekly += amount;
+      const todayDayName = weekDays[now.getDay()];
+      weeklyMap[todayDayName] = (weeklyMap[todayDayName] || 0) + amount;
+    });
+
+    return {
+      dailyRevenue: daily,
+      weeklyRevenue: weekly,
+      selectedMonthRevenue: chosenMonthTotal,
+      totalRevenue: total,
+      revenueOrders: validOrders,
+      chartData: {
+        daily: Object.entries(hourlyMap).map(([label, val]) => ({ label, val })),
+        weekly: Object.entries(weeklyMap).map(([label, val]) => ({ label, val })),
+        by_month: Object.entries(monthWeeksMap).map(([label, val]) => ({ label, val }))
+      }
+    };
+  }, [orders, selectedMonth]);
+
   const handleApproveSlip = (orderId) => {
     const chosenRiderId = selectedRiders[orderId] || riderList[0].id;
     const chosenRider = riderList.find(r => r.id === chosenRiderId) || riderList[0];
@@ -157,7 +260,7 @@ const DashboardPage = () => {
 
     if (!setOrders) return;
     setOrders(prev => prev.map(order => {
-      if (order.id === orderId) {
+      if (String(order.id) === String(orderId)) {
         return {
           ...order,
           statusStep: 3,
@@ -173,7 +276,6 @@ const DashboardPage = () => {
       return order;
     }));
 
-    // อัปเดตรายการแจ้งเตือนเดิมที่เป็น alert ให้เคลียร์เป็น read แล้ว และบันทึกข้อความสำเร็จใหม่
     let currentNotices = [];
     try {
       currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
@@ -182,7 +284,7 @@ const DashboardPage = () => {
     }
 
     const clearedNotices = currentNotices.map(n => {
-      if (n.orderId === orderId && n.type === 'alert') {
+      if (String(n.orderId) === String(orderId) && n.type === 'alert') {
         return { ...n, isRead: true };
       }
       return n;
@@ -195,15 +297,13 @@ const DashboardPage = () => {
       message: `ออเดอร์ #${orderId} ยอดเงินถูกต้อง ไรเดอร์ (${chosenRider.name}) กำลังเดินทางไปรับผ้า`,
       time: realTimeNow,
       type: 'success',
-      isRead: true // ตั้งค่าเป็นอ่านแล้วเพื่อไม่ให้กระดิ่งสั่นค้าง
+      isRead: true
     };
 
     localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...clearedNotices]));
-
     alert(`อนุมัติคำสั่งซื้อ #${orderId} เรียบร้อยแล้ว มอบหมายให้ไรเดอร์ "${chosenRider.name}" ดูแลงาน`);
   };
 
-  // ปฏิเสธสลิปพร้อมส่งแจ้งเตือนและเวลาจริงไปยังลูกค้า
   const handleRejectSlip = (orderId) => {
     const reason = prompt('ระบุสาเหตุที่ปฏิเสธสลิป (เช่น ยอดไม่ตรง, ภาพไม่ชัดเจน, สลิปซ้ำ):');
     if (!reason) return;
@@ -212,7 +312,7 @@ const DashboardPage = () => {
 
     if (!setOrders) return;
     setOrders(prev => prev.map(order => {
-      if (order.id === orderId) {
+      if (String(order.id) === String(orderId)) {
         return {
           ...order,
           paymentRejected: true,
@@ -224,7 +324,6 @@ const DashboardPage = () => {
       return order;
     }));
 
-    // ส่งประวัติแจ้งเตือนไปยังหน้าของลูกค้า (ตั้งค่า isRead: false เพื่อให้กระดิ่งสั่นเตือน)
     const newNotice = {
       id: Date.now(),
       orderId,
@@ -243,17 +342,15 @@ const DashboardPage = () => {
     }
 
     localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...currentNotices]));
-
     alert(`ปฏิเสธสลิป #${orderId} เรียบร้อยแล้ว ระบบได้ส่งการแจ้งเตือนไปยังลูกค้าแล้ว`);
   };
 
-  // ทางร้านซักอบเสร็จแล้ว -> สั่งส่งคืนผ้า (Step 5 -> Step 6)
   const handleCompleteWashing = (orderId) => {
     const realTimeNow = getThaiRealTimestamp();
 
     if (!setOrders) return;
     setOrders(prev => prev.map(order => {
-      if (order.id === orderId) {
+      if (String(order.id) === String(orderId)) {
         return {
           ...order,
           statusStep: 6,
@@ -265,13 +362,6 @@ const DashboardPage = () => {
     }));
     alert(`อัปเดตคำสั่งซื้อ #${orderId} เป็น "ซักอบเสร็จแล้ว" ไรเดอร์จะได้รับแจ้งเตือนให้นำส่งคืนลูกค้าทันที`);
   };
-
-  // คำนวณสรุปรายรับ
-  const completedOrders = (orders || []).filter(o => o.statusStep === 7 || o.paymentVerified);
-  const totalRevenue = completedOrders.reduce((sum, o) => sum + (Number(o.totalPrice || o.price) || 0), 0);
-  const dailyRevenue = totalRevenue > 0 ? Math.round(totalRevenue * 0.35) : 680;
-  const weeklyRevenue = totalRevenue > 0 ? Math.round(totalRevenue * 0.8) : 2450;
-  const monthlyRevenue = totalRevenue > 0 ? totalRevenue : 5380;
 
   const toggleStoreStatus = () => {
     const updated = !isStoreOpen;
@@ -298,10 +388,13 @@ const DashboardPage = () => {
     }
   };
 
+  const activeGraphList = chartData[chartViewMode] || chartData.daily;
+  const maxGraphVal = Math.max(...activeGraphList.map(item => item.val), 100);
+
   return (
     <div className="flex h-screen w-screen bg-slate-100 font-body text-slate-800 overflow-hidden text-base">
       
-      {/* 1. Sidebar ด้านซ้าย รองรับการเปิด-ปิด (Collapsible) */}
+      {/* 1. Sidebar */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-72' : 'w-20'
@@ -317,7 +410,6 @@ const DashboardPage = () => {
         </button>
 
         <div>
-          {/* ส่วนหัว Sidebar */}
           <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-950/40 min-h-[80px]">
             <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center p-1 shadow-md shrink-0">
               <BrandLogo size={42} />
@@ -334,7 +426,6 @@ const DashboardPage = () => {
             )}
           </div>
 
-          {/* เมนูแท็บ */}
           <nav className="p-3 space-y-2">
             <button
               onClick={() => setActiveTab('slips')}
@@ -343,7 +434,6 @@ const DashboardPage = () => {
                   ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
-              title={!isSidebarOpen ? 'ตรวจสอบสลิป & มอบหมายงาน' : ''}
             >
               <div className="flex items-center gap-3">
                 <ClipboardCheck size={20} className="shrink-0" />
@@ -363,7 +453,6 @@ const DashboardPage = () => {
                   ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
-              title={!isSidebarOpen ? 'ผ้ากำลังซักอบ (หน้าร้าน)' : ''}
             >
               <div className="flex items-center gap-3">
                 <Sparkles size={20} className="shrink-0" />
@@ -377,16 +466,34 @@ const DashboardPage = () => {
             </button>
 
             <button
+              onClick={() => setActiveTab('completed')}
+              className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
+                activeTab === 'completed' 
+                  ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <CheckCheck size={20} className="shrink-0" />
+                {isSidebarOpen && <span className="truncate">ส่งมอบสำเร็จแล้ว</span>}
+              </div>
+              {deliveredOrders.length > 0 && (
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px]'} bg-emerald-600 text-white font-black rounded-full`}>
+                  {deliveredOrders.length}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={() => setActiveTab('analytics')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
                 activeTab === 'analytics' 
                   ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
-              title={!isSidebarOpen ? 'สรุปรายรับและรายงาน' : ''}
             >
               <TrendingUp size={20} className="shrink-0" />
-              {isSidebarOpen && <span className="truncate">สรุปรายรับ</span>}
+              {isSidebarOpen && <span className="truncate">สรุปรายรับ &amp; กราฟ</span>}
             </button>
 
             <button
@@ -396,7 +503,6 @@ const DashboardPage = () => {
                   ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`}
-              title={!isSidebarOpen ? 'ปฏิทินและวันหยุดบริการ' : ''}
             >
               <CalendarIcon size={20} className="shrink-0" />
               {isSidebarOpen && <span className="truncate">ปฏิทินวันหยุด</span>}
@@ -404,7 +510,6 @@ const DashboardPage = () => {
           </nav>
         </div>
 
-        {/* ผู้ใช้งาน & Logout */}
         <div className="p-3.5 border-t border-slate-800 bg-slate-950/60">
           <div className={`flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
             <div className="flex items-center gap-2.5 min-w-0">
@@ -434,15 +539,12 @@ const DashboardPage = () => {
 
       {/* 2. Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
-        
-        {/* Top Header Bar */}
         <header className="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-xs">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 transition cursor-pointer"
-              title="เปิด/ปิดแถบเมนูข้าง"
             >
               <Menu size={18} />
             </button>
@@ -450,7 +552,8 @@ const DashboardPage = () => {
               <h1 className="font-display font-bold text-lg text-slate-900 leading-tight">
                 {activeTab === 'slips' && 'ตรวจสอบสลิปและมอบหมายไรเดอร์'}
                 {activeTab === 'washing' && 'แผนกซัก-อบผ้าของทางร้าน'}
-                {activeTab === 'analytics' && 'ภาพรวมและรายงานสรุปรายรับ'}
+                {activeTab === 'completed' && 'รายการที่ไรเดอร์ส่งมอบผ้าสำเร็จแล้ว'}
+                {activeTab === 'analytics' && 'ภาพรวมรายรับและกราฟสถิติ'}
                 {activeTab === 'calendar' && 'จัดการตารางเวลาและวันหยุดบริการ'}
               </h1>
               <p className="text-xs text-slate-500 font-normal">
@@ -475,7 +578,7 @@ const DashboardPage = () => {
 
         <div className="flex-1 overflow-y-auto p-6">
 
-          {/* ======================= แท็บ 1: ตรวจสอบสลิป & เลือกไรเดอร์ ======================= */}
+          {/* ======================= แท็บ 1: ตรวจสอบสลิป ======================= */}
           {activeTab === 'slips' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -514,15 +617,12 @@ const DashboardPage = () => {
 
                           return (
                             <tr key={order.id} className="hover:bg-blue-50/30 transition-colors">
-                              
-                              {/* 1. เลขออเดอร์ */}
                               <td className="py-4 px-4 whitespace-nowrap">
                                 <span className="font-extrabold text-[#1d61f2] text-sm tracking-tight">
                                   #{order.id}
                                 </span>
                               </td>
 
-                              {/* 2. ลูกค้า */}
                               <td className="py-4 px-4 whitespace-nowrap">
                                 <div className="flex items-baseline gap-1.5">
                                   <span className="font-bold text-slate-800 text-sm">
@@ -534,7 +634,6 @@ const DashboardPage = () => {
                                 </div>
                               </td>
 
-                              {/* 3. บริการ */}
                               <td className="py-4 px-4 whitespace-nowrap">
                                 <span className="font-semibold text-slate-700 text-xs">
                                   {order.serviceName}
@@ -546,14 +645,12 @@ const DashboardPage = () => {
                                 )}
                               </td>
 
-                              {/* 4. ยอดโอน */}
                               <td className="py-4 px-4 whitespace-nowrap">
                                 <span className="font-black text-slate-900 text-sm">
                                   {(order.totalPrice || order.price || 0).toLocaleString()} ฿
                                 </span>
                               </td>
 
-                              {/* 5. สลิป */}
                               <td className="py-4 px-4 text-center whitespace-nowrap">
                                 <button
                                   type="button"
@@ -575,7 +672,6 @@ const DashboardPage = () => {
                                 </button>
                               </td>
 
-                              {/* 6. กล่องเลือกไรเดอร์แบบ Modern Pill Card */}
                               <td className="py-4 px-4 whitespace-nowrap">
                                 <div className="relative inline-flex items-center">
                                   <div className="w-7 h-7 rounded-lg bg-[#1d61f2]/10 text-[#1d61f2] flex items-center justify-center shrink-0 absolute left-2 pointer-events-none">
@@ -596,7 +692,6 @@ const DashboardPage = () => {
                                 </div>
                               </td>
 
-                              {/* 7. ปุ่มดำเนินการ */}
                               <td className="py-4 px-4 text-center whitespace-nowrap space-x-1.5">
                                 <button
                                   type="button"
@@ -613,7 +708,6 @@ const DashboardPage = () => {
                                   อนุมัติงาน
                                 </button>
                               </td>
-
                             </tr>
                           );
                         })}
@@ -656,7 +750,7 @@ const DashboardPage = () => {
                             </span>
                           </div>
                           <div className="mt-3 space-y-1 text-xs text-slate-600">
-                            <div><span className="font-bold">ลูกค้า:</span> {order.customerName || 'ลูกค้าทั่วไป'} ({order.customerPhone || '-'})</div>
+                            <div><span className="font-bold">ลูกค้า:</span> {order.customerName || 'คุณลูกค้า'} ({order.customerPhone || '-'})</div>
                             <div><span className="font-bold">ที่อยู่จัดส่ง:</span> {order.address}</div>
                             <div><span className="font-bold text-blue-700">ไรเดอร์ผู้ดูแล:</span> {order.rider?.name || 'สมชาย ส่งไว'}</div>
                           </div>
@@ -677,53 +771,337 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 3: สรุปรายรับ ======================= */}
+          {/* ======================= แท็บ 3: รายการที่ส่งมอบสำเร็จแล้ว ======================= */}
+          {activeTab === 'completed' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
+                <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">ประวัติออเดอร์ที่ไรเดอร์ส่งมอบสำเร็จแล้ว</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">ข้อมูลอัปเดตแบบเรียลไทม์จากแอปพลิเคชันของไรเดอร์เมื่อกดจบงาน</p>
+                  </div>
+                  <span className="bg-emerald-50 text-emerald-700 font-bold text-xs px-3 py-1 rounded-full">
+                    {deliveredOrders.length} รายการสำเร็จ
+                  </span>
+                </div>
+
+                {deliveredOrders.length === 0 ? (
+                  <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
+                    <CheckCheck size={40} className="text-slate-300" />
+                    <span>ยังไม่มีออเดอร์ที่ส่งมอบสำเร็จในขณะนี้</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider whitespace-nowrap">
+                          <th className="py-3.5 px-4">เลขออเดอร์</th>
+                          <th className="py-3.5 px-4">ลูกค้า</th>
+                          <th className="py-3.5 px-4">บริการ</th>
+                          <th className="py-3.5 px-4">ยอดเงินสุทธิ</th>
+                          <th className="py-3.5 px-4">ไรเดอร์ผู้ส่งมอบ</th>
+                          <th className="py-3.5 px-4">เวลาที่ส่งมอบสำเร็จจริง</th>
+                          <th className="py-3.5 px-4 text-center">หลักฐาน</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {deliveredOrders.map(order => (
+                          <tr key={order.id} className="hover:bg-emerald-50/20 transition-colors">
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <span className="font-extrabold text-[#1d61f2] text-sm">#{order.id}</span>
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <span className="font-bold text-slate-800 text-xs block">{order.customerName || 'คุณลูกค้า'}</span>
+                              <span className="text-[11px] text-slate-400">{order.customerPhone || '-'}</span>
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-700">
+                              {order.serviceName}
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap font-bold text-slate-900 text-xs">
+                              {(order.totalPrice || order.price || 0).toLocaleString()} ฿
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <span className="text-xs font-bold text-blue-700 block">
+                                {order.deliveryRiderName || order.rider?.name || 'ไรเดอร์ประจำร้าน'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 whitespace-nowrap">
+                              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+                                {order.deliveredAt || 'เสร็จสมบูรณ์'}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4 text-center whitespace-nowrap">
+                              {order.proofImage ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedSlipModal({ ...order, slipImage: order.proofImage })}
+                                  className="text-xs text-[#1d61f2] font-bold underline cursor-pointer"
+                                >
+                                  ดูภาพส่งงาน
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">ไม่มีรูป</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ======================= แท็บ 4: สรุปรายรับ & กราฟสถิติ ======================= */}
           {activeTab === 'analytics' && (
             <div className="space-y-6">
+              
+              {/* แถวการ์ดสรุปยอดเงิน 3 การ์ด */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* 1. รายรับประจำวัน */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-slate-400 block tracking-wide">รายรับประจำวัน (วันนี้)</span>
                     <span className="text-3xl font-extrabold text-[#1d61f2] leading-normal block pt-1">
                       {dailyRevenue.toLocaleString()} บาท
                     </span>
-                    <span className="text-xs text-emerald-600 font-bold mt-1.5 block">ชำระผ่านพร้อมเพย์ทั้งหมด</span>
+                    <span className="text-xs text-slate-500 font-semibold mt-1.5 block">
+                      {dailyRevenue > 0 ? 'ชำระพร้อมเพย์สำเร็จ' : 'ยังไม่มีรายการชำระวันนี้'}
+                    </span>
                   </div>
-                  <div className="w-13 h-13 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center">
+                  <div className="w-13 h-13 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                     <DollarSign size={26} />
                   </div>
                 </div>
 
+                {/* 2. รายรับรอบสัปดาห์ */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-bold text-slate-400 block tracking-wide">รายรับรอบสัปดาห์ (7 วันล่าสุด)</span>
+                    <span className="text-xs font-bold text-slate-400 block tracking-wide">รอบสัปดาห์ (7 วันล่าสุด)</span>
                     <span className="text-3xl font-extrabold text-slate-900 leading-normal block pt-1">
                       {weeklyRevenue.toLocaleString()} บาท
                     </span>
-                    <span className="text-xs text-slate-500 font-semibold mt-1.5 block">ออเดอร์สะสมต่อเนื่อง</span>
+                    <span className="text-xs text-slate-500 font-semibold mt-1.5 block">
+                      ยอดสะสมช่วง 7 วันที่ผ่านมา
+                    </span>
                   </div>
-                  <div className="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <div className="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                     <TrendingUp size={26} />
                   </div>
                 </div>
 
+                {/* 3. รายรับตามเดือนที่เลือก */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
-                    <span className="text-xs font-bold text-slate-400 block tracking-wide">รายรับประจำเดือนนี้</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-400 block tracking-wide">
+                        รายรับเดือน {thaiMonths.find(m => m.value === Number(selectedMonth))?.label}
+                      </span>
+                    </div>
                     <span className="text-3xl font-extrabold text-slate-900 leading-normal block pt-1">
-                      {monthlyRevenue.toLocaleString()} บาท
+                      {selectedMonthRevenue.toLocaleString()} บาท
                     </span>
-                    <span className="text-xs text-slate-500 font-semibold mt-1.5 block">รอบบัญชีปัจจุบัน</span>
+                    <span className="text-xs text-slate-500 font-semibold mt-1.5 block">
+                      รอบบัญชีเดือนที่เลือก
+                    </span>
                   </div>
-                  <div className="w-13 h-13 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                    <CalendarIcon size={26} />
+                  <div className="w-13 h-13 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <CalendarDays size={26} />
                   </div>
                 </div>
               </div>
+
+              {/* ================= กราฟสถิติรายรับแบบ Visual Bar Chart ================= */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center">
+                      <BarChart3 size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base text-slate-900">
+                        แผนภูมิแสดงยอดขาย: {chartViewMode === 'by_month' ? `รายเดือน (${thaiMonths.find(m => m.value === Number(selectedMonth))?.label})` : chartViewMode === 'weekly' ? 'รอบ 7 วันล่าสุด' : 'วันนี้ (รายชั่วโมง)'}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">แผนภูมิแท่งเปรียบเทียบสถิติรายได้ตามช่วงเวลาจริง</p>
+                    </div>
+                  </div>
+
+                  {/* ตัวควบคุมกราฟ: ปุ่มสลับโหมด + Dropdown เลือกเดือน */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="bg-slate-100 p-1 rounded-2xl flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setChartViewMode('daily')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          chartViewMode === 'daily'
+                            ? 'bg-white text-[#1d61f2] shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        วันนี้ (รายชม.)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChartViewMode('weekly')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          chartViewMode === 'weekly'
+                            ? 'bg-white text-[#1d61f2] shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        7 วันล่าสุด
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChartViewMode('by_month')}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          chartViewMode === 'by_month'
+                            ? 'bg-white text-[#1d61f2] shadow-xs'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        ดูรายเดือน
+                      </button>
+                    </div>
+
+                    {/* Dropdown เลือกเดือน */}
+                    <div className="relative inline-flex items-center">
+                      <select
+                        value={selectedMonth}
+                        onChange={(e) => {
+                          setSelectedMonth(Number(e.target.value));
+                          setChartViewMode('by_month');
+                        }}
+                        className="appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-2xl pl-3 pr-8 py-2 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                      >
+                        {thaiMonths.map(m => (
+                          <option key={m.value} value={m.value}>
+                            เดือน{m.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ตัวกราฟแท่ง */}
+                <div className="w-full pt-4">
+                  <div className="h-60 w-full flex items-end justify-between gap-3 sm:gap-6 px-2 sm:px-6 border-b border-slate-200 pb-2">
+                    {activeGraphList.map((item, idx) => {
+                      const heightPercent = maxGraphVal > 0 ? Math.round((item.val / maxGraphVal) * 100) : 0;
+                      const hasValue = item.val > 0;
+
+                      return (
+                        <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end group relative">
+                          <div className="absolute -top-9 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-lg pointer-events-none whitespace-nowrap shadow-md z-10">
+                            {item.val.toLocaleString()} บาท
+                          </div>
+
+                          {hasValue && (
+                            <span className="text-[10px] font-bold text-[#1d61f2] mb-1.5 animate-in fade-in duration-200">
+                              {item.val}฿
+                            </span>
+                          )}
+
+                          <div 
+                            className={`w-full max-w-[48px] rounded-t-xl transition-all duration-500 ${
+                              hasValue 
+                                ? 'bg-gradient-to-t from-[#1d61f2] to-blue-400 shadow-sm shadow-blue-500/20 group-hover:brightness-110' 
+                                : 'bg-slate-100 hover:bg-slate-200'
+                            }`}
+                            style={{ height: `${Math.max(heightPercent, 6)}%` }}
+                          />
+
+                          <span className={`text-xs mt-3 block font-semibold transition ${
+                            hasValue ? 'text-slate-800 font-bold' : 'text-slate-400'
+                          }`}>
+                            {item.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* สถิติย่อยใต้กราฟ */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+                  <div className="p-3.5 bg-slate-50 rounded-2xl flex items-center justify-between">
+                    <span className="text-slate-500">ออเดอร์ที่สร้างรายได้</span>
+                    <span className="font-extrabold text-slate-800">{revenueOrders.length} รายการ</span>
+                  </div>
+                  <div className="p-3.5 bg-slate-50 rounded-2xl flex items-center justify-between">
+                    <span className="text-slate-500">ยอดเฉลี่ยต่อบิล</span>
+                    <span className="font-extrabold text-[#1d61f2]">
+                      {revenueOrders.length > 0 ? Math.round(totalRevenue / revenueOrders.length).toLocaleString() : 0} ฿
+                    </span>
+                  </div>
+                  <div className="p-3.5 bg-slate-50 rounded-2xl flex items-center justify-between">
+                    <span className="text-slate-500">เดือนที่กำลังแสดงผล</span>
+                    <span className="font-bold text-purple-700">
+                      {thaiMonths.find(m => m.value === Number(selectedMonth))?.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* รายการออเดอร์ที่คำนวณในรายรับ */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">รายการคำสั่งซื้อที่คิดเป็นรายได้</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">รวมออเดอร์ที่โอนชำระเงินเรียบร้อยและงานที่ส่งมอบแล้ว</p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs text-slate-400 block">ยอดรวมสะสมทั้งหมด</span>
+                    <span className="text-lg font-black text-emerald-600">{totalRevenue.toLocaleString()} บาท</span>
+                  </div>
+                </div>
+
+                {revenueOrders.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-2">
+                    <Package size={36} className="text-slate-300" />
+                    <span className="text-sm font-semibold">ยังไม่มีคำสั่งซื้อที่เสร็จสิ้นสมบูรณ์เพื่อคิดยอดรายรับ</span>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {revenueOrders.map((o) => (
+                      <div key={o.id} className="py-3.5 flex items-center justify-between text-xs hover:bg-slate-50/50 px-2 rounded-xl transition">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
+                            ✓
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-slate-900 text-sm">#{o.id}</span>
+                              <span className="text-slate-600 font-semibold">{o.serviceName}</span>
+                              {o.packageName && <span className="text-[11px] text-slate-400">({o.packageName})</span>}
+                            </div>
+                            <span className="text-[11px] text-slate-400 mt-0.5 block">
+                              เวลาที่ทำรายการ: {o.deliveredAt || o.verifiedAt || o.createdAt || '-'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-extrabold text-[#1d61f2] text-sm block">
+                            +{(Number(o.totalPrice || o.price) || 0).toLocaleString()} ฿
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                            พร้อมเพย์สำเร็จ
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
-          {/* ======================= แท็บ 4: ปฏิทินร้าน ======================= */}
+          {/* ======================= แท็บ 5: ปฏิทินร้าน ======================= */}
           {activeTab === 'calendar' && (
             <div className="max-w-4xl space-y-6">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
@@ -792,7 +1170,7 @@ const DashboardPage = () => {
         </div>
       </main>
 
-      {/* Modal แสดงรูปสลิปจริง */}
+      {/* Modal แสดงรูปสลิป / รูปหลักฐาน */}
       {selectedSlipModal && (
         <div
           className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-150"
@@ -804,7 +1182,7 @@ const DashboardPage = () => {
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h4 className="font-bold text-base text-slate-900">หลักฐานสลิปโอนเงิน</h4>
+                <h4 className="font-bold text-base text-slate-900">หลักฐานภาพถ่าย</h4>
                 <span className="text-xs text-[#1d61f2] font-semibold">ออเดอร์ #{selectedSlipModal.id}</span>
               </div>
               <button
@@ -817,10 +1195,10 @@ const DashboardPage = () => {
             </div>
 
             <div className="w-full min-h-[360px] max-h-[500px] bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center p-2">
-              {(selectedSlipModal.slipImage || selectedSlipModal.paymentSlip || selectedSlipModal.slip) ? (
+              {(selectedSlipModal.slipImage || selectedSlipModal.paymentSlip || selectedSlipModal.proofImage) ? (
                 <img
-                  src={selectedSlipModal.slipImage || selectedSlipModal.paymentSlip || selectedSlipModal.slip}
-                  alt={`สลิปโอนเงิน #${selectedSlipModal.id}`}
+                  src={selectedSlipModal.slipImage || selectedSlipModal.paymentSlip || selectedSlipModal.proofImage}
+                  alt={`หลักฐาน #${selectedSlipModal.id}`}
                   className="w-full h-auto max-h-[480px] object-contain rounded-xl shadow-xs"
                 />
               ) : (
@@ -835,33 +1213,17 @@ const DashboardPage = () => {
                     <div className="flex justify-between"><span>ยอดเงิน:</span> <span className="font-bold text-[#1d61f2]">{(selectedSlipModal.totalPrice || selectedSlipModal.price || 0).toLocaleString()} บาท</span></div>
                     <div className="flex justify-between"><span>เวลาที่แจ้ง:</span> <span>{selectedSlipModal.createdAt || 'ไม่ระบุเวลา'}</span></div>
                   </div>
-                  <span className="text-[11px] text-amber-600 bg-amber-50 px-3 py-1 rounded-full font-medium">
-                    * ออเดอร์ทดสอบนี้ยังไม่ได้อัปโหลดไฟล์รูปจริง
-                  </span>
                 </div>
               )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  handleRejectSlip(selectedSlipModal.id);
-                  setSelectedSlipModal(null);
-                }}
-                className="flex-1 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-xs transition cursor-pointer"
+                onClick={() => setSelectedSlipModal(null)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
               >
-                ปฏิเสธสลิปนี้
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleApproveSlip(selectedSlipModal.id);
-                  setSelectedSlipModal(null);
-                }}
-                className="flex-1 py-2.5 bg-[#1d61f2] hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm transition cursor-pointer"
-              >
-                อนุมัติสลิปนี้
+                ปิดหน้าต่าง
               </button>
             </div>
           </div>

@@ -3,35 +3,30 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-  // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer)
+  // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer) ดึงจากผู้ใช้ที่ล็อกอินจริงเท่านั้น
   const [userProfile, setUserProfile] = useState(() => {
     try {
       const savedUser = localStorage.getItem('currentUser');
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
         return {
-          name: parsed.fullName || parsed.name || 'ซักผ้า สะอาดดี',
-          fullName: parsed.fullName || parsed.name || 'ซักผ้า สะอาดดี',
-          phone: parsed.phone || '081-234-5678',
+          name: parsed.fullName || parsed.name || '',
+          fullName: parsed.fullName || parsed.name || '',
+          phone: parsed.phone || '',
           avatar: parsed.avatar || null,
         };
       }
     } catch (e) {
       // JSON parse error handling
     }
-    return {
-      name: 'ซักผ้า สะอาดดี',
-      fullName: 'ซักผ้า สะอาดดี',
-      phone: '081-234-5678',
-      avatar: null,
-    };
+    return null;
   });
 
   const loginUser = (userData) => {
     const formattedUser = {
-      name: userData.fullName || userData.name,
-      fullName: userData.fullName || userData.name,
-      phone: userData.phone,
+      name: userData.fullName || userData.name || '',
+      fullName: userData.fullName || userData.name || '',
+      phone: userData.phone || '',
       avatar: userData.avatar || null,
     };
     setUserProfile(formattedUser);
@@ -40,12 +35,8 @@ export function AppProvider({ children }) {
 
   const logoutUser = () => {
     localStorage.removeItem('currentUser');
-    setUserProfile({
-      name: 'ซักผ้า สะอาดดี',
-      fullName: 'ซักผ้า สะอาดดี',
-      phone: '081-234-5678',
-      avatar: null,
-    });
+    localStorage.removeItem('userProfile');
+    setUserProfile(null);
   };
 
   // 2. ข้อมูลพนักงานรับ-ส่งผ้า (Rider Session)
@@ -91,32 +82,23 @@ export function AppProvider({ children }) {
 
   const [selectedAddressId, setSelectedAddressId] = useState('addr-1');
 
-  // 4. รายการออเดอร์ (ดึงจาก localStorage ก่อน ถ้าไม่มีให้ใช้รายการที่ส่งเสร็จแล้วเท่านั้น)
+  // 4. รายการออเดอร์ (ล้าง Mock Data ทิ้งทั้งหมด เริ่มต้นเป็น Array ว่างเปล่า)
   const [orders, setOrders] = useState(() => {
     try {
       const savedOrders = localStorage.getItem('orders');
       if (savedOrders) {
-        return JSON.parse(savedOrders);
+        const parsed = JSON.parse(savedOrders);
+        // คัดกรองออเดอร์ม็อกตัวอย่างเก่าทิ้ง เหลือเฉพาะออเดอร์ที่สร้างจริง
+        return parsed.filter(o => 
+          o.customerName !== 'ลูกค้าทั่วไป' && 
+          o.id !== 'NN-1024' && 
+          o.id !== 'NN-739182'
+        );
       }
     } catch (e) {
       // JSON parse error handling
     }
-    // ค่าเริ่มต้น: มีเฉพาะออเดอร์เก่าที่สำเร็จแล้ว (status: 'completed', statusStep: 7)
-    return [
-      {
-        id: 'NN-739182',
-        status: 'completed',
-        statusStep: 7,
-        statusTitle: 'ส่งคืนผ้าสำเร็จ',
-        serviceName: 'ชุดเครื่องนอน / ผ้านวม',
-        packageName: 'ไซส์ 5 ฟุต',
-        price: 230,
-        createdAt: '28 ส.ค. 2026',
-        pickupTime: '14:00 - 15:00 น.',
-        address: 'หอพักใจดี ห้อง 204 (ซอยอ่อนนุช 30)',
-        note: 'ผ้านวมสีฟ้า',
-      }
-    ];
+    return [];
   });
 
   // ซิงค์ orders ลง localStorage เมื่อมีการเปลี่ยนแปลง
@@ -128,8 +110,12 @@ export function AppProvider({ children }) {
     }
   }, [orders]);
 
-  // หาออเดอร์ที่กำลังดำเนินงานจริง (ยังไม่เสร็จ)
-  const activeOrder = orders.find(o => o.status === 'in_progress' || (o.statusStep >= 1 && o.statusStep < 7));
+  // ค้นหาออเดอร์ที่กำลังดำเนินงานจริง (ยังไม่เสร็จสิ้น)
+  const activeOrder = orders.find(o => 
+    o.status === 'in_progress' || 
+    (Number(o.statusStep) >= 1 && Number(o.statusStep) < 7)
+  );
+
   const currentAddress = addresses.find(a => a.id === selectedAddressId) || addresses[0];
 
   return (

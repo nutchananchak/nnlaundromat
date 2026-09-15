@@ -11,10 +11,7 @@ export default function BottomNav() {
   const [hasAlert, setHasAlert] = useState(false);
 
   useEffect(() => {
-    // 1. ตรวจสอบว่ายังมีออเดอร์ที่ถูกปฏิเสธสลิปค้างอยู่หรือไม่
     const hasRejectedOrder = (orders || []).some(o => o.paymentRejected === true);
-
-    // 2. ตรวจสอบว่ามีรายการแจ้งเตือนที่ยังไม่ได้อ่านหรือไม่
     let hasUnread = false;
     try {
       const savedNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
@@ -22,21 +19,39 @@ export default function BottomNav() {
     } catch (e) {
       hasUnread = false;
     }
-
-    // มีแจ้งเตือนเฉพาะตอนที่สลิปยังปฏิเสธค้างอยู่ หรือมีข้อความที่ยังไม่ได้เปิดอ่าน
     setHasAlert(hasRejectedOrder || hasUnread);
   }, [orders, location.pathname]);
 
   const menus = [
-    { icon: Home, label: 'หน้าแรก', path: '/' },
-    { icon: ClipboardList, label: 'ออเดอร์', path: '/orders' },
-    { icon: Bell, label: 'แจ้งเตือน', path: '/notifications', hasAlert },
-    { icon: User, label: 'โปรไฟล์', path: '/profile' },
+    { 
+      icon: Home, 
+      label: 'หน้าแรก', 
+      path: '/home', 
+      isActive: location.pathname === '/home' || location.pathname === '/' 
+    },
+    { 
+      icon: ClipboardList, 
+      label: 'ออเดอร์', 
+      path: '/orders', 
+      isActive: location.pathname.startsWith('/orders') 
+    },
+    { 
+      icon: Bell, 
+      label: 'แจ้งเตือน', 
+      path: '/notifications', 
+      hasAlert, 
+      isActive: location.pathname === '/notifications' 
+    },
+    { 
+      icon: User, 
+      label: 'โปรไฟล์', 
+      path: '/profile', 
+      isActive: location.pathname === '/profile' 
+    },
   ];
 
   return (
     <>
-      {/* CSS Animation กระดิ่งสั่น (Bell Swing) */}
       <style>{`
         @keyframes bellRing {
           0%, 100% { transform: rotate(0deg); }
@@ -54,22 +69,26 @@ export default function BottomNav() {
       <nav className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-200 flex justify-around py-3 px-2 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-50 font-body">
         {menus.map((menu) => {
           const Icon = menu.icon;
-          const isActive = location.pathname === menu.path;
           const isBell = menu.path === '/notifications';
 
           return (
             <button
               key={menu.path}
-              onClick={() => navigate(menu.path)}
+              type="button"
+              onClick={() => {
+                if (location.pathname !== menu.path) {
+                  navigate(menu.path);
+                }
+              }}
               className={`flex flex-col items-center gap-1 transition cursor-pointer relative ${
-                isActive ? 'text-[#1d61f2]' : 'text-gray-400 hover:text-gray-600'
+                menu.isActive ? 'text-[#1d61f2]' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
               <div className={`relative ${isBell && menu.hasAlert ? 'bell-shake text-amber-500' : ''}`}>
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                <Icon size={22} strokeWidth={menu.isActive ? 2.5 : 2} />
               </div>
 
-              <span className={`text-[11px] ${isActive ? 'font-bold text-[#1d61f2]' : isBell && menu.hasAlert ? 'font-bold text-amber-600' : 'font-medium'}`}>
+              <span className={`text-[11px] ${menu.isActive ? 'font-bold text-[#1d61f2]' : isBell && menu.hasAlert ? 'font-bold text-amber-600' : 'font-medium'}`}>
                 {menu.label}
               </span>
             </button>
