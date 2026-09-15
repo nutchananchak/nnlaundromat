@@ -15,9 +15,9 @@ export default function NewOrderPage() {
   const displayAddress = currentAddress?.detail || reorderData.address || 'ยังไม่ได้ระบุที่อยู่จัดส่ง';
 
   const packages = serviceType === 'bedding' ? [
-    { id: '3.5ft', name: 'ชุดเครื่องนอน 3.5 ฟุต', price: 200, desc: 'สำหรับที่นอนขนาด 3.5 ฟุต' },
-    { id: '5ft', name: 'ชุดเครื่องนอน 5 ฟุต', price: 230, desc: 'สำหรับที่นอนขนาด 5 ฟุต' },
-    { id: '6ft', name: 'ชุดเครื่องนอน 6 ฟุต', price: 250, desc: 'สำหรับที่นอนขนาด 6 ฟุต' },
+    { id: '3.5ft', name: 'ชุดเครื่องนอน 3.5 ฟุต', price: 200, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 3.5 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
+    { id: '5ft', name: 'ชุดเครื่องนอน 5 ฟุต', price: 230, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 5 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
+    { id: '6ft', name: 'ชุดเครื่องนอน 6 ฟุต', price: 250, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 6 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
   ] : [
     { id: 'S', name: 'ตะกร้า S', price: 160, desc: 'ผ้าไม่เกิน 15 ชิ้น' },
     { id: 'M', name: 'ตะกร้า M', price: 180, desc: 'ผ้าไม่เกิน 35 ชิ้น' },
@@ -213,10 +213,9 @@ export default function NewOrderPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <p className="text-white/80 text-xs font-medium">N&amp;N Laundromat</p>
-            <h1 className="font-display font-medium text-white text-xl tracking-tight">
-              {serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ'}
-            </h1>
+            <p className="font-display font-medium text-white text-xl tracking-tight">
+              {serviceType === 'bedding' ? 'ชุดเครื่องนอน / แยกชิ้น' : 'ซัก อบ พับ'}
+            </p>
           </div>
         </div>
 
@@ -249,7 +248,7 @@ export default function NewOrderPage() {
          {/* 2. เลือกแพ็กเกจ */}
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-2">
-              เลือกแพ็กเกจ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน / ผ้านวม' : 'ซัก อบ พับ'})
+              เลือกแพ็กเกจ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน' : 'ซัก อบ พับ'})
             </label>
             <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
               {packages.map((pkg) => {

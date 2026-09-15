@@ -18,7 +18,7 @@ const REGISTERED_RIDERS = [
   },
   {
     id: 'RD-03',
-    name: 'ซิน วินเพียว',
+    name: 'สตาร์ วินเพียว',
     phone: '0895556666',
     password: 'rider3'
   }

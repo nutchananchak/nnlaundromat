@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
@@ -18,11 +18,12 @@ import {
   X, 
   AlertTriangle, 
   Calendar,
-  Bell,
   LogOut,
   PackageCheck,
   Flame,
   BadgeCheck,
+  Camera,
+  UploadCloud,
   Star
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
@@ -30,25 +31,20 @@ import { useApp } from '../../context/AppContext';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { userProfile, addresses, selectedAddressId, setSelectedAddressId, currentAddress, activeOrder } = useApp();
-  
+  const { userProfile, addresses, selectedAddressId, setSelectedAddressId, currentAddress, activeOrder, setOrders } = useApp();
+  const reUploadInputRef = useRef(null);
+
   const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [selectedService, setSelectedService] = useState('wash_dry_fold');
 
-  // ดึงสถานะเปิด-ปิดร้าน และรายการวันหยุดที่ Admin ตั้งค่าไว้
+  // State สำหรับการแนบสลิปใหม่บนหน้าแรก
+  const [reUploadSlip, setReUploadSlip] = useState(null);
+  const [isSubmittingSlip, setIsSubmittingSlip] = useState(false);
+
+  // สถานะเปิด-ปิดร้าน และวันหยุด
   const [isStoreOpen, setIsStoreOpen] = useState(true);
   const [closedDates, setClosedDates] = useState([]);
-
-  // State สำหรับแบนเนอร์สลับหมุนเวียนอัตโนมัติทุก 30 วินาที (Index 0, 1, 2)
   const [bannerIndex, setBannerIndex] = useState(0);
-
-  // ตรวจสอบว่ามีออเดอร์ที่กำลังดำเนินงานอยู่จริงหรือไม่ (1-6 ถือว่ากำลังทำ, 7 จบแล้ว)
-  const hasOngoingOrder = Boolean(
-    activeOrder && 
-    Number(activeOrder.statusStep) >= 1 && 
-    Number(activeOrder.statusStep) < 7 &&
-    !activeOrder.isCompleted
-  );
 
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
@@ -66,13 +62,71 @@ export default function HomePage() {
     }
   }, []);
 
-  // Timer สลับแบนเนอร์ทุก 30 วินาที (ทำงานเฉพาะตอนที่ไม่มีออเดอร์ค้าง)
+  // ฟังก์ชันสร้าง Timestamp จริงตามเวลาไทย
+  const getThaiTimestamp = () => {
+    const now = new Date();
+    const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
+    const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+    return `${d}, ${t} น.`;
+  };
+
+  // ดักจับและแปลงเวลาให้เป็นวันเวลาจริงเสมอ เลิกใช้ "เพิ่งสร้าง / วันนี้"
+  const formatOrderTimestamp = (timestamp) => {
+    if (!timestamp || String(timestamp).includes('เพิ่งสร้าง') || String(timestamp).trim() === 'วันนี้') {
+      const now = new Date();
+      const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
+      const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+      return `${d}, ${t} น.`;
+    }
+    return timestamp;
+  };
+
+  // ตรวจสอบว่ามีงานที่กำลังดำเนินการจริง (Step 1 - 6)
+  const hasOngoingOrder = Boolean(
+    activeOrder && 
+    Number(activeOrder.statusStep) >= 1 && 
+    Number(activeOrder.statusStep) < 7 &&
+    !activeOrder.isCompleted
+  );
+
+  // ตรวจสอบว่าออเดอร์ปัจจุบันติดสถานะสลิปถูกปฏิเสธหรือไม่
+  const isSlipRejected = Boolean(activeOrder && activeOrder.paymentRejected);
+
+  // ซิงค์แจ้งเตือนเมื่อตรวจพบว่าออเดอร์ถูกปฏิเสธสลิป เพื่อให้ BottomNav ทราบและสั่นเตือน
+  useEffect(() => {
+    if (isSlipRejected && activeOrder) {
+      const realTimeNow = getThaiTimestamp();
+      let currentNotices = [];
+      try {
+        currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+      } catch (e) {
+        currentNotices = [];
+      }
+
+      const alreadyNotified = currentNotices.some(n => n.orderId === activeOrder.id && n.type === 'alert' && !n.isRead);
+
+      if (!alreadyNotified) {
+        const alertNotice = {
+          id: Date.now(),
+          orderId: activeOrder.id,
+          title: 'สลิปการโอนเงินไม่ถูกต้อง',
+          message: `ออเดอร์ #${activeOrder.id} ไม่ผ่านการตรวจสอบ: "${activeOrder.rejectReason || 'ยอดเงินไม่ตรง หรือสลิปไม่ชัดเจน'}" กรุณาแนบสลิปใหม่`,
+          time: activeOrder.rejectedAt || realTimeNow,
+          type: 'alert',
+          isRead: false
+        };
+        localStorage.setItem('customerNotifications', JSON.stringify([alertNotice, ...currentNotices]));
+      }
+    }
+  }, [isSlipRejected, activeOrder]);
+
+  // Timer สลับแบนเนอร์ทุก 30 วินาที เมื่อไม่มีออเดอร์ค้าง
   useEffect(() => {
     if (hasOngoingOrder) return;
 
     const timer = setInterval(() => {
       setBannerIndex((prev) => (prev + 1) % 3);
-    }, 30000); 
+    }, 30000);
 
     return () => clearInterval(timer);
   }, [hasOngoingOrder]);
@@ -132,6 +186,75 @@ export default function HomePage() {
     }
   };
 
+  // จัดการอัปโหลดสลิปใหม่บนหน้าแรก
+  const handleSelectNewSlip = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReUploadSlip(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // ส่งสลิปใหม่กลับไปให้ Admin ตรวจสอบ และซิงค์เคลียร์แจ้งเตือน
+  const handleSendNewSlip = () => {
+    if (!reUploadSlip) {
+      alert('กรุณาเลือกรูปภาพสลิปก่อนกดยืนยัน');
+      return;
+    }
+
+    setIsSubmittingSlip(true);
+    const nowTime = getThaiTimestamp();
+
+    if (setOrders) {
+      setOrders(prev => prev.map(o => {
+        if (o.id === activeOrder.id) {
+          return {
+            ...o,
+            slipImage: reUploadSlip,
+            paymentSlip: reUploadSlip,
+            paymentRejected: false,
+            rejectReason: null,
+            statusStep: 1,
+            statusTitle: 'ส่งสลิปใหม่แล้ว รอแอดมินตรวจสอบ',
+            reUploadedAt: nowTime
+          };
+        }
+        return o;
+      }));
+    }
+
+    try {
+      const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+      const clearedNotices = currentNotices.map(n => {
+        if (n.orderId === activeOrder.id && n.type === 'alert') {
+          return { ...n, isRead: true };
+        }
+        return n;
+      });
+
+      const newSuccessNotice = {
+        id: Date.now(),
+        orderId: activeOrder.id,
+        title: 'แนบสลิปใหม่เรียบร้อยแล้ว',
+        message: `ออเดอร์ #${activeOrder.id} ได้ส่งสลิปใหม่เมื่อ ${nowTime} กำลังรอทางร้านตรวจสอบยอดเงินอีกครั้ง`,
+        time: nowTime,
+        type: 'info',
+        isRead: true
+      };
+
+      localStorage.setItem('customerNotifications', JSON.stringify([newSuccessNotice, ...clearedNotices]));
+    } catch (e) {
+      // Storage error handling
+    }
+
+    setReUploadSlip(null);
+    setIsSubmittingSlip(false);
+    alert('ส่งสลิปใหม่เรียบร้อยแล้ว ทางร้านจะเร่งตรวจสอบยอดเงินให้อีกครั้งครับ');
+  };
+
   return (
     <div style={{
       display: 'flex',
@@ -156,6 +279,7 @@ export default function HomePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
+        {/* 1. Top Bar สีน้ำเงิน โค้งมน */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
@@ -163,10 +287,10 @@ export default function HomePage() {
           }}
           className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
         >
-          {/* หมุดเลือกที่อยู่ */}
+          {/* หมุดเลือกสถานที่ส่งผ้า */}
           <div 
             onClick={() => setShowAddressPicker(true)}
-            className="flex items-center gap-2.5 cursor-pointer max-w-[270px] group"
+            className="flex items-center gap-2.5 cursor-pointer max-w-[290px] group"
           >
             <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/30 text-white flex items-center justify-center shrink-0 shadow-xs">
               <MapPin size={20} />
@@ -184,16 +308,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* ปุ่มแจ้งเตือน & ล็อกเอาท์ */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/notifications')}
-              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
-              title="การแจ้งเตือน"
-            >
-              <Bell size={18} />
-            </button>
+          {/* ปุ่ม Logout ทางขวามือ */}
+          <div className="flex items-center">
             <button 
               type="button"
               onClick={handleLogout}
@@ -208,16 +324,97 @@ export default function HomePage() {
         {/* 2. Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4 pb-40 flex flex-col gap-4">
 
+          {/* กล่องแจ้งเตือนสลิปไม่ผ่าน เชื่อมโยงกับ Notification Center */}
+          {isSlipRejected && (
+            <div className="bg-red-50 border-2 border-red-300 rounded-3xl p-5 shadow-md flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <AlertTriangle size={22} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs font-black text-red-500 tracking-wider uppercase block">แจ้งเตือนด่วน</span>
+                  <h3 className="text-base font-extrabold text-red-900 leading-tight mt-0.5">
+                    สลิปการโอนเงินไม่ถูกต้อง
+                  </h3>
+                  <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                    <span className="font-bold">สาเหตุจากทางร้าน: </span>
+                    {activeOrder.rejectReason || 'ยอดเงินไม่ตรง หรือภาพสลิปไม่ชัดเจน'}
+                  </p>
+                  {activeOrder.rejectedAt && (
+                    <span className="text-[11px] text-red-400 font-medium block mt-1">
+                      เวลาที่แจ้งเตือน: {activeOrder.rejectedAt}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* ปุ่มเชื่อมโยงเปิดไปหน้ารายการแจ้งเตือน */}
+              <button
+                type="button"
+                onClick={() => navigate('/notifications')}
+                className="self-start text-[11.5px] font-bold text-red-600 hover:text-red-800 flex items-center gap-1 -mt-1 cursor-pointer"
+              >
+                <span>ดูประวัติการแจ้งเตือนทั้งหมด</span>
+                <ChevronRight size={14} />
+              </button>
+
+              {/* ช่องแนบภาพสลิปใหม่ */}
+              <div className="pt-2 border-t border-red-200/80 flex flex-col gap-2.5">
+                <input
+                  ref={reUploadInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleSelectNewSlip}
+                  style={{ display: 'none' }}
+                />
+
+                {reUploadSlip ? (
+                  <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-red-200 bg-white shadow-xs">
+                    <img src={reUploadSlip} alt="New slip preview" className="w-full h-full object-contain" />
+                    <button
+                      type="button"
+                      onClick={() => setReUploadSlip(null)}
+                      className="absolute top-2 right-2 px-2.5 py-1 bg-slate-900/70 text-white rounded-lg text-xs font-bold"
+                    >
+                      เปลี่ยนรูปใหม่
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => reUploadInputRef.current?.click()}
+                    className="w-full py-3.5 rounded-2xl border-2 border-dashed border-red-300 hover:border-red-500 bg-white/80 text-red-600 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+                  >
+                    <Camera size={18} /> กดเพื่อถ่ายภาพหรือแนบสลิปใหม่
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSendNewSlip}
+                  disabled={!reUploadSlip || isSubmittingSlip}
+                  className={`w-full py-3 rounded-2xl font-bold text-xs shadow-sm transition flex items-center justify-center gap-2 cursor-pointer ${
+                    reUploadSlip && !isSubmittingSlip
+                      ? 'bg-[#1d61f2] hover:bg-blue-700 text-white shadow-blue-500/20'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  }`}
+                >
+                  <UploadCloud size={16} /> ส่งสลิปใหม่ให้ร้านตรวจสอบอีกครั้ง
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* การ์ดทักทาย & เวลาบริการ */}
           <div className="bg-gradient-to-br from-[#1d61f2] to-[#1447b8] rounded-3xl p-5 text-white shadow-lg shadow-blue-600/15 flex items-center justify-between">
             <div>
-              <span className="text-xs text-blue-200 font-medium block">ยินดีต้อนรับ</span>
+              <span className="text-xs text-blue-200 font-medium block">ยินดีต้อนรับ, </span>
               <h2 className="text-xl font-bold text-white tracking-tight mt-0.5">
                 คุณ {displayName}
               </h2>
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-sm text-xs text-blue-100 font-bold mt-2.5">
                 <Clock size={14} className="text-sky-300" />
-                บริการรับ-ส่งผ้าในวันเดียว เวลา 08:00 - 22:00 น.
+                รับ-ส่งวันเดียวกัน เปิด 08:00 - ปิด 22:00 น.
               </span>
             </div>
             <div className="w-13 h-13 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 ml-2 shadow-xs">
@@ -232,7 +429,7 @@ export default function HomePage() {
               <div>
                 <span className="text-sm font-bold text-red-800 block">ร้านปิดให้บริการชั่วคราว</span>
                 <span className="text-xs text-red-600 block mt-1 leading-relaxed">
-                  ขณะนี้ระบบปิดรับออเดอร์ใหม่ชั่วคราว ขออภัยในความไม่สะดวก
+                  ขณะนี้ระบบปิดรับออเดอร์ใหม่ชั่วคราวตามประกาศของผู้ดูแลระบบ
                 </span>
               </div>
             </div>
@@ -245,7 +442,7 @@ export default function HomePage() {
               <div>
                 <span className="text-sm font-bold text-red-800 block">วันนี้ร้านหยุดให้บริการ</span>
                 <span className="text-xs text-red-600 block mt-1 leading-relaxed">
-                  วันนี้ ({todayStr}) ปิดให้บริการเนื่องจากวันหยุดนักขัตฤกษ์ ขออภัยในความไม่สะดวก
+                  วันนี้ ({todayStr}) ร้านปิดประจำวัน ขออภัยในความไม่สะดวก
                 </span>
               </div>
             </div>
@@ -264,10 +461,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* ส่วนสลับ: มีออเดอร์ที่กำลังดำเนินงาน (1-6) -> โชว์ติดตามสถานะผ้า              */}
-          {/*          ยังไม่มีออเดอร์ / งานจบแล้ว (7) -> โชว์ Smart Banner สลับทุก 30 วินาที   */}
-          {/* ========================================================================= */}
+          {/* ส่วนแสดงสถานะผ้า / Smart Banner */}
           {hasOngoingOrder ? (
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -288,8 +482,10 @@ export default function HomePage() {
                     </h3>
                     <ChevronRight size={18} className="text-[#1d61f2]" />
                   </div>
+                  
+                  {/* แสดงวันเวลาจริง ณ ขณะนั้น ปลอดคำว่า "เพิ่งสร้าง / วันนี้" แน่นอน */}
                   <span className="text-xs text-slate-500 block mt-1 font-medium">
-                    ขั้นตอนที่ {activeOrder.statusStep} จาก {steps.length} • {activeOrder.estimatedTime}
+                    สร้างคำสั่งซื้อเมื่อ: {formatOrderTimestamp(activeOrder.createdAt)}
                   </span>
                 </div>
 
@@ -331,10 +527,8 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            /* แบนเนอร์สลับหมุนเวียน 3 หน้า - ปรับ Padding พอดีจอ ไม่แหว่ง */
+            /* Smart Rotating Banner */
             <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
-              
-              {/* หน้าที่ 1: ขั้นตอนส่งผ้าง่ายๆ ใน 3 ขั้นตอน */}
               {bannerIndex === 0 && (
                 <div className="w-full">
                   <div className="flex items-center gap-2.5 mb-3">
@@ -342,7 +536,7 @@ export default function HomePage() {
                       <Sparkles size={18} />
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm text-slate-800 leading-tight">ใช้บริการง่ายๆ ใน 3 ขั้นตอน</h3>
+                      <h3 className="font-bold text-sm text-slate-800 leading-tight">ส่งผ้าง่ายๆ ใน 3 ขั้นตอน</h3>
                       <span className="text-[11px] text-slate-400 font-medium">สะดวก รวดเร็ว ไม่ต้องเดินทาง</span>
                     </div>
                   </div>
@@ -352,7 +546,7 @@ export default function HomePage() {
                       <div className="w-7 h-7 rounded-lg bg-white shadow-xs text-[#1d61f2] flex items-center justify-center font-black text-xs mb-1">
                         1
                       </div>
-                      <span className="font-bold text-xs text-slate-800">จองบริการ</span>
+                      <span className="font-bold text-xs text-slate-800">สั่งซักผ้า</span>
                       <span className="text-[10px] text-slate-500 mt-0.5">เลือกบริการ</span>
                     </div>
 
@@ -361,7 +555,7 @@ export default function HomePage() {
                         2
                       </div>
                       <span className="font-bold text-xs text-slate-800">ไรเดอร์รับ</span>
-                      <span className="text-[10px] text-slate-500 mt-0.5">ถึงหน้าที่พัก</span>
+                      <span className="text-[10px] text-slate-500 mt-0.5">ถึงหน้าห้องพัก</span>
                     </div>
 
                     <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-blue-50/60 border border-blue-100/60">
@@ -375,7 +569,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* หน้าที่ 2: มาตรฐานสุขอนามัยและความสะอาด ไม่ซักปนกับใคร */}
               {bannerIndex === 1 && (
                 <div className="w-full">
                   <div className="flex items-center gap-2.5 mb-3">
@@ -384,14 +577,14 @@ export default function HomePage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-sm text-slate-800 leading-tight">มาตรฐานความสะอาดสูงสุด</h3>
-                      <span className="text-[11px] text-slate-400 font-medium">มั่นใจได้ทุกครั้งที่ส่งซักกับ N&amp;N Laundromat</span>
+                      <span className="text-[11px] text-slate-400 font-medium">มั่นใจได้ทุกครั้งที่ส่งซักกับ N&amp;N</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-center w-full">
                     <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-emerald-50/60 border border-emerald-100/60">
                       <PackageCheck size={20} className="text-emerald-600 mb-1" />
-                      <span className="font-bold text-xs text-slate-800">1 ตู้ ต่อ 1 คน</span>
+                      <span className="font-bold text-xs text-slate-800">1 ตู้ 1 คน</span>
                       <span className="text-[10px] text-slate-500 mt-0.5">ไม่ซักปนใคร</span>
                     </div>
 
@@ -410,7 +603,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* หน้าที่ 3: รับประกันส่งคืนวันเดียวกัน & ส่งรวดเร็ว */}
               {bannerIndex === 2 && (
                 <div className="w-full">
                   <div className="flex items-center gap-2.5 mb-3">
@@ -419,16 +611,16 @@ export default function HomePage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-sm text-slate-800 leading-tight">Same-Day Delivery</h3>
-                      <span className="text-[11px] text-slate-400 font-medium">ส่งคืนผ้าสะอาดภายในวันเดียว</span>
+                      <span className="text-[11px] text-slate-400 font-medium">ส่งคืนผ้าสะอาดภายในวันเดียวกัน</span>
                     </div>
                   </div>
 
                   <div className="p-3 bg-purple-50/60 border border-purple-100/70 rounded-2xl flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-white text-purple-600 flex items-center justify-center shadow-xs shrink-0">
-                        <Clock size={18} />
+                        <Truck size={18} />
                       </div>
-                        <div className="min-w-0 pr-1">
+                      <div className="min-w-0 pr-1">
                         <span className="text-xs font-bold text-slate-800 block">สั่งซักวันนี้ รับคืนวันนี้ทันที</span>
                         <span className="text-[10.5px] text-slate-500 block mt-0.5">ไม่ต้องรอนานหลายวัน ผ้าแห้งสนิท</span>
                       </div>
@@ -440,7 +632,6 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* จุด Dot Indicators แสดงสถานะสไลด์ & กดเลือกดูได้ */}
               <div className="flex items-center justify-center gap-1.5 pt-2.5 mt-2 border-t border-slate-100">
                 {[0, 1, 2].map((idx) => (
                   <button
@@ -454,7 +645,6 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-
             </div>
           )}
 
@@ -497,8 +687,8 @@ export default function HomePage() {
                 }`}>
                   <BedDouble size={26} />
                 </div>
-                <span className="font-bold text-sm text-slate-900">ชุดเครื่องนอน/ผ้านวม</span>
-                <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 200฿</span>
+                <span className="font-bold text-sm text-slate-900">ชุดเครื่องนอน/แยกชิ้น</span>
+                <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 10฿</span>
               </div>
             </div>
           </div>

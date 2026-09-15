@@ -100,9 +100,9 @@ const DashboardPage = () => {
 
   // รายชื่อไรเดอร์ประจำร้าน
   const riderList = [
-    { id: 'RD-01', name: 'สมชาย ส่งไว', phone: '089-111-2233' },
-    { id: 'RD-02', name: 'ธนาวุฒิ บริการดี', phone: '081-444-5566' },
-    { id: 'RD-03', name: 'กิตติศักดิ์ ซิ่งเร็ว', phone: '086-777-8899' },
+    { id: 'RD-01', name: 'วรรณา สีดา', phone: '089-111-2233' },
+    { id: 'RD-02', name: 'วันดี ทองอ่อน', phone: '081-444-5566' },
+    { id: 'RD-03', name: 'สตาร์ วินเพียว', phone: '086-777-8899' },
   ];
 
   const [selectedRiders, setSelectedRiders] = useState({});
@@ -126,6 +126,14 @@ const DashboardPage = () => {
 
   if (!activeAdmin) return null;
 
+  // ฟังก์ชันตัวช่วยดึงวันเวลาจริงตามเวลาไทย
+  const getThaiRealTimestamp = () => {
+    const now = new Date();
+    const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
+    const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+    return `${d}, ${t} น.`;
+  };
+
   // กรองรายการออเดอร์รอตรวจสอบสลิป (Step 1)
   const pendingSlipOrders = (orders || []).filter(o => 
     o.statusStep === 1 && 
@@ -141,10 +149,11 @@ const DashboardPage = () => {
     (o.customerName && o.customerName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // อนุมัติสลิปพร้อมระบุไรเดอร์
+  // อนุมัติสลิปพร้อมระบุไรเดอร์และเวลาจริง
   const handleApproveSlip = (orderId) => {
     const chosenRiderId = selectedRiders[orderId] || riderList[0].id;
     const chosenRider = riderList.find(r => r.id === chosenRiderId) || riderList[0];
+    const realTimeNow = getThaiRealTimestamp();
 
     if (!setOrders) return;
     setOrders(prev => prev.map(order => {
@@ -155,18 +164,51 @@ const DashboardPage = () => {
           statusTitle: 'ไรเดอร์ได้รับมอบหมาย กำลังไปรับผ้า',
           status: 'in_progress',
           paymentVerified: true,
+          paymentRejected: false,
+          rejectReason: null,
+          verifiedAt: realTimeNow,
           rider: chosenRider
         };
       }
       return order;
     }));
+
+    // อัปเดตรายการแจ้งเตือนเดิมที่เป็น alert ให้เคลียร์เป็น read แล้ว และบันทึกข้อความสำเร็จใหม่
+    let currentNotices = [];
+    try {
+      currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+    } catch (e) {
+      currentNotices = [];
+    }
+
+    const clearedNotices = currentNotices.map(n => {
+      if (n.orderId === orderId && n.type === 'alert') {
+        return { ...n, isRead: true };
+      }
+      return n;
+    });
+
+    const newNotice = {
+      id: Date.now(),
+      orderId,
+      title: 'สลิปได้รับการอนุมัติเรียบร้อย',
+      message: `ออเดอร์ #${orderId} ยอดเงินถูกต้อง ไรเดอร์ (${chosenRider.name}) กำลังเดินทางไปรับผ้า`,
+      time: realTimeNow,
+      type: 'success',
+      isRead: true // ตั้งค่าเป็นอ่านแล้วเพื่อไม่ให้กระดิ่งสั่นค้าง
+    };
+
+    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...clearedNotices]));
+
     alert(`อนุมัติคำสั่งซื้อ #${orderId} เรียบร้อยแล้ว มอบหมายให้ไรเดอร์ "${chosenRider.name}" ดูแลงาน`);
   };
 
-  // ปฏิเสธสลิป
+  // ปฏิเสธสลิปพร้อมส่งแจ้งเตือนและเวลาจริงไปยังลูกค้า
   const handleRejectSlip = (orderId) => {
-    const reason = prompt('ระบุสาเหตุที่ปฏิเสธสลิป (เช่น ยอดไม่ตรง, สลิปซ้ำ):');
+    const reason = prompt('ระบุสาเหตุที่ปฏิเสธสลิป (เช่น ยอดไม่ตรง, ภาพไม่ชัดเจน, สลิปซ้ำ):');
     if (!reason) return;
+
+    const realTimeNow = getThaiRealTimestamp();
 
     if (!setOrders) return;
     setOrders(prev => prev.map(order => {
@@ -175,16 +217,40 @@ const DashboardPage = () => {
           ...order,
           paymentRejected: true,
           rejectReason: reason,
-          statusTitle: 'สลิปไม่ถูกต้อง รอแนบใหม่'
+          rejectedAt: realTimeNow,
+          statusTitle: 'สลิปไม่ถูกต้อง (รอแนบสลิปใหม่)'
         };
       }
       return order;
     }));
-    alert(`ปฏิเสธสลิป #${orderId} เรียบร้อยแล้ว`);
+
+    // ส่งประวัติแจ้งเตือนไปยังหน้าของลูกค้า (ตั้งค่า isRead: false เพื่อให้กระดิ่งสั่นเตือน)
+    const newNotice = {
+      id: Date.now(),
+      orderId,
+      title: 'สลิปการโอนเงินไม่ถูกต้อง',
+      message: `ออเดอร์ #${orderId} ถูกปฏิเสธเนื่องจาก "${reason}" กรุณาแนบสลิปใหม่ในหน้าแรกของแอป`,
+      time: realTimeNow,
+      type: 'alert',
+      isRead: false
+    };
+
+    let currentNotices = [];
+    try {
+      currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+    } catch (e) {
+      currentNotices = [];
+    }
+
+    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...currentNotices]));
+
+    alert(`ปฏิเสธสลิป #${orderId} เรียบร้อยแล้ว ระบบได้ส่งการแจ้งเตือนไปยังลูกค้าแล้ว`);
   };
 
   // ทางร้านซักอบเสร็จแล้ว -> สั่งส่งคืนผ้า (Step 5 -> Step 6)
   const handleCompleteWashing = (orderId) => {
+    const realTimeNow = getThaiRealTimestamp();
+
     if (!setOrders) return;
     setOrders(prev => prev.map(order => {
       if (order.id === orderId) {
@@ -192,6 +258,7 @@ const DashboardPage = () => {
           ...order,
           statusStep: 6,
           statusTitle: 'ผ้าซักอบเสร็จแล้ว ไรเดอร์กำลังนำส่งคืนลูกค้า',
+          washedAt: realTimeNow
         };
       }
       return order;
@@ -240,7 +307,6 @@ const DashboardPage = () => {
           isSidebarOpen ? 'w-72' : 'w-20'
         } bg-slate-900 text-white flex flex-col justify-between shrink-0 shadow-2xl z-20 transition-all duration-300 relative`}
       >
-        {/* ปุ่มลูกศร Toggle ซ่อนตรงขอบ Sidebar */}
         <button
           type="button"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -249,7 +315,7 @@ const DashboardPage = () => {
         >
           {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>
-        
+
         <div>
           {/* ส่วนหัว Sidebar */}
           <div className="p-4 border-b border-slate-800 flex items-center gap-3 bg-slate-950/40 min-h-[80px]">
@@ -270,7 +336,6 @@ const DashboardPage = () => {
 
           {/* เมนูแท็บ */}
           <nav className="p-3 space-y-2">
-            {/* แท็บ 1 */}
             <button
               onClick={() => setActiveTab('slips')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -291,7 +356,6 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* แท็บ 2 */}
             <button
               onClick={() => setActiveTab('washing')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -312,7 +376,6 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* แท็บ 3 */}
             <button
               onClick={() => setActiveTab('analytics')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -326,7 +389,6 @@ const DashboardPage = () => {
               {isSidebarOpen && <span className="truncate">สรุปรายรับ</span>}
             </button>
 
-            {/* แท็บ 4 */}
             <button
               onClick={() => setActiveTab('calendar')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -373,7 +435,7 @@ const DashboardPage = () => {
       {/* 2. Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         
-        {/* Top Header Bar พร้อมปุ่ม Hamburger เมนู */}
+        {/* Top Header Bar */}
         <header className="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-xs">
           <div className="flex items-center gap-3">
             <button
@@ -771,7 +833,7 @@ const DashboardPage = () => {
                   <div className="w-full my-4 border-t border-slate-100 pt-3 text-xs text-slate-600 space-y-1 text-left">
                     <div className="flex justify-between"><span>ผู้โอน:</span> <span className="font-bold">{selectedSlipModal.customerName || 'คุณลูกค้า'}</span></div>
                     <div className="flex justify-between"><span>ยอดเงิน:</span> <span className="font-bold text-[#1d61f2]">{(selectedSlipModal.totalPrice || selectedSlipModal.price || 0).toLocaleString()} บาท</span></div>
-                    <div className="flex justify-between"><span>เวลาที่แจ้ง:</span> <span>{selectedSlipModal.createdAt || 'วันนี้'}</span></div>
+                    <div className="flex justify-between"><span>เวลาที่แจ้ง:</span> <span>{selectedSlipModal.createdAt || 'ไม่ระบุเวลา'}</span></div>
                   </div>
                   <span className="text-[11px] text-amber-600 bg-amber-50 px-3 py-1 rounded-full font-medium">
                     * ออเดอร์ทดสอบนี้ยังไม่ได้อัปโหลดไฟล์รูปจริง

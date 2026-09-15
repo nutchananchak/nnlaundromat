@@ -1,101 +1,64 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
+  ArrowLeft, 
   Bell, 
-  Package, 
-  CheckCircle2, 
-  Clock, 
   AlertTriangle, 
-  Store, 
-  ChevronRight, 
-  CheckCheck,
-  Sparkles,
-  Bike
+  CheckCircle2, 
+  Info, 
+  Clock, 
+  Trash2, 
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
+import { useApp } from '../../context/AppContext';
 
-export default function NotificationsPage() {
+export default function NotificationPage() {
   const navigate = useNavigate();
+  const { orders } = useApp ? useApp() : {};
+  const [notifications, setNotifications] = useState([]);
 
-  // ข้อมูลจำลองการแจ้งเตือนเน้นสถานะผ้า + เวลาเปิด-ปิด/วันหยุด
-  const [notifications, setNotifications] = useState([
-    {
-      id: 'notif-1',
-      type: 'order',
-      title: 'ผ้าของคุณกำลังอยู่ในกระบวนการซัก-อบ',
-      description: 'ออเดอร์ #NN-849201 ทางร้านได้รับผ้าเรียบร้อยแล้วและกำลังดำเนินการซัก-อบตามมาตรฐาน',
-      time: '15 นาทีที่แล้ว',
-      isRead: false,
-      targetPath: '/home',
-      icon: Sparkles,
-      color: '#1d61f2',
-      bgColor: '#eff6ff',
-    },
-    {
-      id: 'notif-2',
-      type: 'store_alert',
-      title: 'แจ้งหยุดให้บริการชั่วคราว (ปรับปรุงระบบน้ำประปา)',
-      description: 'ทางร้าน N&N Laundromat ขอหยุดรับบริการในวันที่ 5 ก.ย. 2026 เวลา 09:00 - 13:00 น. และจะเปิดรอบจัดส่งตามปกติหลังเวลาดังกล่าว',
-      time: '1 ชั่วโมงที่แล้ว',
-      isRead: false,
-      targetPath: null,
-      icon: AlertTriangle,
-      color: '#ea580c',
-      bgColor: '#fff7ed',
-    },
-    {
-      id: 'notif-3',
-      type: 'order',
-      title: 'ไรเดอร์กำลังเดินทางนำผ้ามาส่งคืน',
-      description: 'ออเดอร์ #NN-849201 ซัก อบ พับ เรียบร้อยแล้ว ไรเดอร์กำลังเดินทางไปส่งที่หอพักใจดี ห้อง 204',
-      time: '3 ชั่วโมงที่แล้ว',
-      isRead: true,
-      targetPath: '/home',
-      icon: Bike,
-      color: '#0284c7',
-      bgColor: '#f0f9ff',
-    },
-    {
-      id: 'notif-4',
-      type: 'store_schedule',
-      title: 'แจ้งเวลาทำการช่วงวันหยุดนักขัตฤกษ์',
-      description: 'ร้านเปิดให้บริการตามปกติ ทุกวันจันทร์ - อาทิตย์ เวลา 08:00 - 21:00 น. สามารถสั่งบริการรับ-ส่งล่วงหน้าได้ตลอด 24 ชม.',
-      time: '28 ส.ค. 2026',
-      isRead: true,
-      targetPath: null,
-      icon: Store,
-      color: '#16a34a',
-      bgColor: '#f0fdf4',
-    },
-    {
-      id: 'notif-5',
-      type: 'order',
-      title: 'ส่งมอบผ้าสำเร็จเรียบร้อย',
-      description: 'ออเดอร์ #NN-739182 ส่งคืนเรียบร้อยแล้ว ขอบคุณที่ไว้วางใจใช้บริการ N&N Laundromat',
-      time: '28 ส.ค. 2026',
-      isRead: true,
-      targetPath: '/orders/NN-739182',
-      icon: CheckCircle2,
-      color: '#059669',
-      bgColor: '#ecfdf5',
+  useEffect(() => {
+    // 1. โหลดข้อมูลแจ้งเตือนจาก localStorage
+    const saved = localStorage.getItem('customerNotifications');
+    let list = [];
+    if (saved) {
+      try {
+        list = JSON.parse(saved);
+      } catch (e) {
+        list = [];
+      }
     }
-  ]);
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(item => ({ ...item, isRead: true })));
-  };
+    // หากไม่มีแจ้งเตือนใน storage แต่มีออเดอร์ในระบบ สร้าง mock default เริ่มต้น
+    if (list.length === 0 && orders && orders.length > 0) {
+      list = [
+        {
+          id: 1,
+          title: 'ยินดีต้อนรับสู่ N&N Laundromat',
+          message: 'ขอบคุณที่เลือกใช้บริการซัก อบ พับ เดลิเวอรี่ของเราครับ',
+          time: 'วันนี้',
+          type: 'info',
+          isRead: true
+        }
+      ];
+    }
 
-  const handleNotificationClick = (notif) => {
-    setNotifications(prev => 
-      prev.map(item => item.id === notif.id ? { ...item, isRead: true } : item)
-    );
+    setNotifications(list);
 
-    if (notif.targetPath) {
-      navigate(notif.targetPath);
+    // 2. เมื่อเข้ามาหน้านี้ ถือว่าผู้ใช้เปิดดูแล้ว -> มาร์กทุกข้อความว่า isRead = true เพื่อให้กระดิ่งหยุดสั่น
+    const updatedAsRead = list.map(item => ({ ...item, isRead: true }));
+    localStorage.setItem('customerNotifications', JSON.stringify(updatedAsRead));
+  }, [orders]);
+
+  // ล้างการแจ้งเตือนทั้งหมด
+  const handleClearAll = () => {
+    if (window.confirm('คุณต้องการลบรายการแจ้งเตือนทั้งหมดหรือไม่?')) {
+      localStorage.setItem('customerNotifications', JSON.stringify([]));
+      setNotifications([]);
     }
   };
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
     <div style={{
@@ -119,115 +82,113 @@ export default function NotificationsPage() {
         position: 'relative',
         overflowX: 'hidden',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-      }} className="font-body">
+      }} className="font-body text-base">
 
-        {/* Header */}
-        <div style={{
-          background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
-          color: '#ffffff',
-          boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
-          flexShrink: 0
-        }} className="rounded-b-3xl px-6 pt-6 pb-6 flex items-center justify-between z-20">
-          <div>
-            <p style={{ color: 'rgba(255, 255, 255, 0.8)' }} className="text-xs font-medium">N&N Laundromat</p>
-            <h1 style={{ color: '#ffffff' }} className="font-bold text-xl tracking-tight flex items-center gap-2">
-              การแจ้งเตือน
-              {unreadCount > 0 && (
-                <span className="text-[11px] bg-red-500 text-white font-bold px-2 py-0.5 rounded-full shadow-sm">
-                  {unreadCount} ใหม่
-                </span>
-              )}
-            </h1>
-          </div>
-
-          {unreadCount > 0 && (
+        {/* ส่วนหัว Header */}
+        <div 
+          style={{
+            background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
+            boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
+          }}
+          className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
+        >
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleMarkAllAsRead}
-              className="text-xs font-bold bg-white/20 text-white px-3 py-1.5 rounded-xl hover:bg-white/30 transition cursor-pointer flex items-center gap-1"
-              title="อ่านทั้งหมด"
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
             >
-              <CheckCheck size={14} />
-              อ่านทั้งหมด
+              <ArrowLeft size={18} />
+            </button>
+            <div>
+              <h1 className="text-lg font-bold text-white leading-tight">กล่องข้อความแจ้งเตือน</h1>
+              <span className="text-xs text-blue-200 font-medium">อัปเดตสถานะออเดอร์และการเงิน</span>
+            </div>
+          </div>
+
+          {notifications.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-red-500 text-white flex items-center justify-center transition cursor-pointer"
+              title="ลบแจ้งเตือนทั้งหมด"
+            >
+              <Trash2 size={16} />
             </button>
           )}
         </div>
 
-        {/* Scrollable Notification List */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 pb-24 flex flex-col gap-3">
-          
+        {/* เนื้อหารายการแจ้งเตือน */}
+        <div className="flex-1 overflow-y-auto p-4 pb-24 flex flex-col gap-3">
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div style={{ backgroundColor: '#eff6ff', color: '#1d61f2' }} className="w-16 h-16 rounded-full flex items-center justify-center mb-3">
-                <Bell size={32} />
+            <div className="flex flex-col items-center justify-center py-28 text-center text-slate-400 gap-3">
+              <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-300">
+                <Bell size={28} />
               </div>
-              <h3 style={{ color: '#1e293b' }} className="font-bold text-sm mb-1">ไม่มีการแจ้งเตือน</h3>
-              <p style={{ color: '#94a3b8' }} className="text-xs max-w-[200px]">
-                อัปเดตสถานะผ้าและประกาศสำคัญจากทางร้านจะแสดงที่นี่
-              </p>
+              <div>
+                <span className="text-sm font-bold text-slate-700 block">ไม่มีข้อความแจ้งเตือน</span>
+                <span className="text-xs text-slate-400 mt-0.5 block">เมื่อมีอัปเดตสลิปหรือสถานะงาน ข้อความจะปรากฏที่นี่</span>
+              </div>
             </div>
           ) : (
-            notifications.map((notif) => {
-              const Icon = notif.icon;
+            notifications.map((item) => {
+              const isAlert = item.type === 'alert';
+              const isSuccess = item.type === 'success';
 
               return (
                 <div
-                  key={notif.id}
-                  onClick={() => handleNotificationClick(notif)}
-                  style={{ 
-                    backgroundColor: notif.isRead ? '#ffffff' : '#f8faff',
-                    borderColor: notif.isRead ? '#f1f5f9' : '#bfdbfe' 
-                  }}
-                  className={`rounded-2xl p-4 border transition cursor-pointer flex items-start gap-3.5 shadow-sm hover:border-blue-300 relative ${
-                    !notif.isRead ? 'ring-1 ring-blue-100' : ''
+                  key={item.id}
+                  onClick={() => navigate('/')}
+                  className={`p-4 rounded-3xl border transition cursor-pointer flex items-start gap-3.5 shadow-xs ${
+                    isAlert 
+                      ? 'bg-red-50/80 border-red-200 hover:border-red-300' 
+                      : isSuccess
+                      ? 'bg-emerald-50/60 border-emerald-200 hover:border-emerald-300'
+                      : 'bg-white border-slate-100 hover:border-blue-200'
                   }`}
                 >
-                  {/* จุดสถานะยังไม่ได้อ่าน */}
-                  {!notif.isRead && (
-                    <div className="w-2 h-2 rounded-full bg-[#1d61f2] absolute top-4 right-4"></div>
-                  )}
-
-                  {/* ไอคอนตามประเภท */}
-                  <div
-                    style={{ backgroundColor: notif.bgColor, color: notif.color }}
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5 shadow-sm"
-                  >
-                    <Icon size={20} />
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5 shadow-2xs ${
+                    isAlert
+                      ? 'bg-red-500 text-white'
+                      : isSuccess
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-[#1d61f2] text-white'
+                  }`}>
+                    {isAlert && <AlertTriangle size={20} />}
+                    {isSuccess && <CheckCircle2 size={20} />}
+                    {!isAlert && !isSuccess && <Sparkles size={20} />}
                   </div>
 
-                  {/* ข้อความแจ้งเตือน */}
-                  <div className="flex-1 min-w-0 pr-2">
-                    <h3 
-                      style={{ color: notif.isRead ? '#1e293b' : '#0f172a' }} 
-                      className={`text-xs leading-snug ${notif.isRead ? 'font-bold' : 'font-extrabold'}`}
-                    >
-                      {notif.title}
-                    </h3>
-                    <p style={{ color: '#64748b' }} className="text-[11px] mt-1 leading-relaxed">
-                      {notif.description}
-                    </p>
-                    <div className="flex items-center gap-1 mt-2">
-                      <Clock size={11} style={{ color: '#94a3b8' }} />
-                      <span style={{ color: '#94a3b8' }} className="text-[10px] font-medium">
-                        {notif.time}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-sm font-bold truncate ${
+                        isAlert ? 'text-red-900' : isSuccess ? 'text-emerald-900' : 'text-slate-800'
+                      }`}>
+                        {item.title}
+                      </h4>
+                      <span className="text-[10px] text-slate-400 font-medium shrink-0 ml-2">
+                        {item.time}
                       </span>
                     </div>
-                  </div>
 
-                  {/* ลูกศรนำทาง (เฉพาะรายการสถานะผ้าที่มีปลายทาง) */}
-                  {notif.targetPath && (
-                    <div className="self-center text-gray-400 shrink-0">
-                      <ChevronRight size={16} />
-                    </div>
-                  )}
+                    <p className={`text-xs mt-1 leading-relaxed ${
+                      isAlert ? 'text-red-700' : isSuccess ? 'text-emerald-700' : 'text-slate-500'
+                    }`}>
+                      {item.message}
+                    </p>
+
+                    {isAlert && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 mt-2 bg-white px-2.5 py-1 rounded-lg border border-red-200 shadow-2xs">
+                        แตะเพื่อไปแนบสลิปใหม่ที่หน้าหลัก <ChevronRight size={13} />
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })
           )}
-
         </div>
 
-        {/* แถบเมนูล่าง */}
         <BottomNav />
       </div>
     </div>
