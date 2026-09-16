@@ -60,27 +60,51 @@ export function AppProvider({ children }) {
     localStorage.removeItem('rememberRider');
   };
 
-  // 3. หมุดที่อยู่ลูกค้า
-  const [addresses, setAddresses] = useState([
-    {
-      id: 'addr-1',
-      title: 'หอพัก (ค่าเริ่มต้น)',
-      detail: 'หอพักปิยมนต์ ห้อง 204 (ซอยอ่อนนุช 30)',
-      lat: 13.8415,
-      lng: 100.5789,
-      isDefault: true,
-    },
-    {
-      id: 'addr-2',
-      title: 'บ้าน / คอนโด',
-      detail: 'คอนโดลุมพินี พาร์ค อาคาร B ชั้น 12 ห้อง 1205',
-      lat: 13.8322,
-      lng: 100.5712,
-      isDefault: false,
+  // 3. หมุดที่อยู่ลูกค้า (เริ่มต้นเป็น Array ว่างเปล่า 100% ถ้ายังไม่มีการปักหมุด)
+  const [addresses, setAddresses] = useState(() => {
+    try {
+      const saved = localStorage.getItem('addresses');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // คัดกรองเอา Mock data เก่าที่เคยบันทึกไว้ออก
+        return parsed.filter(a => 
+          !a.detail?.includes('ปิยมนต์') && 
+          !a.detail?.includes('ลุมพินี') &&
+          a.id !== 'addr-1' &&
+          a.id !== 'addr-2'
+        );
+      }
+    } catch (e) {
+      // JSON parse error handling
     }
-  ]);
+    return []; // ค่าเริ่มต้นว่างเปล่า ไม่มีการใส่ที่อยู่จำลอง
+  });
 
-  const [selectedAddressId, setSelectedAddressId] = useState('addr-1');
+  // รหัสหมุดที่อยู่เริ่มต้นที่เลือกใช้งาน
+  const [selectedAddressId, setSelectedAddressId] = useState(() => {
+    return localStorage.getItem('selectedAddressId') || null;
+  });
+
+  // ซิงค์ addresses และ selectedAddressId ลง localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('addresses', JSON.stringify(addresses));
+
+      if (addresses.length > 0) {
+        const hasSelected = addresses.some(a => a.id === selectedAddressId);
+        if (!hasSelected) {
+          const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
+          setSelectedAddressId(defaultAddr.id);
+          localStorage.setItem('selectedAddressId', defaultAddr.id);
+        }
+      } else {
+        setSelectedAddressId(null);
+        localStorage.removeItem('selectedAddressId');
+      }
+    } catch (e) {
+      // Storage error handling
+    }
+  }, [addresses, selectedAddressId]);
 
   // 4. รายการออเดอร์ (ล้าง Mock Data ทิ้งทั้งหมด เริ่มต้นเป็น Array ว่างเปล่า)
   const [orders, setOrders] = useState(() => {
@@ -88,7 +112,6 @@ export function AppProvider({ children }) {
       const savedOrders = localStorage.getItem('orders');
       if (savedOrders) {
         const parsed = JSON.parse(savedOrders);
-        // คัดกรองออเดอร์ม็อกตัวอย่างเก่าทิ้ง เหลือเฉพาะออเดอร์ที่สร้างจริง
         return parsed.filter(o => 
           o.customerName !== 'ลูกค้าทั่วไป' && 
           o.id !== 'NN-1024' && 
@@ -101,7 +124,6 @@ export function AppProvider({ children }) {
     return [];
   });
 
-  // ซิงค์ orders ลง localStorage เมื่อมีการเปลี่ยนแปลง
   useEffect(() => {
     try {
       localStorage.setItem('orders', JSON.stringify(orders));
@@ -110,13 +132,16 @@ export function AppProvider({ children }) {
     }
   }, [orders]);
 
-  // ค้นหาออเดอร์ที่กำลังดำเนินงานจริง (ยังไม่เสร็จสิ้น)
+  // ค้นหาออเดอร์ที่กำลังดำเนินงานจริง
   const activeOrder = orders.find(o => 
     o.status === 'in_progress' || 
     (Number(o.statusStep) >= 1 && Number(o.statusStep) < 7)
   );
 
-  const currentAddress = addresses.find(a => a.id === selectedAddressId) || addresses[0];
+  // ดึงที่อยู่ที่เลือกใช้งานจริง (ถ้ายังไม่มีการปักหมุด จะได้ค่า null ทันที)
+  const currentAddress = addresses.length > 0 
+    ? (addresses.find(a => a.id === selectedAddressId) || addresses[0]) 
+    : null;
 
   return (
     <AppContext.Provider value={{

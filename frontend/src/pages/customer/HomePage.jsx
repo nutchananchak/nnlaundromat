@@ -37,11 +37,9 @@ export default function HomePage() {
   const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [selectedService, setSelectedService] = useState('wash_dry_fold');
 
-  // State สำหรับการแนบสลิปใหม่บนหน้าแรก
   const [reUploadSlip, setReUploadSlip] = useState(null);
   const [isSubmittingSlip, setIsSubmittingSlip] = useState(false);
 
-  // สถานะเปิด-ปิดร้าน และวันหยุด
   const [isStoreOpen, setIsStoreOpen] = useState(true);
   const [closedDates, setClosedDates] = useState([]);
   const [bannerIndex, setBannerIndex] = useState(0);
@@ -62,7 +60,6 @@ export default function HomePage() {
     }
   }, []);
 
-  // ฟังก์ชันสร้าง Timestamp จริงตามเวลาไทย
   const getThaiTimestamp = () => {
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
@@ -70,7 +67,6 @@ export default function HomePage() {
     return `${d}, ${t} น.`;
   };
 
-  // ดักจับและแปลงเวลาให้เป็นวันเวลาจริงเสมอ เลิกใช้ "เพิ่งสร้าง / วันนี้"
   const formatOrderTimestamp = (timestamp) => {
     if (!timestamp || String(timestamp).includes('เพิ่งสร้าง') || String(timestamp).trim() === 'วันนี้') {
       const now = new Date();
@@ -81,7 +77,6 @@ export default function HomePage() {
     return timestamp;
   };
 
-  // ตรวจสอบว่ามีงานที่กำลังดำเนินการจริง (Step 1 - 6)
   const hasOngoingOrder = Boolean(
     activeOrder && 
     Number(activeOrder.statusStep) >= 1 && 
@@ -89,10 +84,8 @@ export default function HomePage() {
     !activeOrder.isCompleted
   );
 
-  // ตรวจสอบว่าออเดอร์ปัจจุบันติดสถานะสลิปถูกปฏิเสธหรือไม่
   const isSlipRejected = Boolean(activeOrder && activeOrder.paymentRejected);
 
-  // ซิงค์แจ้งเตือนเมื่อตรวจพบว่าออเดอร์ถูกปฏิเสธสลิป เพื่อให้ BottomNav ทราบและสั่นเตือน
   useEffect(() => {
     if (isSlipRejected && activeOrder) {
       const realTimeNow = getThaiTimestamp();
@@ -120,7 +113,6 @@ export default function HomePage() {
     }
   }, [isSlipRejected, activeOrder]);
 
-  // Timer สลับแบนเนอร์ทุก 30 วินาที เมื่อไม่มีออเดอร์ค้าง
   useEffect(() => {
     if (hasOngoingOrder) return;
 
@@ -169,6 +161,11 @@ export default function HomePage() {
       alert('ขออภัย วันนี้เป็นวันหยุดประจำของทางร้าน งดให้บริการรับ-ส่งผ้า');
       return;
     }
+    if (!currentAddress) {
+      alert('กรุณาปักหมุดที่อยู่สำหรับจัดส่งผ้าในระบบก่อนทำรายการ');
+      navigate('/profile');
+      return;
+    }
 
     navigate('/order/new', {
       state: {
@@ -186,7 +183,6 @@ export default function HomePage() {
     }
   };
 
-  // จัดการอัปโหลดสลิปใหม่บนหน้าแรก
   const handleSelectNewSlip = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -198,7 +194,6 @@ export default function HomePage() {
     }
   };
 
-  // ส่งสลิปใหม่กลับไปให้ Admin ตรวจสอบ และซิงค์เคลียร์แจ้งเตือน
   const handleSendNewSlip = () => {
     if (!reUploadSlip) {
       alert('กรุณาเลือกรูปภาพสลิปก่อนกดยืนยัน');
@@ -279,7 +274,7 @@ export default function HomePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
-        {/* 1. Top Bar สีน้ำเงิน โค้งมน */}
+        {/* 1. Top Bar โทนเรียบ สุภาพ */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
@@ -287,9 +282,15 @@ export default function HomePage() {
           }}
           className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
         >
-          {/* หมุดเลือกสถานที่ส่งผ้า */}
+          {/* หมุดเลือกสถานที่ส่งผ้า (แบบสีกลมกลืน) */}
           <div 
-            onClick={() => setShowAddressPicker(true)}
+            onClick={() => {
+              if (!addresses || addresses.length === 0) {
+                navigate('/profile');
+              } else {
+                setShowAddressPicker(true);
+              }
+            }}
             className="flex items-center gap-2.5 cursor-pointer max-w-[290px] group"
           >
             <div className="w-10 h-10 rounded-2xl bg-white/20 border border-white/30 text-white flex items-center justify-center shrink-0 shadow-xs">
@@ -300,15 +301,14 @@ export default function HomePage() {
                 ส่งผ้าที่
               </span>
               <div className="flex items-center gap-1 mt-1">
-                <span className="text-sm font-bold text-white truncate">
-                  {currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : 'เลือกสถานที่รับ-ส่งผ้า'}
+                <span className="text-sm font-bold truncate text-white">
+                  {currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : 'ยังไม่ระบุที่อยู่ (แตะเพื่อปักหมุด)'}
                 </span>
                 <ChevronDown size={16} className="text-blue-200 group-hover:text-white transition shrink-0" />
               </div>
             </div>
           </div>
 
-          {/* ปุ่ม Logout ทางขวามือ */}
           <div className="flex items-center">
             <button 
               type="button"
@@ -324,7 +324,7 @@ export default function HomePage() {
         {/* 2. Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4 pb-40 flex flex-col gap-4">
 
-          {/* กล่องแจ้งเตือนสลิปไม่ผ่าน เชื่อมโยงกับ Notification Center */}
+          {/* แจ้งเตือนสลิปไม่ผ่าน */}
           {isSlipRejected && (
             <div className="bg-red-50 border-2 border-red-300 rounded-3xl p-5 shadow-md flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-300">
               <div className="flex items-start gap-3">
@@ -348,7 +348,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* ปุ่มเชื่อมโยงเปิดไปหน้ารายการแจ้งเตือน */}
               <button
                 type="button"
                 onClick={() => navigate('/notifications')}
@@ -358,7 +357,6 @@ export default function HomePage() {
                 <ChevronRight size={14} />
               </button>
 
-              {/* ช่องแนบภาพสลิปใหม่ */}
               <div className="pt-2 border-t border-red-200/80 flex flex-col gap-2.5">
                 <input
                   ref={reUploadInputRef}
@@ -374,7 +372,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={() => setReUploadSlip(null)}
-                      className="absolute top-2 right-2 px-2.5 py-1 bg-slate-900/70 text-white rounded-lg text-xs font-bold"
+                      className="absolute top-2 right-2 px-2.5 py-1 bg-slate-900/70 text-white rounded-lg text-xs font-bold cursor-pointer"
                     >
                       เปลี่ยนรูปใหม่
                     </button>
@@ -483,7 +481,6 @@ export default function HomePage() {
                     <ChevronRight size={18} className="text-[#1d61f2]" />
                   </div>
                   
-                  {/* แสดงวันเวลาจริง ณ ขณะนั้น ปลอดคำว่า "เพิ่งสร้าง / วันนี้" แน่นอน */}
                   <span className="text-xs text-slate-500 block mt-1 font-medium">
                     สร้างคำสั่งซื้อเมื่อ: {formatOrderTimestamp(activeOrder.createdAt)}
                   </span>
@@ -527,7 +524,6 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            /* Smart Rotating Banner */
             <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
               {bannerIndex === 0 && (
                 <div className="w-full">
@@ -641,7 +637,6 @@ export default function HomePage() {
                     className={`h-1.5 rounded-full transition-all cursor-pointer ${
                       bannerIndex === idx ? 'w-6 bg-[#1d61f2]' : 'w-2 bg-slate-200 hover:bg-slate-300'
                     }`}
-                    title={`ไปที่ข้อมูลหน้า ${idx + 1}`}
                   />
                 ))}
               </div>

@@ -27,7 +27,7 @@ export default function NewOrderPage() {
   const galleryInputRef = useRef(null);
 
   const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
-  const displayAddress = currentAddress?.detail || reorderData.address || 'ยังไม่ได้ระบุที่อยู่จัดส่ง';
+  const displayAddress = currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : (reorderData.address || null);
 
   const packages = serviceType === 'bedding' ? [
     { id: '3.5ft', name: 'ชุดเครื่องนอน 3.5 ฟุต', price: 200, desc: 'ประกอบด้วย 5 ชิ้น ผ้านวมและผ้าปู 3.5 ฟุตอย่างละ 1 ผืน ปอกหมอน 1 ชิ้น ปอกหมอนข้าง 2 ชิ้น' },
@@ -50,7 +50,6 @@ export default function NewOrderPage() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [plasticBagCount, setPlasticBagCount] = useState(0);
 
-  // ข้อมูลรอบเวลาพร้อมระบุเวลาเริ่มต้น (ชั่วโมง)
   const timeSlotsConfig = [
     { label: '08:00 - 09:00 น.', startHour: 8 },
     { label: '10:00 - 11:00 น.', startHour: 10 },
@@ -71,11 +70,9 @@ export default function NewOrderPage() {
     { label: '21:00 - 22:00 น.', startHour: 21 },
   ];
 
-  // คำนวณชั่วโมงปัจจุบัน (เช่น 15:20 = 15.33)
   const now = new Date();
   const currentDecimalHour = now.getHours() + now.getMinutes() / 60;
 
-  // รอบเวลารับผ้าที่ผ่านเวลาไปแล้ว
   const availablePickupSlots = useMemo(() => {
     return timeSlotsConfig.map(slot => ({
       ...slot,
@@ -86,7 +83,6 @@ export default function NewOrderPage() {
   const defaultPickup = availablePickupSlots.find(s => !s.isExpired)?.label || '';
   const [pickupTime, setSelectedPickupTime] = useState(defaultPickup);
 
-  // รอบเวลาส่งผ้าคืนต้องอยู่หลังรอบรับผ้าอย่างน้อย 2 ชม. และยังไม่หมดเวลา
   const selectedPickupConfig = timeSlotsConfig.find(s => s.label === pickupTime);
   const minDeliveryHour = selectedPickupConfig ? selectedPickupConfig.startHour + 2 : currentDecimalHour + 2;
 
@@ -114,7 +110,6 @@ export default function NewOrderPage() {
     }
   };
 
-  // รายการตัวเลือกพิเศษ
   const washDrySpecialOptions = [
     { id: 'silk', name: 'ผ้าไหม', price: 100, unit: 'ตัว' },
     { id: 'leather', name: 'เสื้อหนัง', price: 80, unit: 'ตัว' },
@@ -184,6 +179,12 @@ export default function NewOrderPage() {
   const handleCreateOrder = (e) => {
     e.preventDefault();
 
+    if (!displayAddress) {
+      alert('กรุณาปักหมุดที่อยู่สำหรับจัดส่งผ้าก่อนยืนยันออเดอร์');
+      navigate('/profile');
+      return;
+    }
+
     if (!pickupTime) {
       alert('รอบเวลารับผ้าสำหรับวันนี้หมดแล้ว โปรดเลือกบริการในวันถัดไป');
       return;
@@ -231,6 +232,8 @@ export default function NewOrderPage() {
           plasticBagCount,
           plasticBagPrice,
           address: displayAddress,
+          lat: currentAddress?.lat,
+          lng: currentAddress?.lng,
           basketImage,
           note,
           totalPrice,
@@ -291,22 +294,24 @@ export default function NewOrderPage() {
           {/* 1. สถานที่รับ-ส่งผ้า */}
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-2">สถานที่รับ-ส่งผ้า</label>
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-start gap-3 shadow-sm">
-              <MapPin className="text-[#1d61f2] shrink-0 mt-0.5" size={20} />
+            <div className={`p-4 rounded-2xl border flex items-start gap-3 shadow-sm ${
+              displayAddress ? 'bg-white border-gray-100' : 'bg-amber-50/70 border-amber-200'
+            }`}>
+              <MapPin className={displayAddress ? 'text-[#1d61f2]' : 'text-amber-500'} size={20} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-gray-400 font-medium">
                   {currentAddress?.title ? `ที่อยู่จัดส่ง (${currentAddress.title})` : 'ที่อยู่จัดส่ง'}
                 </p>
-                <p className="text-sm font-semibold text-gray-800 truncate mt-0.5">
-                  {displayAddress}
+                <p className={`text-sm font-semibold truncate mt-0.5 ${displayAddress ? 'text-gray-800' : 'text-amber-700'}`}>
+                  {displayAddress || 'ยังไม่ได้ระบุที่อยู่จัดส่ง (โปรดปักหมุด)'}
                 </p>
               </div>
               <button 
                 type="button" 
                 onClick={() => navigate('/profile')}
-                className="text-xs text-[#1d61f2] font-semibold self-center shrink-0 hover:underline cursor-pointer"
+                className="text-xs text-[#1d61f2] font-bold self-center shrink-0 hover:underline cursor-pointer"
               >
-                เปลี่ยน
+                {displayAddress ? 'เปลี่ยน' : 'ปักหมุด'}
               </button>
             </div>
           </div>
@@ -353,7 +358,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 3. ความต้องการพิเศษ (Special Requests) */}
+          {/* 3. ความต้องการพิเศษ */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">
@@ -411,7 +416,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 3.1 ตัวเลือกรับถุงพลาสติกใส่ผ้า (5 บาท/ใบ) */}
+          {/* 3.1 ตัวเลือกรับถุงพลาสติกใส่ผ้า */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">
@@ -458,7 +463,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 4. รอบเวลารับผ้า (คัดกรองเวลาปัจจุบัน ไม่ขีดฆ่า แค่กดไม่ได้) */}
+          {/* 4. รอบเวลารับผ้า */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">รอบเวลารับผ้า</label>
@@ -493,7 +498,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 5. รอบเวลาส่งผ้าคืน (คัดกรองให้อยู่หลังรอบรับผ้า ไม่ขีดฆ่า แค่กดไม่ได้) */}
+          {/* 5. รอบเวลาส่งผ้าคืน */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">รอบเวลาส่งผ้าคืน</label>
