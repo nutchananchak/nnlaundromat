@@ -66,7 +66,7 @@ const BrandLogo = ({ size = 48 }) => (
       LAUNDROMAT
     </text>
     <text x="60" y="106" textAnchor="middle" fill="#64748b" fontSize="6.5" fontWeight="700" fontFamily="sans-serif" letterSpacing="1.5">
-      DELIVERY SERVICE
+      DELIVERY
     </text>
   </svg>
 );
