@@ -784,7 +784,7 @@ export default function HomePage() {
                         onClick={() => setCancelReason(reason)}
                         className={`py-3 px-3.5 rounded-xl border text-xs cursor-pointer transition-all ${
                           isSelected 
-                            ? 'bg-grey-50/80 border-[#1d61f2] text-[#1d61f2] font-bold shadow-xs' 
+                            ? 'bg-blue-50/80 border-[#1d61f2] text-[#1d61f2] font-bold shadow-xs' 
                             : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >

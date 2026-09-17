@@ -6,15 +6,12 @@ import {
   Phone, 
   Navigation, 
   Camera, 
-  CheckCircle2, 
   Clock, 
-  FileText, 
-  Trash2,
-  Truck
+  Trash2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
-const TaskDetailPage = () => {
+export default function TaskDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { orders, setOrders } = useApp ? useApp() : {};
@@ -36,7 +33,7 @@ const TaskDetailPage = () => {
   }, [activeRider, navigate]);
 
   const order = (orders || []).find((o) => String(o.id) === String(id));
-  const [proofImage, setProofImage] = useState(order?.proofImage || null);
+  const [proofImage, setProofImage] = useState(order?.riderBasketImage || order?.proofImage || null);
 
   if (!activeRider) return null;
 
@@ -90,37 +87,40 @@ const TaskDetailPage = () => {
     }
   };
 
-  // ฟังก์ชันเลื่อนสถานะงาน พร้อมบันทึกเวลาจริง
+  // เลื่อนสถานะงาน พร้อมบันทึกเวลาจริง และรูปถ่ายตะกร้าจากไรเดอร์
   const handleAdvanceStep = (nextStep, nextTitle) => {
-    if (!setOrders) return;
-
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
     const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
     const realNowTimestamp = `${d}, ${t} น.`;
 
-    setOrders((prev) =>
-      prev.map((item) => {
-        if (String(item.id) === String(order.id)) {
-          const isDone = nextStep === 7;
-          return {
-            ...item,
-            statusStep: nextStep,
-            statusTitle: nextTitle,
-            status: isDone ? 'completed' : item.status,
-            isCompleted: isDone,
-            proofImage: proofImage || item.proofImage,
-            // เมื่อไรเดอร์กดยืนยันส่งผ้า (Step 7) ให้บันทึกเวลาที่ส่งมอบสำเร็จจริง
-            deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
-            deliveryRiderName: activeRider?.name || item.rider?.name || 'ไรเดอร์ประจำร้าน'
-          };
-        }
-        return item;
-      })
-    );
+    const isDone = nextStep === 7;
 
-    // หากเป็นการส่งผ้าสำเร็จ (Step 7) ให้ส่งข้อความแจ้งเตือนไปยังฝั่งลูกค้า
-    if (nextStep === 7) {
+    const updatedOrders = (orders || []).map((item) => {
+      if (String(item.id) === String(order.id)) {
+        return {
+          ...item,
+          statusStep: nextStep,
+          statusTitle: nextTitle,
+          status: isDone ? 'completed' : item.status,
+          isCompleted: isDone,
+          // บันทึกรูปถ่ายของไรเดอร์เข้า riderBasketImage เมื่อรับผ้า
+          riderBasketImage: proofImage || item.riderBasketImage || null,
+          proofImage: proofImage || item.proofImage || null,
+          // บันทึกเวลาส่งมอบเฉพาะตอนที่ไรเดอร์กดยืนยัน Step 7 เท่านั้น
+          deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
+          deliveryRiderName: activeRider?.name || item.rider?.name || 'ไรเดอร์ประจำร้าน'
+        };
+      }
+      return item;
+    });
+
+    if (setOrders) {
+      setOrders(updatedOrders);
+    }
+    localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+    if (isDone) {
       try {
         const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
         const finishNotice = {
@@ -247,10 +247,10 @@ const TaskDetailPage = () => {
             </button>
           </div>
 
-          {/* อัปโหลดรูปภาพหลักฐาน */}
+          {/* อัปโหลดรูปภาพหลักฐานตะกร้าผ้าจากไรเดอร์ */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-800">รูปถ่ายยืนยันการรับหรือส่งคืนผ้า</span>
+              <span className="text-xs font-bold text-gray-800">รูปถ่ายยืนยันจุดรับผ้า / ตะกร้าผ้า</span>
               {proofImage && (
                 <button
                   type="button"
@@ -286,7 +286,7 @@ const TaskDetailPage = () => {
                 className="w-full h-28 border-2 border-dashed border-gray-200 hover:border-[#1d61f2] rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-[#1d61f2] transition cursor-pointer bg-gray-50/50"
               >
                 <Camera size={26} />
-                <span className="text-xs font-medium">กดเพื่อถ่ายภาพหรือแนบรูปหลักฐาน</span>
+                <span className="text-xs font-medium">กดเพื่อถ่ายภาพตะกร้าผ้าหน้างาน</span>
               </button>
             )}
           </div>
@@ -295,17 +295,17 @@ const TaskDetailPage = () => {
 
         {/* Footer Actions ตาม Step */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex flex-col gap-2 z-20 shadow-lg">
-          {order.statusStep === 3 && (
+          {Number(order.statusStep) === 3 && (
             <button
               type="button"
               onClick={() => handleAdvanceStep(4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
               className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md hover:bg-blue-700 cursor-pointer"
             >
-              ยืนยันรับผ้าจากลูกค้า (กำลังนำส่งร้าน)
+              ยืนยันรับผ้าจากลูกค้า (นำส่งร้าน)
             </button>
           )}
 
-          {order.statusStep === 4 && (
+          {Number(order.statusStep) === 4 && (
             <button
               type="button"
               onClick={() => handleAdvanceStep(5, 'ร้านกำลังดำเนินการซักอบ')}
@@ -315,7 +315,7 @@ const TaskDetailPage = () => {
             </button>
           )}
 
-          {order.statusStep === 6 && (
+          {Number(order.statusStep) === 6 && (
             <button
               type="button"
               onClick={() => handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ')}
@@ -325,7 +325,7 @@ const TaskDetailPage = () => {
             </button>
           )}
 
-          {order.statusStep === 7 && (
+          {Number(order.statusStep) >= 7 && (
             <div className="w-full py-3 text-center text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl">
               ออเดอร์นี้เสร็จสิ้นกระบวนการเรียบร้อยแล้ว {order.deliveredAt ? `(${order.deliveredAt})` : ''}
             </div>
@@ -335,6 +335,4 @@ const TaskDetailPage = () => {
       </div>
     </div>
   );
-};
-
-export default TaskDetailPage;
+}
