@@ -86,6 +86,7 @@ export default function OrdersPage() {
         }} className="rounded-b-3xl px-6 pt-6 pb-6 flex items-center justify-between z-20">
           <div>
             <h1 className="font-bold text-white text-xl tracking-tight">รายการออเดอร์</h1>
+            <span className="text-xs text-blue-200 font-medium">ติดตามสถานะและประวัติการสั่งซัก</span>
           </div>
 
           <button
