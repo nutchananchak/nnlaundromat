@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
   ChevronDown, 
-  Layers, 
+  Shirt, 
   BedDouble, 
   ShieldCheck, 
   Clock, 
@@ -22,28 +22,33 @@ import {
   PackageCheck,
   Flame,
   BadgeCheck,
-  Camera,
-  UploadCloud,
-  Star
+  QrCode,
+  Star,
+  Receipt
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { userProfile, addresses, selectedAddressId, setSelectedAddressId, currentAddress, activeOrder, setOrders } = useApp();
-  const reUploadInputRef = useRef(null);
+  const { 
+    userProfile, 
+    addresses, 
+    selectedAddressId, 
+    setSelectedAddressId, 
+    currentAddress, 
+    orders,
+    setOrders 
+  } = useApp();
 
   const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [selectedService, setSelectedService] = useState('wash_dry_fold');
-
-  const [reUploadSlip, setReUploadSlip] = useState(null);
-  const [isSubmittingSlip, setIsSubmittingSlip] = useState(false);
 
   const [isStoreOpen, setIsStoreOpen] = useState(true);
   const [closedDates, setClosedDates] = useState([]);
   const [bannerIndex, setBannerIndex] = useState(0);
 
+  // ดึงสถานะร้านและวันหยุด
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
     if (savedStoreStatus !== null) {
@@ -77,13 +82,22 @@ export default function HomePage() {
     return timestamp;
   };
 
-  const hasOngoingOrder = Boolean(
-    activeOrder && 
-    Number(activeOrder.statusStep) >= 1 && 
-    Number(activeOrder.statusStep) < 7 &&
-    !activeOrder.isCompleted
-  );
+  // แยก Order ตาม User
+  const currentUserId = userProfile?.phone || userProfile?.id || userProfile?.email;
+  const userOrders = (orders || []).filter(o => {
+    const orderOwner = o.customerPhone || o.userPhone || o.userId || o.customerId;
+    return currentUserId && orderOwner === currentUserId;
+  });
 
+  // ค้นหาออเดอร์ที่กำลังดำเนินการ หรือสำเร็จแล้วแต่ยังไม่ได้กดดู
+  const activeOrder = userOrders.find(o => {
+    const step = Number(o.statusStep) || 1;
+    if (step >= 1 && step < 7 && !o.isCompleted) return true;
+    if (step >= 7 && !o.viewedCompleted) return true;
+    return false;
+  });
+
+  const hasOngoingOrder = Boolean(activeOrder);
   const isSlipRejected = Boolean(activeOrder && activeOrder.paymentRejected);
 
   useEffect(() => {
@@ -147,8 +161,27 @@ export default function HomePage() {
   ];
 
   const handleViewOrderStatus = () => {
+    if (!activeOrder) return;
+
+    if (Number(activeOrder.statusStep) >= 7) {
+      if (setOrders) {
+        setOrders(prev => prev.map(o => o.id === activeOrder.id ? { ...o, viewedCompleted: true } : o));
+      }
+      try {
+        const saved = JSON.parse(localStorage.getItem('orders') || '[]');
+        const updated = saved.map(o => o.id === activeOrder.id ? { ...o, viewedCompleted: true } : o);
+        localStorage.setItem('orders', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    navigate(`/orders/${activeOrder.id}`);
+  };
+
+  const handleGoToRetryPayment = () => {
     if (activeOrder) {
-      navigate(`/orders/${activeOrder.id}`);
+      navigate(`/orders/${activeOrder.id}`, { state: { retryPayment: true } });
     }
   };
 
@@ -183,73 +216,6 @@ export default function HomePage() {
     }
   };
 
-  const handleSelectNewSlip = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setReUploadSlip(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSendNewSlip = () => {
-    if (!reUploadSlip) {
-      alert('กรุณาเลือกรูปภาพสลิปก่อนกดยืนยัน');
-      return;
-    }
-
-    setIsSubmittingSlip(true);
-    const nowTime = getThaiTimestamp();
-
-    if (setOrders) {
-      setOrders(prev => prev.map(o => {
-        if (o.id === activeOrder.id) {
-          return {
-            ...o,
-            slipImage: reUploadSlip,
-            paymentSlip: reUploadSlip,
-            paymentRejected: false,
-            rejectReason: null,
-            statusStep: 1,
-            statusTitle: 'ส่งสลิปใหม่แล้ว รอแอดมินตรวจสอบ',
-            reUploadedAt: nowTime
-          };
-        }
-        return o;
-      }));
-    }
-
-    try {
-      const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-      const clearedNotices = currentNotices.map(n => {
-        if (n.orderId === activeOrder.id && n.type === 'alert') {
-          return { ...n, isRead: true };
-        }
-        return n;
-      });
-
-      const newSuccessNotice = {
-        id: Date.now(),
-        orderId: activeOrder.id,
-        title: 'แนบสลิปใหม่เรียบร้อยแล้ว',
-        message: `ออเดอร์ #${activeOrder.id} ได้ส่งสลิปใหม่เมื่อ ${nowTime} กำลังรอทางร้านตรวจสอบยอดเงินอีกครั้ง`,
-        time: nowTime,
-        type: 'info',
-        isRead: true
-      };
-
-      localStorage.setItem('customerNotifications', JSON.stringify([newSuccessNotice, ...clearedNotices]));
-    } catch (e) {
-      // Storage error handling
-    }
-
-    setReUploadSlip(null);
-    setIsSubmittingSlip(false);
-    alert('ส่งสลิปใหม่เรียบร้อยแล้ว ทางร้านจะเร่งตรวจสอบยอดเงินให้อีกครั้งครับ');
-  };
-
   return (
     <div style={{
       display: 'flex',
@@ -274,7 +240,7 @@ export default function HomePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
-        {/* 1. Top Bar โทนเรียบ สุภาพ */}
+        {/* 1. Top Bar */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
@@ -282,7 +248,6 @@ export default function HomePage() {
           }}
           className="rounded-b-3xl px-5 pt-6 pb-5 flex items-center justify-between shrink-0 z-20 text-white"
         >
-          {/* หมุดเลือกสถานที่ส่งผ้า (แบบสีกลมกลืน) */}
           <div 
             onClick={() => {
               if (!addresses || addresses.length === 0) {
@@ -324,80 +289,35 @@ export default function HomePage() {
         {/* 2. Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4 pb-40 flex flex-col gap-4">
 
-          {/* แจ้งเตือนสลิปไม่ผ่าน */}
+          {/* ป้ายแจ้งเตือนสลิปไม่ผ่าน */}
           {isSlipRejected && (
-            <div className="bg-red-50 border-2 border-red-300 rounded-3xl p-5 shadow-md flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-300">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-red-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 rounded-3xl p-5 shadow-lg shadow-red-500/10 flex flex-col gap-3.5 animate-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-red-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-500/20">
                   <AlertTriangle size={22} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="text-xs font-black text-red-500 tracking-wider uppercase block">แจ้งเตือนด่วน</span>
-                  <h3 className="text-base font-extrabold text-red-900 leading-tight mt-0.5">
-                    สลิปการโอนเงินไม่ถูกต้อง
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-extrabold text-red-500 tracking-wider uppercase">แจ้งเตือนการชำระเงิน</span>
+                    <span className="text-[10.5px] font-bold text-red-400">#{activeOrder.id}</span>
+                  </div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight mt-0.5">
+                    สลิปการโอนเงินไม่ผ่านการอนุมัติ
                   </h3>
-                  <p className="text-xs text-red-700 mt-1 leading-relaxed">
-                    <span className="font-bold">สาเหตุจากทางร้าน: </span>
-                    {activeOrder.rejectReason || 'ยอดเงินไม่ตรง หรือภาพสลิปไม่ชัดเจน'}
-                  </p>
-                  {activeOrder.rejectedAt && (
-                    <span className="text-[11px] text-red-400 font-medium block mt-1">
-                      เวลาที่แจ้งเตือน: {activeOrder.rejectedAt}
-                    </span>
-                  )}
+                  <div className="mt-2 p-2.5 bg-white/80 rounded-xl border border-red-100 text-xs text-red-700 leading-relaxed font-medium">
+                    <span className="font-bold text-red-800">สาเหตุจากร้าน: </span>
+                    {activeOrder.rejectReason || 'ยอดเงินไม่ถูกต้อง หรือภาพสลิปไม่ชัดเจน'}
+                  </div>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate('/notifications')}
-                className="self-start text-[11.5px] font-bold text-red-600 hover:text-red-800 flex items-center gap-1 -mt-1 cursor-pointer"
-              >
-                <span>ดูประวัติการแจ้งเตือนทั้งหมด</span>
-                <ChevronRight size={14} />
-              </button>
-
-              <div className="pt-2 border-t border-red-200/80 flex flex-col gap-2.5">
-                <input
-                  ref={reUploadInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleSelectNewSlip}
-                  style={{ display: 'none' }}
-                />
-
-                {reUploadSlip ? (
-                  <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-red-200 bg-white shadow-xs">
-                    <img src={reUploadSlip} alt="New slip preview" className="w-full h-full object-contain" />
-                    <button
-                      type="button"
-                      onClick={() => setReUploadSlip(null)}
-                      className="absolute top-2 right-2 px-2.5 py-1 bg-slate-900/70 text-white rounded-lg text-xs font-bold cursor-pointer"
-                    >
-                      เปลี่ยนรูปใหม่
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => reUploadInputRef.current?.click()}
-                    className="w-full py-3.5 rounded-2xl border-2 border-dashed border-red-300 hover:border-red-500 bg-white/80 text-red-600 font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
-                  >
-                    <Camera size={18} /> กดเพื่อถ่ายภาพหรือแนบสลิปใหม่
-                  </button>
-                )}
-
+              <div className="pt-2 border-t border-red-200/60 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleSendNewSlip}
-                  disabled={!reUploadSlip || isSubmittingSlip}
-                  className={`w-full py-3 rounded-2xl font-bold text-xs shadow-sm transition flex items-center justify-center gap-2 cursor-pointer ${
-                    reUploadSlip && !isSubmittingSlip
-                      ? 'bg-[#1d61f2] hover:bg-blue-700 text-white shadow-blue-500/20'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  }`}
+                  onClick={handleGoToRetryPayment}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-red-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
                 >
-                  <UploadCloud size={16} /> ส่งสลิปใหม่ให้ร้านตรวจสอบอีกครั้ง
+                  <QrCode size={16} /> สแกน QR Code และแนบสลิปใหม่
                 </button>
               </div>
             </div>
@@ -420,69 +340,79 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* แจ้งเตือนร้านปิดชั่วคราว */}
+          {/* ป้ายแจ้งเตือนร้านปิดชั่วคราว */}
           {!isStoreOpen && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 shadow-xs">
-              <AlertTriangle size={22} className="text-red-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="text-sm font-bold text-red-800 block">ร้านปิดให้บริการชั่วคราว</span>
-                <span className="text-xs text-red-600 block mt-1 leading-relaxed">
-                  ขณะนี้ระบบปิดรับออเดอร์ใหม่ชั่วคราวตามประกาศของผู้ดูแลระบบ
+            <div className="p-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200/90 rounded-3xl flex items-center gap-3.5 shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-red-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-extrabold text-red-900 block">ร้านปิดให้บริการชั่วคราว</span>
+                <span className="text-xs text-red-600 block mt-0.5 leading-relaxed font-medium">
+                  ขณะนี้ระบบปิดรับคำสั่งซื้อใหม่ชั่วคราวตามประกาศจากทางร้าน
                 </span>
               </div>
             </div>
           )}
 
-          {/* แจ้งเตือนวันนี้เป็นวันหยุด */}
+          {/* ป้ายแจ้งเตือนวันนี้เป็นวันหยุด */}
           {isTodayClosed && isStoreOpen && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 shadow-xs">
-              <AlertTriangle size={22} className="text-red-500 shrink-0 mt-0.5" />
-              <div>
-                <span className="text-sm font-bold text-red-800 block">วันนี้ร้านหยุดให้บริการ</span>
-                <span className="text-xs text-red-600 block mt-1 leading-relaxed">
-                  วันนี้ ({todayStr}) ร้านปิดประจำวัน ขออภัยในความไม่สะดวก
+            <div className="p-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200/90 rounded-3xl flex items-center gap-3.5 shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-red-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-extrabold text-red-900 block">วันนี้ร้านหยุดให้บริการ</span>
+                <span className="text-xs text-red-600 block mt-0.5 leading-relaxed font-medium">
+                  วันนี้ ({todayStr}) ร้านหยุดประจำวัน ขออภัยในความไม่สะดวกครับ
                 </span>
               </div>
             </div>
           )}
 
-          {/* แจ้งเตือนล่วงหน้า 1 วัน */}
+          {/* แจ้งเตือนวันหยุดล่วงหน้า */}
           {isTomorrowClosed && isStoreOpen && (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 shadow-xs">
-              <Calendar size={22} className="text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <span className="text-sm font-bold text-amber-800 block">แจ้งเตือนวันหยุดบริการล่วงหน้า</span>
-                <span className="text-xs text-amber-700 block mt-1 leading-relaxed">
-                  วันพรุ่งนี้ ({tomorrowStr}) ร้านจะหยุดให้บริการ 1 วัน โปรดสั่งซักและรับผ้าคืนภายในวันนี้ก่อน 22:00 น.
+            <div className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-3xl flex items-center gap-3.5 shadow-sm">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Calendar size={20} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-sm font-extrabold text-amber-900 block">แจ้งวันหยุดบริการล่วงหน้า</span>
+                <span className="text-xs text-amber-700 block mt-0.5 leading-relaxed font-medium">
+                  วันพรุ่งนี้ ({tomorrowStr}) ร้านหยุด 1 วัน โปรดสั่งซักและรับผ้าคืนภายในวันนี้ก่อน 22:00 น.
                 </span>
               </div>
             </div>
           )}
 
-          {/* ส่วนแสดงสถานะผ้า / Smart Banner */}
+          {/* ✅ ส่วนแสดงสถานะผ้า: คุมธีมน้ำเงิน N&N สะอาดตา ไม่หลุดธีม */}
           {hasOngoingOrder ? (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-base text-slate-800">ติดตามสถานะผ้า</span>
-                <span className="text-xs font-bold text-[#1d61f2] bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                <span className="font-bold text-base text-slate-800">
+                  {Number(activeOrder.statusStep) >= 7 ? 'ออเดอร์ที่เสร็จสมบูรณ์' : 'ติดตามสถานะผ้า'}
+                </span>
+                <span className="text-xs font-bold text-[#1d61f2] bg-blue-50/80 px-3 py-1 rounded-full border border-blue-200">
                   #{activeOrder.id}
                 </span>
               </div>
 
               <div
                 onClick={handleViewOrderStatus}
-                className="bg-white p-5 rounded-3xl border border-slate-100 shadow-xs hover:border-blue-200 transition cursor-pointer flex flex-col gap-3.5"
+                className="bg-white p-5 rounded-3xl border border-blue-100 hover:border-[#1d61f2] shadow-sm transition cursor-pointer flex flex-col gap-3.5 group"
               >
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1.5">
                     <h3 className="font-bold text-base text-[#1d61f2]">
-                      {activeOrder.statusTitle}
+                      {activeOrder.statusTitle || (Number(activeOrder.statusStep) >= 7 ? 'จัดส่งผ้าสำเร็จเรียบร้อยแล้ว' : 'กำลังดำเนินการ')}
                     </h3>
-                    <ChevronRight size={18} className="text-[#1d61f2]" />
+                    <ChevronRight size={18} className="text-blue-400 group-hover:text-[#1045b8] transition" />
                   </div>
                   
                   <span className="text-xs text-slate-500 block mt-1 font-medium">
-                    สร้างคำสั่งซื้อเมื่อ: {formatOrderTimestamp(activeOrder.createdAt)}
+                    {Number(activeOrder.statusStep) >= 7
+                      ? 'แตะที่นี่เพื่อตรวจสอบใบเสร็จและรายละเอียดออเดอร์'
+                      : `สร้างคำสั่งซื้อเมื่อ: ${formatOrderTimestamp(activeOrder.createdAt)}`}
                   </span>
                 </div>
 
@@ -490,7 +420,7 @@ export default function HomePage() {
                   <div className="absolute top-4 left-4 right-4 h-1 bg-slate-100 -z-0">
                     <div 
                       className="h-full bg-[#1d61f2] transition-all duration-500"
-                      style={{ width: `${((activeOrder.statusStep - 1) / (steps.length - 1)) * 100}%` }}
+                      style={{ width: `${((Math.min(activeOrder.statusStep, 7) - 1) / (steps.length - 1)) * 100}%` }}
                     />
                   </div>
 
@@ -521,9 +451,18 @@ export default function HomePage() {
                     );
                   })}
                 </div>
+
+                {/* ✅ แถบกดดูใบเสร็จ: คุมธีมสีน้ำเงิน N&N เรียบหรู */}
+                {Number(activeOrder.statusStep) >= 7 && (
+                  <div className="mt-1 py-2.5 px-3 bg-blue-50/80 border border-blue-200/80 rounded-2xl flex items-center justify-center gap-2 text-[#1045b8] text-xs font-bold shadow-2xs group-hover:bg-blue-100 transition">
+                    <Receipt size={15} className="text-[#1d61f2]" />
+                    <span>กดดูใบเสร็จรับเงิน &amp; สรุปรายการผ้า</span>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
+            /* Smart Banner เมื่อไม่มีออเดอร์ค้าง */
             <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
               {bannerIndex === 0 && (
                 <div className="w-full">
@@ -568,7 +507,7 @@ export default function HomePage() {
               {bannerIndex === 1 && (
                 <div className="w-full">
                   <div className="flex items-center gap-2.5 mb-3">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                       <ShieldCheck size={18} />
                     </div>
                     <div>
@@ -578,20 +517,20 @@ export default function HomePage() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-center w-full">
-                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-emerald-50/60 border border-emerald-100/60">
-                      <PackageCheck size={20} className="text-emerald-600 mb-1" />
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-blue-50/60 border border-blue-100/60">
+                      <PackageCheck size={20} className="text-[#1d61f2] mb-1" />
                       <span className="font-bold text-xs text-slate-800">1 ตู้ 1 คน</span>
                       <span className="text-[10px] text-slate-500 mt-0.5">ไม่ซักปนใคร</span>
                     </div>
 
-                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-emerald-50/60 border border-emerald-100/60">
-                      <Flame size={20} className="text-emerald-600 mb-1" />
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-blue-50/60 border border-blue-100/60">
+                      <Flame size={20} className="text-[#1d61f2] mb-1" />
                       <span className="font-bold text-xs text-slate-800">อบฆ่าเชื้อ</span>
                       <span className="text-[10px] text-slate-500 mt-0.5">กำจัดไรฝุ่น</span>
                     </div>
 
-                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-emerald-50/60 border border-emerald-100/60">
-                      <BadgeCheck size={20} className="text-emerald-600 mb-1" />
+                    <div className="flex flex-col items-center py-2.5 px-1 rounded-2xl bg-blue-50/60 border border-blue-100/60">
+                      <BadgeCheck size={20} className="text-[#1d61f2] mb-1" />
                       <span className="font-bold text-xs text-slate-800">พับแพ็กดี</span>
                       <span className="text-[10px] text-slate-500 mt-0.5">ถุงกันฝุ่น</span>
                     </div>
@@ -602,7 +541,7 @@ export default function HomePage() {
               {bannerIndex === 2 && (
                 <div className="w-full">
                   <div className="flex items-center gap-2.5 mb-3">
-                    <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                       <Truck size={18} />
                     </div>
                     <div>
@@ -611,9 +550,9 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className="p-3 bg-purple-50/60 border border-purple-100/70 rounded-2xl flex items-center justify-between">
+                  <div className="p-3 bg-blue-50/60 border border-blue-100/70 rounded-2xl flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white text-purple-600 flex items-center justify-center shadow-xs shrink-0">
+                      <div className="w-9 h-9 rounded-xl bg-white text-[#1d61f2] flex items-center justify-center shadow-xs shrink-0">
                         <Truck size={18} />
                       </div>
                       <div className="min-w-0 pr-1">
@@ -621,7 +560,7 @@ export default function HomePage() {
                         <span className="text-[10.5px] text-slate-500 block mt-0.5">ไม่ต้องรอนานหลายวัน ผ้าแห้งสนิท</span>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold text-purple-700 bg-white px-2 py-1 rounded-lg shadow-2xs shrink-0">
+                    <span className="text-[10px] font-bold text-[#1045b8] bg-white px-2 py-1 rounded-lg shadow-2xs shrink-0">
                       วันเดียวจบ
                     </span>
                   </div>
@@ -663,7 +602,7 @@ export default function HomePage() {
                 <div className={`w-13 h-13 rounded-2xl flex items-center justify-center mb-2.5 ${
                   selectedService === 'wash_dry_fold' ? 'bg-[#1d61f2] text-white' : 'bg-blue-50 text-[#1d61f2]'
                 }`}>
-                  <Layers size={26} />
+                  <Shirt size={26} />
                 </div>
                 <span className="font-bold text-sm text-slate-900">ซัก อบ พับ</span>
                 <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 160฿</span>

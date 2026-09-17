@@ -97,7 +97,7 @@ const LoginSuccessModal = ({ isOpen, user, onConfirm }) => {
             boxShadow: '0 10px 15px -3px rgba(29, 97, 242, 0.3)'
           }}
         >
-          เริ่มใช้งานแอปพลิเคชัน
+          เริ่มใช้งาน
         </button>
       </div>
     </div>
