@@ -19,7 +19,10 @@ import {
   LocateFixed,
   Search,
   Layers,
-  Loader2
+  Loader2,
+  KeyRound,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { 
   GoogleMap, 
@@ -33,11 +36,10 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 // 📍 พิกัดร้าน N&N Laundromat (ตรงข้ามอ่อนนุช 25)
 const STORE_COORDS = { lat: 13.709648150061998, lng: 100.62401489583843 };
-const MAX_DELIVERY_RADIUS_KM = 3.0; // รัศมีบริการ 3 กม.
+const MAX_DELIVERY_RADIUS_KM = 3.0;
 
 const libraries = ['places'];
 
-// คำนวณระยะทางแบบ Haversine Formula
 const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -62,9 +64,25 @@ export default function ProfilePage() {
     logoutUser 
   } = useApp();
 
+  // Toast Notification State
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 2800);
+  };
+
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editName, setEditName] = useState(userProfile?.fullName || userProfile?.name || '');
   const [editPhone, setEditPhone] = useState(userProfile?.phone || '');
+
+  // OTP State
+  const [otpStep, setOtpStep] = useState('input');
+  const [inputOtp, setInputOtp] = useState('');
+  const [mockGeneratedOtp, setMockGeneratedOtp] = useState('1234');
+  const [otpCountdown, setOtpCountdown] = useState(60);
 
   useEffect(() => {
     if (userProfile) {
@@ -72,6 +90,14 @@ export default function ProfilePage() {
       setEditPhone(userProfile.phone || '');
     }
   }, [userProfile]);
+
+  useEffect(() => {
+    let timer;
+    if (otpStep === 'verify' && otpCountdown > 0) {
+      timer = setInterval(() => setOtpCountdown(prev => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [otpStep, otpCountdown]);
 
   // โหลดที่อยู่จาก localStorage
   useEffect(() => {
@@ -108,7 +134,7 @@ export default function ProfilePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // สถานะแผนที่ & พิกัด
+  // แผนที่ & พิกัด
   const [addressCoords, setAddressCoords] = useState(null);
   const [distanceFromStore, setDistanceFromStore] = useState(0);
   const [isWithinRange, setIsWithinRange] = useState(true);
@@ -136,7 +162,6 @@ export default function ProfilePage() {
     setIsWithinRange(dist <= MAX_DELIVERY_RADIUS_KM);
   };
 
-  // Geocoding แปลงพิกัดเป็นชื่อที่อยู่
   const reverseGeocode = (lat, lng) => {
     updateDistance(lat, lng);
     if (!window.google || !window.google.maps) return;
@@ -160,7 +185,6 @@ export default function ProfilePage() {
     setTimeout(() => setIsMapReady(true), 600);
   }, [addressCoords]);
 
-  // เมื่อผู้ใช้เลื่อนแผนที่เสร็จสิ้น
   const onCameraIdle = () => {
     if (!mapRef.current || !isMapReady) return;
     const center = mapRef.current.getCenter();
@@ -170,7 +194,6 @@ export default function ProfilePage() {
     reverseGeocode(lat, lng);
   };
 
-  // ค้นหาสถานที่ Places Autocomplete
   useEffect(() => {
     if (!isLoaded || !searchQuery.trim() || !window.google?.maps?.places) {
       setSuggestions([]);
@@ -202,7 +225,6 @@ export default function ProfilePage() {
     return () => clearTimeout(timer);
   }, [searchQuery, isLoaded, addressCoords]);
 
-  // ค้นหาโดยตรง
   const handleDirectSearch = (e) => {
     if (e) e.preventDefault();
     if (!searchQuery.trim() || !window.google?.maps) return;
@@ -230,12 +252,11 @@ export default function ProfilePage() {
           mapRef.current.setZoom(18);
         }
       } else {
-        alert('ไม่พบสถานที่ดังกล่าว กรุณาระบุชื่ออาคาร ซอย หรือจุดสังเกตเพิ่มเติม');
+        showToast('ไม่พบสถานที่ดังกล่าว กรุณาระบุจุดสังเกตเพิ่มเติม', 'error');
       }
     });
   };
 
-  // แตะเลือกผลการค้นหา
   const handleSelectPrediction = (prediction) => {
     setShowDropdown(false);
     setSearchQuery(prediction.structured_formatting?.main_text || prediction.description);
@@ -260,10 +281,9 @@ export default function ProfilePage() {
     });
   };
 
-  // ดึง GPS สดของเครื่อง
   const handleGetLiveGPS = () => {
     if (!navigator.geolocation) {
-      alert('อุปกรณ์ของคุณไม่รองรับ GPS');
+      showToast('อุปกรณ์ของคุณไม่รองรับ GPS', 'error');
       return;
     }
 
@@ -284,16 +304,15 @@ export default function ProfilePage() {
       (err) => {
         setIsLocating(false);
         if (err.code === 1) {
-          alert('กรุณากดอนุญาตให้สิทธิ์ Location/GPS ในเบราว์เซอร์ เพื่อระบุตำแหน่งบ้านอัตโนมัติ');
+          showToast('กรุณากดอนุญาตสิทธิ์ Location/GPS ในเบราว์เซอร์', 'error');
         } else {
-          alert('สัญญาณ GPS ขัดข้อง กรุณาเลื่อนหมุดบนแผนที่เพื่อระบุตำแหน่ง');
+          showToast('สัญญาณ GPS ขัดข้อง กรุณาเลื่อนหมุดบนแผนที่', 'error');
         }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   };
 
-  // เมื่อกดปุ่ม "ปักหมุด"
   const handleOpenAddressForm = (addr = null) => {
     setIsMapReady(false);
     setSearchQuery('');
@@ -311,7 +330,7 @@ export default function ProfilePage() {
     }
 
     if ((addresses || []).length >= 3) {
-      alert('คุณสามารถบันทึกที่อยู่ได้สูงสุด 3 ตำแหน่ง');
+      showToast('สามารถบันทึกที่อยู่ได้สูงสุด 3 ตำแหน่ง', 'error');
       return;
     }
 
@@ -349,12 +368,12 @@ export default function ProfilePage() {
   const handleSaveAddress = (e) => {
     e.preventDefault();
     if (!addressTitle.trim() || !addressDetail.trim() || !addressCoords) {
-      alert('กรุณากรอกข้อมูลที่อยู่ให้ครบถ้วน');
+      showToast('กรุณากรอกข้อมูลที่อยู่ให้ครบถ้วน', 'error');
       return;
     }
 
     if (!isWithinRange) {
-      alert(`ขออภัยครับ ตำแหน่งนี้อยู่ห่างจากร้าน ${distanceFromStore.toFixed(2)} กม. ซึ่งเกินรัศมีให้บริการ 3 กม.`);
+      showToast(`ตำแหน่งอยู่ห่างจากร้าน ${distanceFromStore.toFixed(2)} กม. เกินเขตบริการ`, 'error');
       return;
     }
 
@@ -370,6 +389,7 @@ export default function ProfilePage() {
         distanceKm: distanceFromStore.toFixed(2)
       } : a);
       updateAndPersistAddresses(updatedList);
+      showToast('อัปเดตตำแหน่งที่อยู่เรียบร้อยแล้ว');
     } else {
       const isFirst = currentList.length === 0;
       const newAddrId = 'addr-' + Date.now();
@@ -387,6 +407,7 @@ export default function ProfilePage() {
       if (isFirst && setSelectedAddressId) {
         setSelectedAddressId(newAddrId);
       }
+      showToast('บันทึกที่อยู่จัดส่งใหม่เรียบร้อย');
     }
     setShowAddressModal(false);
   };
@@ -400,6 +421,7 @@ export default function ProfilePage() {
       isDefault: a.id === id
     }));
     updateAndPersistAddresses(updatedList);
+    showToast('ตั้งเป็นที่อยู่หลักเรียบร้อย');
   };
 
   const handleDeleteAddress = (id) => {
@@ -412,6 +434,7 @@ export default function ProfilePage() {
         }
       }
       updateAndPersistAddresses(remaining);
+      showToast('ลบที่อยู่เรียบร้อยแล้ว');
     }
   };
 
@@ -423,41 +446,108 @@ export default function ProfilePage() {
         localStorage.setItem('currentUser', JSON.stringify(updated));
         return updated;
       });
+      showToast('เปลี่ยนรูปโปรไฟล์เรียบร้อย');
     }
   };
 
-  const handleSaveProfile = (e) => {
+  // ตรวจสอบและจัดการเปลี่ยนเบอร์ด้วย OTP
+  const handleInitiateProfileSave = (e) => {
     e.preventDefault();
     const trimmedName = editName.trim();
+    const trimmedPhone = editPhone.trim();
+
     if (!trimmedName) {
-      alert('กรุณากรอกชื่อ - นามสกุล');
+      showToast('กรุณากรอกชื่อ - นามสกุล', 'error');
       return;
     }
 
+    if (!trimmedPhone || trimmedPhone.length < 9) {
+      showToast('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง', 'error');
+      return;
+    }
+
+    const originalPhone = userProfile?.phone || '';
+    if (trimmedPhone !== originalPhone) {
+      const generatedCode = String(Math.floor(1000 + Math.random() * 9000));
+      setMockGeneratedOtp(generatedCode);
+      setOtpStep('verify');
+      setOtpCountdown(60);
+      setInputOtp('');
+      showToast(`รหัส OTP คือ: ${generatedCode} (สำหรับทดสอบ)`, 'success');
+      return;
+    }
+
+    finalizeProfileUpdate(trimmedName, trimmedPhone);
+  };
+
+  const handleVerifyOtpAndSave = (e) => {
+    e.preventDefault();
+    if (inputOtp.trim() !== mockGeneratedOtp && inputOtp.trim() !== '1234') {
+      showToast('รหัส OTP ไม่ถูกต้อง กรุณากรอกใหม่', 'error');
+      return;
+    }
+    finalizeProfileUpdate(editName.trim(), editPhone.trim());
+  };
+
+  const finalizeProfileUpdate = (name, phone) => {
     const updatedUser = {
       ...userProfile,
-      name: trimmedName,
-      fullName: trimmedName,
-      phone: editPhone
+      name: name,
+      fullName: name,
+      phone: phone
     };
 
     setUserProfile(updatedUser);
     localStorage.setItem('currentUser', JSON.stringify(updatedUser));
     setShowEditProfileModal(false);
+    setOtpStep('input');
+    showToast('บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว');
   };
 
+  // รายงานปัญหา ส่งตรงไปที่ระบบ Admin
   const handleSubmitReport = (e) => {
     e.preventDefault();
     if (!reportDetail.trim()) {
-      alert('กรุณากรอกรายละเอียดปัญหา');
+      showToast('กรุณากรอกรายละเอียดปัญหา', 'error');
       return;
     }
+
+    const now = new Date();
+    const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
+    const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+    const reportTime = `${d}, ${t} น.`;
+
+    const topicLabels = {
+      order_issue: 'ปัญหาเกี่ยวกับผ้า / การซัก',
+      rider_issue: 'ปัญหาเกี่ยวกับไรเดอร์',
+      payment_issue: 'ปัญหาการชำระเงิน'
+    };
+
+    const newReport = {
+      id: 'REP-' + Date.now(),
+      customerId: userProfile?.id || userProfile?.phone || 'CUST',
+      customerName: userProfile?.fullName || userProfile?.name || 'ลูกค้า',
+      customerPhone: userProfile?.phone || '-',
+      topic: topicLabels[reportTopic] || 'ปัญหาทั่วไป',
+      detail: reportDetail.trim(),
+      createdAt: reportTime,
+      status: 'pending'
+    };
+
+    try {
+      const existingReports = JSON.parse(localStorage.getItem('adminReports') || '[]');
+      localStorage.setItem('adminReports', JSON.stringify([newReport, ...existingReports]));
+    } catch (err) {
+      console.error(err);
+    }
+
     setReportSuccess(true);
     setTimeout(() => {
       setReportSuccess(false);
       setShowReportModal(false);
       setReportDetail('');
-    }, 1500);
+      showToast('ส่งเรื่องถึงแอดมินเรียบร้อยแล้ว');
+    }, 1200);
   };
 
   const handleLogout = () => {
@@ -495,25 +585,50 @@ export default function ProfilePage() {
         position: 'relative',
         overflowX: 'hidden',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-      }} className="font-body">
+      }} className="font-body text-base">
 
-        {/* Header จัดชิดซ้าย */}
+        {/* ✅ ป้าย Toast Notification แบบสวยงาม ลอยจากด้านบน */}
+        {toast.show && (
+          <div className="absolute top-6 left-5 right-5 z-60 animate-in slide-in-from-top-4 duration-200">
+            <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md ${
+              toast.type === 'error'
+                ? 'bg-red-500/95 border-red-400 text-white'
+                : 'bg-emerald-600/95 border-emerald-500 text-white'
+            }`}>
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                {toast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+              </div>
+              <span className="text-xs font-bold flex-1 leading-snug">{toast.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Header จัดชิดซ้าย + ปุ่มออกจากระบบชี้เมาส์แล้วแดง */}
         <div style={{
           background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
           color: '#ffffff',
           boxShadow: '0 10px 25px rgba(29, 97, 242, 0.25)',
           flexShrink: 0
-        }} className="rounded-b-3xl px-6 pt-6 pb-6 flex items-center justify-between z-20">
+        }} className="rounded-b-3xl px-6 pt-7 pb-6 flex items-center justify-between z-20">
           <div>
-            <p style={{ color: 'rgba(255, 255, 255, 0.8)' }} className="text-xs font-medium">N&amp;N Laundromat</p>
-            <h1 style={{ color: '#ffffff' }} className="font-bold text-xl tracking-tight">โปรไฟล์และการตั้งค่า</h1>
+            <h1 className="font-bold text-white text-xl tracking-tight leading-tight">โปรไฟล์และการตั้งค่า</h1>
+            <span className="text-xs text-blue-200 font-medium block mt-0.5">จัดการข้อมูลบัญชีและที่อยู่จัดส่งผ้า</span>
           </div>
+
+          <button 
+            type="button"
+            onClick={handleLogout}
+            className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-red-500 active:bg-red-600 text-white flex items-center justify-center transition-colors duration-200 cursor-pointer shadow-xs"
+            title="ออกจากระบบ"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 pb-28 flex flex-col gap-4">
 
           {/* การ์ดโปรไฟล์ */}
-          <div style={{ backgroundColor: '#ffffff', color: '#0f172a' }} className="rounded-3xl p-5 border border-gray-100 shadow-sm flex flex-col items-center text-center relative">
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col items-center text-center relative">
             <div className="relative mb-3">
               {userProfile?.avatar ? (
                 <img
@@ -522,7 +637,7 @@ export default function ProfilePage() {
                   className="w-20 h-20 rounded-full object-cover border-4 border-blue-50 shadow-md"
                 />
               ) : (
-                <div style={{ backgroundColor: '#eff6ff', color: '#1d61f2' }} className="w-20 h-20 rounded-full flex items-center justify-center shadow-inner border-2 border-blue-100">
+                <div className="w-20 h-20 rounded-full bg-blue-50 text-[#1d61f2] flex items-center justify-center shadow-inner border-2 border-blue-100">
                   <User size={38} />
                 </div>
               )}
@@ -541,46 +656,47 @@ export default function ProfilePage() {
               </label>
             </div>
 
-            <h2 style={{ color: '#0f172a' }} className="font-bold text-lg">{displayName}</h2>
-            <p style={{ color: '#64748b' }} className="text-xs mt-1 flex items-center justify-center gap-1.5 font-medium">
+            <h2 className="font-bold text-lg text-slate-900">{displayName}</h2>
+            <p className="text-xs mt-1 flex items-center justify-center gap-1.5 font-medium text-slate-500">
               <Phone size={13} className="text-[#1d61f2]" /> {userProfile?.phone || '-'}
             </p>
 
-            <div style={{ backgroundColor: '#eff6ff', color: '#1d61f2' }} className="mt-3 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 border border-blue-100">
-              <ShieldCheck size={14} /> บัญชีลูกค้ายืนยันแล้ว
+            <div className="mt-3 px-3.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 bg-blue-50 text-[#1045b8] border border-blue-200/80 shadow-2xs">
+              <ShieldCheck size={14} className="text-[#1d61f2]" /> บัญชีลูกค้ายืนยันแล้ว
             </div>
           </div>
 
           {/* แก้ไขข้อมูลส่วนตัว */}
-          <div style={{ backgroundColor: '#ffffff', color: '#0f172a' }} className="rounded-3xl p-2 border border-gray-100 shadow-sm">
+          <div className="bg-white rounded-3xl p-2 border border-slate-200/80 shadow-xs">
             <button
               type="button"
               onClick={() => {
                 setEditName(userProfile?.fullName || userProfile?.name || '');
                 setEditPhone(userProfile?.phone || '');
+                setOtpStep('input');
                 setShowEditProfileModal(true);
               }}
-              className="flex items-center justify-between p-3.5 hover:bg-gray-50 rounded-2xl transition cursor-pointer text-left w-full"
+              className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-2xl transition cursor-pointer text-left w-full"
             >
               <div className="flex items-center gap-3">
-                <div style={{ backgroundColor: '#eff6ff', color: '#1d61f2' }} className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
                   <User size={18} />
                 </div>
                 <div>
-                  <span style={{ color: '#1e293b' }} className="text-xs font-bold block">แก้ไขข้อมูลส่วนตัว</span>
-                  <span style={{ color: '#94a3b8' }} className="text-[11px]">ชื่อ - นามสกุล, เบอร์โทรศัพท์</span>
+                  <span className="text-xs font-bold text-slate-900 block">แก้ไขข้อมูลส่วนตัว</span>
+                  <span className="text-[11px] text-slate-400">ชื่อ - นามสกุล, เบอร์โทรศัพท์ (ยืนยันผ่าน OTP)</span>
                 </div>
               </div>
-              <ChevronRight size={16} className="text-gray-400" />
+              <ChevronRight size={16} className="text-slate-400" />
             </button>
           </div>
 
           {/* ที่อยู่รับ-ส่งผ้า */}
-          <div style={{ backgroundColor: '#ffffff', color: '#0f172a' }} className="rounded-3xl p-5 border border-gray-100 shadow-sm flex flex-col gap-3">
+          <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MapPin size={18} className="text-[#1d61f2]" />
-                <h3 style={{ color: '#0f172a' }} className="font-bold text-sm">
+                <h3 className="font-bold text-sm text-slate-900">
                   ที่อยู่รับ-ส่งผ้า ({(addresses || []).length}/3)
                 </h3>
               </div>
@@ -589,8 +705,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => handleOpenAddressForm()}
-                  style={{ color: '#1d61f2', backgroundColor: '#eff6ff' }}
-                  className="px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-blue-100 transition cursor-pointer"
+                  className="px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 bg-blue-50 text-[#1d61f2] hover:bg-blue-100 transition cursor-pointer"
                 >
                   <Plus size={13} /> ปักหมุดเพิ่ม
                 </button>
@@ -619,19 +734,19 @@ export default function ProfilePage() {
                 {addresses.map((addr) => (
                   <div
                     key={addr.id}
-                    style={{ 
-                      backgroundColor: addr.isDefault ? '#f8faff' : '#ffffff',
-                      borderColor: addr.isDefault ? '#bfdbfe' : '#f1f5f9'
-                    }}
-                    className="p-3.5 rounded-2xl border flex flex-col gap-2 transition shadow-xs"
+                    className={`p-3.5 rounded-2xl border flex flex-col gap-2 transition shadow-2xs ${
+                      addr.isDefault 
+                        ? 'bg-blue-50/40 border-blue-200' 
+                        : 'bg-white border-slate-200/80'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <span style={{ color: '#1e293b' }} className="font-bold text-xs">
+                        <span className="font-bold text-xs text-slate-900">
                           {addr.title}
                         </span>
                         {addr.isDefault && (
-                          <span style={{ backgroundColor: '#eff6ff', color: '#1d61f2' }} className="text-[10px] font-bold px-2 py-0.5 rounded-md">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#1d61f2] border border-blue-200/60">
                             ค่าเริ่มต้น
                           </span>
                         )}
@@ -646,25 +761,24 @@ export default function ProfilePage() {
                         <button
                           type="button"
                           onClick={() => handleOpenAddressForm(addr)}
-                          className="p-1 text-gray-400 hover:text-[#1d61f2] transition cursor-pointer"
+                          className="p-1 text-slate-400 hover:text-[#1d61f2] transition cursor-pointer"
                         >
                           <Edit3 size={14} />
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteAddress(addr.id)}
-                          className="p-1 text-gray-400 hover:text-red-500 transition cursor-pointer"
+                          className="p-1 text-slate-400 hover:text-red-500 transition cursor-pointer"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
 
-                    <p style={{ color: '#64748b' }} className="text-xs leading-relaxed">
+                    <p className="text-xs leading-relaxed text-slate-600">
                       {addr.detail}
                     </p>
 
-                    {/* ✅ ส่วนจัดการสถานะที่อยู่ (เอาปุ่มนำทางออก เพื่อให้หน้าจอลูกค้าคลีนขึ้น) */}
                     <div className="flex items-center justify-between pt-1 border-t border-slate-100">
                       {!addr.isDefault ? (
                         <button
@@ -687,35 +801,25 @@ export default function ProfilePage() {
           </div>
 
           {/* รายงานปัญหา */}
-          <div style={{ backgroundColor: '#ffffff', color: '#0f172a' }} className="rounded-3xl p-2 border border-gray-100 shadow-sm">
+          <div className="bg-white rounded-3xl p-2 border border-slate-200/80 shadow-xs">
             <button
               type="button"
               onClick={() => setShowReportModal(true)}
-              className="flex items-center justify-between p-3.5 hover:bg-gray-50 rounded-2xl transition cursor-pointer text-left w-full"
+              className="flex items-center justify-between p-3.5 hover:bg-slate-50 rounded-2xl transition cursor-pointer text-left w-full"
             >
               <div className="flex items-center gap-3">
-                <div style={{ backgroundColor: '#fff7ed', color: '#ea580c' }} className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#ea580c] flex items-center justify-center shrink-0">
                   <AlertCircle size={18} />
                 </div>
                 <div>
-                  <span style={{ color: '#1e293b' }} className="text-xs font-bold block">รายงานปัญหา / ติดต่อร้าน</span>
-                  <span style={{ color: '#94a3b8' }} className="text-[11px]">แจ้งปัญหาการซัก, ไรเดอร์, หรือการชำระเงิน</span>
+                  <span className="text-xs font-bold text-slate-900 block">รายงานปัญหา / ติดต่อร้าน</span>
+                  <span className="text-[11px] text-slate-400">ส่งตรงถึงระบบแอดมิน พร้อมติดตามแก้ไข</span>
                 </div>
               </div>
-              <ChevronRight size={16} className="text-gray-400" />
+              <ChevronRight size={16} className="text-slate-400" />
             </button>
           </div>
 
-          {/* ออกจากระบบ */}
-          <button
-            type="button"
-            onClick={handleLogout}
-            style={{ backgroundColor: '#fef2f2', borderColor: '#fee2e2', color: '#dc2626' }}
-            className="w-full p-3.5 rounded-2xl border flex items-center justify-center gap-2 font-bold text-xs hover:bg-red-100 transition cursor-pointer shadow-sm active:scale-[0.99]"
-          >
-            <LogOut size={16} />
-            ออกจากระบบ
-          </button>
         </div>
 
         {/* Modal แผนที่ Google Maps */}
@@ -723,7 +827,6 @@ export default function ProfilePage() {
           <div className="absolute inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] h-[92vh] max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
               
-              {/* Header Modal */}
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white z-20">
                 <div>
                   <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
@@ -737,10 +840,7 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              {/* คอนเทนต์เลื่อนได้ทั้งหมด */}
               <div className="flex-1 overflow-y-auto flex flex-col">
-                
-                {/* ช่องค้นหา */}
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0 sticky top-0 z-30">
                   <form onSubmit={handleDirectSearch} className="relative flex gap-2">
                     <div className="relative flex-1">
@@ -766,7 +866,6 @@ export default function ProfilePage() {
                       ค้นหา
                     </button>
 
-                    {/* Dropdown ค้นหาสถานที่ */}
                     {showDropdown && suggestions.length > 0 && (
                       <div className="absolute left-0 right-16 top-[calc(100%+6px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-40 max-h-56 overflow-y-auto divide-y divide-slate-100">
                         {suggestions.map((item) => (
@@ -793,7 +892,6 @@ export default function ProfilePage() {
                   </form>
                 </div>
 
-                {/* กล่อง Google Maps พร้อม Center Pin */}
                 <div className="relative w-full h-80 min-h-[320px] shrink-0 bg-slate-100">
                   {isLoaded && addressCoords ? (
                     <GoogleMap
@@ -809,7 +907,6 @@ export default function ProfilePage() {
                         clickableIcons: false
                       }}
                     >
-                      {/* วงกลมขอบเขตรัศมี 3 กม. รอบร้าน */}
                       <CircleF
                         center={STORE_COORDS}
                         radius={MAX_DELIVERY_RADIUS_KM * 1000}
@@ -834,7 +931,6 @@ export default function ProfilePage() {
                     </div>
                   )}
 
-                  {/* หมุดเป้าตรงกลางจอ */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full pointer-events-none z-10 flex flex-col items-center">
                     <div className="w-9 h-9 rounded-full bg-[#1d61f2] text-white flex items-center justify-center shadow-xl border-2 border-white ring-4 ring-blue-500/30 animate-bounce">
                       <MapPin size={20} />
@@ -842,7 +938,6 @@ export default function ProfilePage() {
                     <div className="w-2 h-2 rounded-full bg-slate-900/60 blur-[1px] mt-0.5"></div>
                   </div>
 
-                  {/* ปุ่มสลับโหมดดาวเทียม */}
                   <button
                     type="button"
                     onClick={() => setMapType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
@@ -852,7 +947,6 @@ export default function ProfilePage() {
                     <span>{mapType === 'roadmap' ? 'ดาวเทียม' : 'แผนที่'}</span>
                   </button>
 
-                  {/* ปุ่ม GPS ปัจจุบัน */}
                   <button
                     type="button"
                     onClick={handleGetLiveGPS}
@@ -862,7 +956,6 @@ export default function ProfilePage() {
                     <LocateFixed size={18} className={isLocating ? 'text-blue-500 animate-spin' : ''} />
                   </button>
 
-                  {/* ป้ายระยะทาง */}
                   <div className="absolute top-3 left-3 z-10 pointer-events-none">
                     <div className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 ${
                       isWithinRange ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
@@ -873,7 +966,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* ฟอร์มกรอกชื่อและรายละเอียดบ้าน */}
                 <form onSubmit={handleSaveAddress} className="p-4 bg-white flex flex-col gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">ชื่อสถานที่เรียกง่าย</label>
@@ -916,82 +1008,161 @@ export default function ProfilePage() {
                     </button>
                   </div>
                 </form>
-
               </div>
 
             </div>
           </div>
         )}
 
-        {/* Modal แก้ไขข้อมูลส่วนตัว */}
+        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP */}
         {showEditProfileModal && (
-          <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                <h3 className="font-bold text-base text-gray-900">แก้ไขข้อมูลส่วนตัว</h3>
-                <button type="button" onClick={() => setShowEditProfileModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer">
+          <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 border border-slate-100">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 className="font-bold text-base text-slate-900">
+                  {otpStep === 'input' ? 'แก้ไขข้อมูลส่วนตัว' : 'ยืนยันรหัส OTP เปลี่ยนเบอร์'}
+                </h3>
+                <button 
+                  type="button" 
+                  onClick={() => setShowEditProfileModal(false)} 
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer"
+                >
                   <X size={16} />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveProfile} className="flex flex-col gap-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">ชื่อ - นามสกุล</label>
-                  <input
-                    type="text"
-                    required
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 p-2.5 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#1d61f2]"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-700 block mb-1">เบอร์โทรศัพท์</label>
-                  <input
-                    type="tel"
-                    required
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 p-2.5 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-[#1d61f2]"
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setShowEditProfileModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-xs cursor-pointer">
-                    ยกเลิก
-                  </button>
-                  <button type="submit" style={{ backgroundColor: '#1d61f2', color: '#ffffff' }} className="flex-1 py-2.5 rounded-xl font-bold text-xs shadow-md cursor-pointer">
-                    บันทึก
-                  </button>
-                </div>
-              </form>
+              {otpStep === 'input' ? (
+                <form onSubmit={handleInitiateProfileSave} className="flex flex-col gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">ชื่อ - นามสกุล</label>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2]"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-700">เบอร์โทรศัพท์</label>
+                      <span className="text-[10px] text-amber-600 font-bold">ต้องยืนยัน OTP เมื่อเปลี่ยน</span>
+                    </div>
+                    <input
+                      type="tel"
+                      required
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2]"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button 
+                      type="button" 
+                      onClick={() => setShowEditProfileModal(false)} 
+                      className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-1 py-2.5 rounded-xl bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer"
+                    >
+                      {editPhone.trim() !== (userProfile?.phone || '') ? 'ขอรหัส OTP' : 'บันทึก'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtpAndSave} className="flex flex-col gap-3.5">
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-2.5">
+                    <KeyRound size={18} className="text-[#1d61f2] shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">ระบบได้ส่งรหัส OTP 4 หลัก</span>
+                      <span className="text-[11px] text-slate-500 block mt-0.5">
+                        ไปยังหมายเลข <b>{editPhone}</b> เพื่อยืนยันความถูกต้องก่อนเปลี่ยนเบอร์ล็อกอิน
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">กรอกรหัส OTP (รหัสทดสอบ: {mockGeneratedOtp})</label>
+                    <input
+                      type="text"
+                      maxLength="4"
+                      required
+                      placeholder="• • • •"
+                      value={inputOtp}
+                      onChange={(e) => setInputOtp(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-center text-lg font-black tracking-widest text-slate-900 outline-none focus:border-[#1d61f2]"
+                    />
+                  </div>
+
+                  <div className="text-center text-[11px] text-slate-400">
+                    {otpCountdown > 0 ? (
+                      <span>ขอรหัสใหม่ได้ในอีก {otpCountdown} วินาที</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newCode = String(Math.floor(1000 + Math.random() * 9000));
+                          setMockGeneratedOtp(newCode);
+                          setOtpCountdown(60);
+                          showToast(`รหัส OTP ใหม่คือ: ${newCode}`, 'success');
+                        }}
+                        className="font-bold text-[#1d61f2] hover:underline cursor-pointer"
+                      >
+                        กดส่งรหัส OTP ใหม่อีกครั้ง
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button 
+                      type="button" 
+                      onClick={() => setOtpStep('input')} 
+                      className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50"
+                    >
+                      ย้อนกลับ
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 cursor-pointer"
+                    >
+                      ยืนยันและบันทึก
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}
 
         {/* Modal รายงานปัญหา */}
         {showReportModal && (
-          <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-3.5">
-              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                <h3 className="font-bold text-base text-gray-900 flex items-center gap-2">
-                  <AlertCircle size={18} className="text-[#ea580c]" /> รายงานปัญหา
+          <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-3.5 border border-slate-100">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                  <AlertCircle size={18} className="text-[#ea580c]" /> รายงานปัญหาไปยังแอดมิน
                 </h3>
-                <button type="button" onClick={() => setShowReportModal(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 cursor-pointer">
+                <button type="button" onClick={() => setShowReportModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer">
                   <X size={16} />
                 </button>
               </div>
 
               {reportSuccess ? (
-                <div className="py-8 text-center">
+                <div className="py-8 text-center animate-in zoom-in-95 duration-150">
                   <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-2 mx-auto">
                     <Check size={26} />
                   </div>
-                  <h4 className="font-bold text-sm text-gray-900">ส่งรายงานเรียบร้อยแล้ว</h4>
+                  <h4 className="font-bold text-sm text-slate-900">ส่งเรื่องถึงแอดมินเรียบร้อย</h4>
+                  <p className="text-xs text-slate-500 mt-1">เจ้าหน้าที่จะเร่งตรวจสอบและติดต่อกลับโดยเร็วที่สุด</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmitReport} className="flex flex-col gap-3">
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">ประเภทปัญหา</label>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">ประเภทปัญหา</label>
                     <div className="relative">
                       <select 
                         value={reportTopic} 
@@ -1006,14 +1177,21 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1">รายละเอียดปัญหา</label>
-                    <textarea rows="3" required value={reportDetail} onChange={(e) => setReportDetail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#ea580c] resize-none"></textarea>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">รายละเอียดปัญหา</label>
+                    <textarea 
+                      rows="3" 
+                      required 
+                      placeholder="ระบุปัญหาที่พบ พร้อมเลขที่ออเดอร์ (ถ้ามี)..."
+                      value={reportDetail} 
+                      onChange={(e) => setReportDetail(e.target.value)} 
+                      className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#ea580c] resize-none"
+                    ></textarea>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <button type="button" onClick={() => setShowReportModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-xs cursor-pointer">
+                    <button type="button" onClick={() => setShowReportModal(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs cursor-pointer hover:bg-slate-50">
                       ยกเลิก
                     </button>
-                    <button type="submit" style={{ backgroundColor: '#ea580c', color: '#ffffff' }} className="flex-1 py-2.5 rounded-xl font-bold text-xs cursor-pointer">
+                    <button type="submit" className="flex-1 py-2.5 rounded-xl bg-[#ea580c] hover:bg-orange-700 text-white font-bold text-xs cursor-pointer shadow-md shadow-orange-500/20">
                       ส่งรายงาน
                     </button>
                   </div>
