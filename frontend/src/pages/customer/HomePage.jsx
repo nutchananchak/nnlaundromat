@@ -24,7 +24,10 @@ import {
   BadgeCheck,
   QrCode,
   Star,
-  Receipt
+  Receipt,
+  Ban,
+  MessageCircle,
+  ExternalLink
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
@@ -47,6 +50,10 @@ export default function HomePage() {
   const [isStoreOpen, setIsStoreOpen] = useState(true);
   const [closedDates, setClosedDates] = useState([]);
   const [bannerIndex, setBannerIndex] = useState(0);
+
+  // State สำหรับ Modal ยกเลิกออเดอร์
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้');
 
   // ดึงสถานะร้านและวันหยุด
   useEffect(() => {
@@ -89,8 +96,9 @@ export default function HomePage() {
     return currentUserId && orderOwner === currentUserId;
   });
 
-  // ค้นหาออเดอร์ที่กำลังดำเนินการ หรือสำเร็จแล้วแต่ยังไม่ได้กดดู
+  // ค้นหาออเดอร์ที่ยังไม่เสร็จและยังไม่ถูกยกเลิก หรือสำเร็จแล้วแต่ยังไม่ได้กดดู
   const activeOrder = userOrders.find(o => {
+    if (o.isCancelled || o.status === 'cancelled') return false;
     const step = Number(o.statusStep) || 1;
     if (step >= 1 && step < 7 && !o.isCompleted) return true;
     if (step >= 7 && !o.viewedCompleted) return true;
@@ -99,6 +107,10 @@ export default function HomePage() {
 
   const hasOngoingOrder = Boolean(activeOrder);
   const isSlipRejected = Boolean(activeOrder && activeOrder.paymentRejected);
+
+  // เช็กว่าออเดอร์อยู่ในขั้นตอนที่ยังสามารถยกเลิกได้หรือไม่ (ต้องก่อน Step 3: กำลังมารับ)
+  const currentStepNum = Number(activeOrder?.statusStep) || 1;
+  const canCancelOrder = hasOngoingOrder && currentStepNum < 3;
 
   useEffect(() => {
     if (isSlipRejected && activeOrder) {
@@ -183,6 +195,64 @@ export default function HomePage() {
     if (activeOrder) {
       navigate(`/orders/${activeOrder.id}`, { state: { retryPayment: true } });
     }
+  };
+
+  // ✅ ฟังก์ชันดำเนินการยกเลิกออเดอร์
+  const handleConfirmCancelOrder = () => {
+    if (!activeOrder) return;
+
+    const cancelTimestamp = getThaiTimestamp();
+
+    if (setOrders) {
+      setOrders(prev => prev.map(o => {
+        if (o.id === activeOrder.id) {
+          return {
+            ...o,
+            isCancelled: true,
+            status: 'cancelled',
+            statusTitle: 'ยกเลิกออเดอร์แล้ว',
+            cancelReason: cancelReason,
+            cancelledAt: cancelTimestamp
+          };
+        }
+        return o;
+      }));
+    }
+
+    try {
+      const saved = JSON.parse(localStorage.getItem('orders') || '[]');
+      const updated = saved.map(o => {
+        if (o.id === activeOrder.id) {
+          return {
+            ...o,
+            isCancelled: true,
+            status: 'cancelled',
+            statusTitle: 'ยกเลิกออเดอร์แล้ว',
+            cancelReason: cancelReason,
+            cancelledAt: cancelTimestamp
+          };
+        }
+        return o;
+      });
+      localStorage.setItem('orders', JSON.stringify(updated));
+
+      // แจ้งเตือนในกล่องข้อความ
+      const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+      const cancelNotice = {
+        id: Date.now(),
+        orderId: activeOrder.id,
+        title: 'ยกเลิกคำสั่งซื้อเรียบร้อยแล้ว',
+        message: `ออเดอร์ #${activeOrder.id} ได้รับการยกเลิกเรียบร้อยแล้ว หากชำระเงินแล้วสามารถส่งหลักฐานขอคืนเงินทาง LINE Official ได้เลยครับ`,
+        time: cancelTimestamp,
+        type: 'info',
+        isRead: false
+      };
+      localStorage.setItem('customerNotifications', JSON.stringify([cancelNotice, ...currentNotices]));
+    } catch (e) {
+      console.error(e);
+    }
+
+    setShowCancelModal(false);
   };
 
   const handleBookService = () => {
@@ -385,78 +455,109 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ✅ ส่วนแสดงสถานะผ้า: คุมธีมน้ำเงิน N&N สะอาดตา ไม่หลุดธีม */}
+          {/* ส่วนแสดงสถานะผ้า พร้อมปุ่มยกเลิกออเดอร์ตามเงื่อนไข */}
           {hasOngoingOrder ? (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="font-bold text-base text-slate-800">
                   {Number(activeOrder.statusStep) >= 7 ? 'ออเดอร์ที่เสร็จสมบูรณ์' : 'ติดตามสถานะผ้า'}
                 </span>
-                <span className="text-xs font-bold text-[#1d61f2] bg-blue-50/80 px-3 py-1 rounded-full border border-blue-200">
+                <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                  Number(activeOrder.statusStep) >= 7 
+                    ? 'text-[#1045b8] bg-blue-50 border-blue-200'
+                    : 'text-[#1d61f2] bg-blue-50/80 border-blue-200'
+                }`}>
                   #{activeOrder.id}
                 </span>
               </div>
 
-              <div
-                onClick={handleViewOrderStatus}
-                className="bg-white p-5 rounded-3xl border border-blue-100 hover:border-[#1d61f2] shadow-sm transition cursor-pointer flex flex-col gap-3.5 group"
-              >
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <h3 className="font-bold text-base text-[#1d61f2]">
-                      {activeOrder.statusTitle || (Number(activeOrder.statusStep) >= 7 ? 'จัดส่งผ้าสำเร็จเรียบร้อยแล้ว' : 'กำลังดำเนินการ')}
-                    </h3>
-                    <ChevronRight size={18} className="text-blue-400 group-hover:text-[#1045b8] transition" />
-                  </div>
-                  
-                  <span className="text-xs text-slate-500 block mt-1 font-medium">
-                    {Number(activeOrder.statusStep) >= 7
-                      ? 'แตะที่นี่เพื่อตรวจสอบใบเสร็จและรายละเอียดออเดอร์'
-                      : `สร้างคำสั่งซื้อเมื่อ: ${formatOrderTimestamp(activeOrder.createdAt)}`}
-                  </span>
-                </div>
-
-                <div className="flex items-start justify-between relative mt-2 px-1">
-                  <div className="absolute top-4 left-4 right-4 h-1 bg-slate-100 -z-0">
-                    <div 
-                      className="h-full bg-[#1d61f2] transition-all duration-500"
-                      style={{ width: `${((Math.min(activeOrder.statusStep, 7) - 1) / (steps.length - 1)) * 100}%` }}
-                    />
+              <div className="bg-white p-5 rounded-3xl border border-blue-100 shadow-sm flex flex-col gap-3.5">
+                
+                {/* คลิกเพื่อไปหน้าออเดอร์ */}
+                <div 
+                  onClick={handleViewOrderStatus}
+                  className="cursor-pointer group flex flex-col gap-3"
+                >
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <h3 className="font-bold text-base text-[#1d61f2]">
+                        {activeOrder.statusTitle || (Number(activeOrder.statusStep) >= 7 ? 'จัดส่งผ้าสำเร็จเรียบร้อยแล้ว' : 'กำลังดำเนินการ')}
+                      </h3>
+                      <ChevronRight size={18} className="text-blue-400 group-hover:text-[#1045b8] transition" />
+                    </div>
+                    
+                    <span className="text-xs text-slate-500 block mt-1 font-medium">
+                      {Number(activeOrder.statusStep) >= 7
+                        ? 'แตะที่นี่เพื่อตรวจสอบใบเสร็จและรายละเอียดออเดอร์'
+                        : `สร้างคำสั่งซื้อเมื่อ: ${formatOrderTimestamp(activeOrder.createdAt)}`}
+                    </span>
                   </div>
 
-                  {steps.map((item) => {
-                    const Icon = item.icon;
-                    const isPassed = item.step <= activeOrder.statusStep;
-                    const isCurrent = item.step === activeOrder.statusStep;
+                  {/* แถบ Progress Bar 7 ขั้นตอน */}
+                  <div className="flex items-start justify-between relative mt-2 px-1">
+                    <div className="absolute top-4 left-4 right-4 h-1 bg-slate-100 -z-0">
+                      <div 
+                        className="h-full bg-[#1d61f2] transition-all duration-500"
+                        style={{ width: `${((Math.min(activeOrder.statusStep, 7) - 1) / (steps.length - 1)) * 100}%` }}
+                      />
+                    </div>
 
-                    return (
-                      <div key={item.step} className="flex flex-col items-center z-10 w-9 text-center">
-                        <div 
-                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                            isCurrent
-                              ? 'bg-[#1d61f2] text-white ring-4 ring-blue-100 scale-110 shadow-sm'
-                              : isPassed
-                              ? 'bg-[#1d61f2] text-white'
-                              : 'bg-white text-slate-400 border border-slate-200'
-                          }`}
-                        >
-                          <Icon size={14} />
+                    {steps.map((item) => {
+                      const Icon = item.icon;
+                      const isPassed = item.step <= activeOrder.statusStep;
+                      const isCurrent = item.step === activeOrder.statusStep;
+
+                      return (
+                        <div key={item.step} className="flex flex-col items-center z-10 w-9 text-center">
+                          <div 
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                              isCurrent
+                                ? 'bg-[#1d61f2] text-white ring-4 ring-blue-100 scale-110 shadow-sm'
+                                : isPassed
+                                ? 'bg-[#1d61f2] text-white'
+                                : 'bg-white text-slate-400 border border-slate-200'
+                            }`}
+                          >
+                            <Icon size={14} />
+                          </div>
+                          <span className={`text-[9px] mt-1.5 font-bold ${
+                            isCurrent ? 'text-[#1d61f2]' : isPassed ? 'text-slate-700' : 'text-slate-400'
+                          }`}>
+                            {item.label}
+                          </span>
                         </div>
-                        <span className={`text-[9px] mt-1.5 font-bold ${
-                          isCurrent ? 'text-[#1d61f2]' : isPassed ? 'text-slate-700' : 'text-slate-400'
-                        }`}>
-                          {item.label}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* ✅ แถบกดดูใบเสร็จ: คุมธีมสีน้ำเงิน N&N เรียบหรู */}
-                {Number(activeOrder.statusStep) >= 7 && (
-                  <div className="mt-1 py-2.5 px-3 bg-blue-50/80 border border-blue-200/80 rounded-2xl flex items-center justify-center gap-2 text-[#1045b8] text-xs font-bold shadow-2xs group-hover:bg-blue-100 transition">
+                {/* แถบแจ้งเตือนพิเศษเมื่อออเดอร์สำเร็จแล้ว */}
+                {Number(activeOrder.statusStep) >= 7 ? (
+                  <div 
+                    onClick={handleViewOrderStatus}
+                    className="mt-1 py-2.5 px-3 bg-blue-50/80 border border-blue-200/80 rounded-2xl flex items-center justify-center gap-2 text-[#1045b8] text-xs font-bold shadow-2xs hover:bg-blue-100 transition cursor-pointer"
+                  >
                     <Receipt size={15} className="text-[#1d61f2]" />
                     <span>กดดูใบเสร็จรับเงิน &amp; สรุปรายการผ้า</span>
+                  </div>
+                ) : (
+                  /* ✅ เงื่อนไขการยกเลิกออเดอร์: ยกเลิกได้เฉพาะก่อนไรเดอร์ออกมารับผ้า (Step 1 และ Step 2) */
+                  <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                    {canCancelOrder ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCancelModal(true)}
+                        className="w-full py-2 px-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <Ban size={14} /> ยกเลิกออเดอร์นี้
+                      </button>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-center">
+                        <span className="text-[11px] text-slate-500 font-semibold block">
+                          🛵 ไรเดอร์ออกเดินทางมารับผ้าแล้ว จึงไม่สามารถยกเลิกออเดอร์ได้
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -646,6 +747,83 @@ export default function HomePage() {
           </button>
 
         </div>
+
+        {/* ✅ Modal ยืนยันการยกเลิกออเดอร์ & นโยบายขอคืนเงินผ่าน LINE Official */}
+        {showCancelModal && (
+          <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-5 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2 text-red-600">
+                  <AlertTriangle size={20} />
+                  <h3 className="font-bold text-base text-slate-900">ยืนยันการยกเลิกออเดอร์</h3>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowCancelModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  คุณกำลังจะยกเลิกออเดอร์ <b className="text-slate-900">#{activeOrder?.id}</b> ก่อนที่ไรเดอร์จะออกเดินทางไปรับผ้า
+                </p>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">ระบุเหตุผลการยกเลิก</label>
+                  <select 
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none"
+                  >
+                    <option value="เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้">เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้</option>
+                    <option value="ต้องการเปลี่ยนที่อยู่รับ-ส่งผ้า">ต้องการเปลี่ยนที่อยู่รับ-ส่งผ้า</option>
+                    <option value="เลือกรายการหรือแพ็กเกจผิด">เลือกรายการหรือแพ็กเกจผิด</option>
+                    <option value="อื่นๆ">อื่นๆ</option>
+                  </select>
+                </div>
+
+                {/* กล่องข้อความแจ้งเตือนขอคืนเงินผ่าน LINE Official */}
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col gap-2 text-left">
+                  <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                    <MessageCircle size={16} className="text-emerald-600 shrink-0" />
+                    <span>นโยบายการคืนเงิน (Refund)</span>
+                  </div>
+                  <p className="text-[11.5px] text-amber-900 leading-relaxed">
+                    หากคุณได้ชำระเงินเรียบร้อยแล้ว โปรดส่งสลิปหลักฐานและแจ้งหมายเลขออเดอร์เพื่อขอรับเงินคืนผ่านทาง <b>LINE Official</b> ของทางร้าน
+                  </p>
+                  <a
+                    href="https://line.me/ti/p/@nnlaundromat"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl text-[11px] font-bold shadow-xs transition"
+                  >
+                    <ExternalLink size={12} /> แอด LINE: @nnlaundromat
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCancelModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                >
+                  ย้อนกลับ
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCancelOrder}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 transition cursor-pointer"
+                >
+                  ยืนยันยกเลิก
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal เลือกที่อยู่ */}
         {showAddressPicker && (

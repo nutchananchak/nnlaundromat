@@ -6,14 +6,15 @@ import {
   Clock, 
   Camera, 
   FileText, 
-  CheckSquare, 
-  Square, 
   ShoppingBag, 
   X, 
   Plus, 
   Minus, 
   Upload, 
-  Package
+  Package,
+  Check,
+  AlertCircle,
+  ChevronRight
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -21,12 +22,15 @@ export default function NewOrderPage() {
   const navigate = useNavigate();
   const location = useLocation() || {};
   const reorderData = location.state || {};
-  const { currentAddress, userProfile } = useApp();
+  const { currentAddress, userProfile, addresses, setSelectedAddressId } = useApp();
 
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
   const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
+  
+  // จัดการการเลือกที่อยู่ภายในหน้านี้
+  const [showAddressModal, setShowAddressModal] = useState(false);
   const displayAddress = currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : (reorderData.address || null);
 
   const packages = serviceType === 'bedding' ? [
@@ -49,6 +53,13 @@ export default function NewOrderPage() {
   const [agreed, setAgreed] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [plasticBagCount, setPlasticBagCount] = useState(0);
+
+  // State สำหรับป้ายแจ้งเตือน Modal
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
+
+  const showAlert = (title, message) => {
+    setAlertModal({ isOpen: true, title, message });
+  };
 
   const timeSlotsConfig = [
     { label: '08:00 - 09:00 น.', startHour: 8 },
@@ -111,15 +122,15 @@ export default function NewOrderPage() {
   };
 
   const washDrySpecialOptions = [
-    { id: 'silk', name: 'ผ้าไหม', price: 100, unit: 'ตัว' },
-    { id: 'leather', name: 'เสื้อหนัง', price: 80, unit: 'ตัว' },
-    { id: 'fur', name: 'ขนสัตว์', price: 100, unit: 'ตัว' },
+    { id: 'silk', name: 'ผ้าไหม', price: 120, unit: 'ตัว' },
+    { id: 'leather', name: 'เสื้อหนัง', price: 150, unit: 'ตัว' },
+    { id: 'fur', name: 'ขนสัตว์', price: 150, unit: 'ตัว' },
     { id: 'evening_dress', name: 'ชุดราตรี', price: 150, unit: 'ตัว' },
-    { id: 'suit_top', name: 'สูท (เฉพาะเสื้อ)', price: 100, unit: 'ตัว' },
-    { id: 'suit_full', name: 'สูท (เสื้อและกางเกง)', price: 150, unit: 'ชุด' },
+    { id: 'suit_top', name: 'สูท (เฉพาะเสื้อ)', price: 120, unit: 'ตัว' },
+    { id: 'suit_full', name: 'สูท (เสื้อและกางเกง)', price: 180, unit: 'ชุด' },
     { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 100, unit: 'ตัว' },
-    { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 80, unit: 'ตัว' },
-    { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "Dry Clean Only"', price: 120, unit: 'ตัว' },
+    { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 100, unit: 'ตัว' },
+    { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "ซักแห้งเท่านั้น"', price: 120, unit: 'ตัว' },
   ];
 
   const beddingSpecialOptions = [
@@ -180,37 +191,30 @@ export default function NewOrderPage() {
     e.preventDefault();
 
     if (!displayAddress) {
-      alert('กรุณาปักหมุดที่อยู่สำหรับจัดส่งผ้าก่อนยืนยันออเดอร์');
-      navigate('/profile');
+      showAlert('ยังไม่ได้ระบุที่อยู่', 'กรุณาระบุที่อยู่สำหรับจัดส่งผ้าก่อนยืนยันออเดอร์');
       return;
     }
 
     if (!pickupTime) {
-      alert('รอบเวลารับผ้าสำหรับวันนี้หมดแล้ว โปรดเลือกบริการในวันถัดไป');
+      showAlert('รอบเวลารับผ้าหมดแล้ว', 'รอบเวลารับผ้าสำหรับวันนี้หมดแล้ว โปรดเลือกบริการในวันถัดไป');
       return;
     }
 
     if (!deliveryTime) {
-      alert('กรุณาเลือกรอบเวลาส่งผ้าคืนที่ยังสามารถให้บริการได้');
+      showAlert('กรุณาเลือกรอบเวลาส่งผ้า', 'กรุณาเลือกรอบเวลาส่งผ้าคืนที่ยังสามารถให้บริการได้');
       return;
     }
 
     const hasSpecialItems = Object.values(specialItemCounts).some(count => count > 0);
 
-    if (serviceType === 'bedding') {
-      if (!selectedPackage && !hasSpecialItems) {
-        alert('กรุณาเลือกแพ็กเกจ หรือเลือกความต้องการพิเศษอย่างน้อย 1 รายการ');
-        return;
-      }
-    } else {
-      if (!selectedPackage) {
-        alert('กรุณาเลือกแพ็กเกจที่ต้องการใช้งาน');
-        return;
-      }
+    // ทั้งซักอบพับและชุดเครื่องนอน: เลือกแพ็กเกจ หรือเลือกรายการพิเศษอย่างน้อย 1 อย่าง
+    if (!selectedPackage && !hasSpecialItems) {
+      showAlert('โปรดเลือกบริการ', 'กรุณาเลือกแพ็กเกจ หรือเลือกความต้องการพิเศษอย่างน้อย 1 รายการ');
+      return;
     }
 
     if (!agreed) {
-      alert('กรุณากดยอมรับเงื่อนไขการใช้บริการ');
+      showAlert('เงื่อนไขการให้บริการ', 'กรุณากดยอมรับเงื่อนไขการใช้บริการของทางร้านก่อนดำเนินการต่อ');
       return;
     }
 
@@ -294,7 +298,7 @@ export default function NewOrderPage() {
           {/* 1. สถานที่รับ-ส่งผ้า */}
           <div>
             <label className="block text-sm font-semibold text-gray-900 mb-2">สถานที่รับ-ส่งผ้า</label>
-            <div className={`p-4 rounded-2xl border flex items-start gap-3 shadow-sm ${
+            <div className={`p-4 rounded-2xl border flex items-start gap-3 shadow-xs transition ${
               displayAddress ? 'bg-white border-gray-100' : 'bg-amber-50/70 border-amber-200'
             }`}>
               <MapPin className={displayAddress ? 'text-[#1d61f2]' : 'text-amber-500'} size={20} />
@@ -303,24 +307,26 @@ export default function NewOrderPage() {
                   {currentAddress?.title ? `ที่อยู่จัดส่ง (${currentAddress.title})` : 'ที่อยู่จัดส่ง'}
                 </p>
                 <p className={`text-sm font-semibold truncate mt-0.5 ${displayAddress ? 'text-gray-800' : 'text-amber-700'}`}>
-                  {displayAddress || 'ยังไม่ได้ระบุที่อยู่จัดส่ง (โปรดปักหมุด)'}
+                  {displayAddress || 'ยังไม่ได้ระบุที่อยู่จัดส่ง (โปรดแตะเลือก)'}
                 </p>
               </div>
               <button 
                 type="button" 
-                onClick={() => navigate('/profile')}
-                className="text-xs text-[#1d61f2] font-bold self-center shrink-0 hover:underline cursor-pointer"
+                onClick={() => setShowAddressModal(true)}
+                className="text-xs text-[#1d61f2] font-bold self-center shrink-0 hover:underline cursor-pointer bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100"
               >
-                {displayAddress ? 'เปลี่ยน' : 'ปักหมุด'}
+                {displayAddress ? 'เปลี่ยน' : 'เลือกที่อยู่'}
               </button>
             </div>
           </div>
 
-          {/* 2. เลือกแพ็กเกจ */}
+          {/* 2. เลือกแพ็กเกจ (สามารถแตะซ้ำเพื่อยกเลิกการเลือกได้) */}
           <div>
-            <label className="block text-sm font-bold text-gray-900 mb-2">
-              เลือกแพ็กเกจ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน' : 'ซัก อบ พับ'})
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-bold text-gray-900">
+                เลือกแพ็กเกจ ({serviceType === 'bedding' ? 'ชุดเครื่องนอน' : 'ซัก อบ พับ'})
+              </label>
+            </div>
             <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
               {packages.map((pkg) => {
                 const isSelected = selectedPackage === pkg.id;
@@ -431,11 +437,8 @@ export default function NewOrderPage() {
 
             <div className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0">
-                  <Package size={20} />
-                </div>
                 <div>
-                  <h4 className="font-bold text-xs text-gray-900">ถุงพลาสติกใส่ผ้ากันฝุ่น</h4>
+                  <h4 className="font-bold text-xs text-gray-900">ถุงพลาสติกใส่ผ้า</h4>
                   <p className="text-[11px] text-gray-500 mt-0.5">ราคา 5 บาท / 1 ใบ</p>
                 </div>
               </div>
@@ -502,7 +505,7 @@ export default function NewOrderPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">รอบเวลาส่งผ้าคืน</label>
-              <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1">
+              <span className="text-xs text-blue-600 font-semibold flex items-center gap-1">
                 <Clock size={13} /> {deliveryTime || 'โปรดเลือกรอบเวลา'}
               </span>
             </div>
@@ -521,7 +524,7 @@ export default function NewOrderPage() {
                         slot.isExpired
                           ? 'bg-gray-100 text-gray-400 border-gray-200/50 opacity-40 cursor-not-allowed shadow-none'
                           : isSelected
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs cursor-pointer active:scale-95'
+                          ? 'bg-[#1d61f2] text-white border-[#1d61f2] shadow-xs cursor-pointer active:scale-95'
                           : 'bg-gray-50/70 text-gray-700 border-gray-100 hover:bg-gray-100 hover:border-gray-200 cursor-pointer active:scale-95'
                       }`}
                     >
@@ -536,7 +539,7 @@ export default function NewOrderPage() {
           {/* 6. ถ่ายรูปตะกร้าผ้า */}
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-1">รูปถ่ายตะกร้าผ้า / จุดวางผ้า</label>
-            <p className="text-xs text-gray-500 mb-2.5">เลือกถ่ายจากกล้อง หรืออัปโหลดภาพเพื่อให้ไรเดอร์หาจุดรับผ้าได้ถูกต้อง</p>
+            <p className="text-xs text-gray-500 mb-2.5">เลือกถ่ายจากกล้องหรืออัปโหลดภาพเพื่อให้ไรเดอร์หาจุดรับผ้าได้ถูกต้อง</p>
             
             <input 
               ref={cameraInputRef}
@@ -556,14 +559,18 @@ export default function NewOrderPage() {
             />
 
             {basketImage ? (
-              <div className="relative w-full h-44 rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-xs">
-                <img src={basketImage} alt="Basket Preview" className="w-full h-full object-cover" />
+              <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-gray-200 bg-slate-900/5 shadow-xs flex items-center justify-center">
+                <img 
+                  src={basketImage} 
+                  alt="Basket Preview" 
+                  className="w-full h-full object-contain p-1" 
+                />
                 <button
                   type="button"
                   onClick={() => setBasketImage(null)}
-                  className="absolute top-2 right-2 px-2.5 py-1 bg-black/60 hover:bg-black/80 text-white text-xs font-bold rounded-lg transition cursor-pointer"
+                  className="absolute top-2.5 right-2.5 px-3 py-1.5 bg-black/70 hover:bg-black/85 text-white text-xs font-bold rounded-xl transition cursor-pointer backdrop-blur-xs flex items-center gap-1"
                 >
-                  เปลี่ยนรูป
+                  <X size={13} /> ลบรูป
                 </button>
               </div>
             ) : (
@@ -599,27 +606,30 @@ export default function NewOrderPage() {
           <div>
             <label className="block text-sm font-bold text-gray-900 mb-2">หมายเหตุถึงพนักงาน (ถ้ามี)</label>
             <div className="bg-white p-3.5 rounded-2xl border border-gray-100 flex items-start gap-2.5 shadow-sm">
-              <FileText className="text-gray-400 shrink-0 mt-0.5" size={18} />
               <textarea
                 rows="2"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="เช่น เสื้อหนัง, ผ้าสีตก, แขวนไว้หน้าห้อง..."
+                placeholder="เช่น วางตะกร้าไว้หน้าตึก A ได้เลย"
                 className="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none resize-none leading-normal p-0 m-0"
               ></textarea>
             </div>
           </div>
 
           {/* 8. ยอมรับเงื่อนไขการใช้บริการ */}
-          <div className="flex items-center gap-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-            <div onClick={() => setAgreed(!agreed)} className="cursor-pointer shrink-0">
-              {agreed ? (
-                <CheckSquare className="text-[#1d61f2]" size={22} />
-              ) : (
-                <Square className="text-gray-300" size={22} />
-              )}
+          <div 
+            onClick={() => setAgreed(!agreed)}
+            className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3.5 shadow-xs ${
+              agreed ? 'bg-blue-50/50 border-blue-200 ring-2 ring-blue-100/50' : 'bg-white border-gray-100 hover:border-gray-200'
+            }`}
+          >
+            <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 transition-all ${
+              agreed ? 'bg-[#1d61f2] text-white shadow-xs' : 'border-2 border-gray-300 bg-white'
+            }`}>
+              {agreed && <Check size={14} strokeWidth={3} />}
             </div>
-            <span className="text-xs text-gray-700 font-medium leading-relaxed flex-1">
+
+            <span className="text-xs text-gray-700 font-medium leading-relaxed flex-1 select-none">
               ข้าพเจ้าได้ตรวจสอบข้อมูลและ{' '}
               <button 
                 type="button" 
@@ -650,11 +660,77 @@ export default function NewOrderPage() {
           <button
             type="button"
             onClick={handleCreateOrder}
-            className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
+            className="w-full py-3 rounded-xl bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
           >
             ยืนยันการสั่งบริการ
           </button>
         </div>
+
+        {/* Modal เลือกที่อยู่จัดส่งทันทีในหน้านี้ */}
+        {showAddressModal && (
+          <div className="absolute inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-xs">
+            <div className="bg-white w-full max-w-[430px] rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <MapPin size={18} className="text-[#1d61f2]" />
+                  <span className="font-bold text-base text-gray-900">เลือกสถานที่รับ-ส่งผ้า</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddressModal(false)}
+                  className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2.5 max-h-60 overflow-y-auto">
+                {(!addresses || addresses.length === 0) ? (
+                  <p className="text-xs text-gray-400 text-center py-4">ยังไม่มีที่อยู่จัดส่งในระบบ</p>
+                ) : (
+                  addresses.map((addr) => {
+                    const isSelected = currentAddress?.id === addr.id;
+                    return (
+                      <div
+                        key={addr.id}
+                        onClick={() => {
+                          setSelectedAddressId(addr.id);
+                          setShowAddressModal(false);
+                        }}
+                        className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
+                          isSelected
+                            ? 'bg-blue-50/70 border-[#1d61f2]'
+                            : 'bg-white border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-3">
+                          <span className="font-bold text-xs text-gray-900 block">{addr.title}</span>
+                          <span className="text-[11px] text-gray-500 truncate block mt-0.5">{addr.detail}</span>
+                        </div>
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-[#1d61f2] text-white flex items-center justify-center shrink-0">
+                            <Check size={12} strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddressModal(false);
+                  navigate('/profile');
+                }}
+                className="w-full py-2.5 rounded-xl border border-dashed border-gray-300 text-gray-600 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-gray-50 transition cursor-pointer"
+              >
+                <Plus size={14} /> ปักหมุดที่อยู่ใหม่ในหน้าโปรไฟล์
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Modal แสดงเงื่อนไข */}
         {showTermsModal && (
@@ -687,6 +763,26 @@ export default function NewOrderPage() {
                 className="w-full py-3 mt-2 rounded-xl bg-[#1d61f2] text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
               >
                 เข้าใจและยอมรับเงื่อนไข
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Alert Modal แจ้งเตือนแบบโมเดิร์น */}
+        {alertModal.isOpen && (
+          <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center mb-3">
+                <AlertCircle size={24} />
+              </div>
+              <h4 className="font-bold text-base text-gray-900 mb-1">{alertModal.title}</h4>
+              <p className="text-xs text-gray-500 leading-relaxed mb-5">{alertModal.message}</p>
+              <button
+                type="button"
+                onClick={() => setAlertModal({ isOpen: false, title: '', message: '' })}
+                className="w-full py-2.5 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer hover:bg-blue-700 transition"
+              >
+                ตกลง
               </button>
             </div>
           </div>
