@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, 
@@ -18,14 +18,14 @@ import {
   X, 
   AlertTriangle, 
   Calendar,
-  LogOut,
   PackageCheck,
   Flame,
   BadgeCheck,
   QrCode,
   Star,
   Receipt,
-  Ban
+  Ban,
+  Bell
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
@@ -49,6 +49,9 @@ export default function HomePage() {
   const [closedDates, setClosedDates] = useState([]);
   const [bannerIndex, setBannerIndex] = useState(0);
 
+  // State ตรวจสอบว่ามีข้อความแจ้งเตือนที่ยังไม่ได้อ่านหรือไม่
+  const [hasUnreadNotices, setHasUnreadNotices] = useState(false);
+
   // State สำหรับ Modal ยกเลิกออเดอร์
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้');
@@ -60,7 +63,7 @@ export default function HomePage() {
     'อื่นๆ'
   ];
 
-  // ดึงสถานะร้านและวันหยุด
+  // ดึงสถานะร้าน, วันหยุด และเช็กสถานะการแจ้งเตือน
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
     if (savedStoreStatus !== null) {
@@ -74,6 +77,15 @@ export default function HomePage() {
       } catch (e) {
         setClosedDates([]);
       }
+    }
+
+    // เช็กว่ามีข้อความที่ยังไม่ได้อ่านไหม เพื่อโชว์จุดแดงที่กระดิ่ง
+    try {
+      const storedNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+      const unreadExists = storedNotices.some(n => !n.isRead);
+      setHasUnreadNotices(unreadExists);
+    } catch (e) {
+      setHasUnreadNotices(false);
     }
   }, []);
 
@@ -140,6 +152,7 @@ export default function HomePage() {
           isRead: false
         };
         localStorage.setItem('customerNotifications', JSON.stringify([alertNotice, ...currentNotices]));
+        setHasUnreadNotices(true);
       }
     }
   }, [isSlipRejected, activeOrder]);
@@ -252,6 +265,7 @@ export default function HomePage() {
         isRead: false
       };
       localStorage.setItem('customerNotifications', JSON.stringify([cancelNotice, ...currentNotices]));
+      setHasUnreadNotices(true);
     } catch (e) {
       console.error(e);
     }
@@ -282,14 +296,6 @@ export default function HomePage() {
     });
   };
 
-  const handleLogout = () => {
-    if (window.confirm('คุณต้องการออกจากระบบหรือไม่?')) {
-      localStorage.removeItem('currentUser');
-      localStorage.removeItem('userProfile');
-      navigate('/login/customer', { replace: true });
-    }
-  };
-
   return (
     <div style={{
       display: 'flex',
@@ -314,7 +320,7 @@ export default function HomePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
-        {/* 1. Top Bar */}
+        {/* 1. Top Bar: ปรับมุมขวาเป็นปุ่มกระดิ่งแจ้งเตือน */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
@@ -349,13 +355,17 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center">
+            {/* ✅ ปุ่มกระดิ่งแจ้งเตือน นำทางไปหน้า /notifications */}
             <button 
               type="button"
-              onClick={handleLogout}
-              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-red-500/90 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
-              title="ออกจากระบบ"
+              onClick={() => navigate('/notifications')}
+              className="relative w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 text-white flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95"
+              title="การแจ้งเตือน"
             >
-              <LogOut size={18} />
+              <Bell size={18} />
+              {hasUnreadNotices && (
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-400 ring-2 ring-blue-600 animate-pulse" />
+              )}
             </button>
           </div>
         </div>
@@ -756,7 +766,6 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150 border border-slate-100">
               
-              {/* Header Modal แบบคลีน ไม่ใช้ไอคอนรกตา */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="font-bold text-base text-slate-900 leading-tight">ยกเลิกคำสั่งซื้อ</h3>
@@ -795,7 +804,6 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* ข้อมูลการขอคืนเงิน: เรียบง่าย ไม่มีไอคอนรก */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col gap-1">
                 <span className="text-xs font-bold text-slate-800">
                   ขั้นตอนการขอรับเงินคืน
@@ -805,7 +813,6 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* ปุ่มดำเนินการ */}
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"

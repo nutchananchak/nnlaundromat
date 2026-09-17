@@ -684,7 +684,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <span className="text-xs font-bold text-slate-900 block">แก้ไขข้อมูลส่วนตัว</span>
-                  <span className="text-[11px] text-slate-400">ชื่อ - นามสกุล, เบอร์โทรศัพท์ (ยืนยันผ่าน OTP)</span>
+                  <span className="text-[11px] text-slate-400">ชื่อ - นามสกุล, เบอร์โทรศัพท์ </span>
                 </div>
               </div>
               <ChevronRight size={16} className="text-slate-400" />
