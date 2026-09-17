@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   ShoppingBag,
   Clock,
-  User
+  User,
+  AlertCircle
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -21,18 +22,18 @@ export default function PaymentPage() {
   const location = useLocation() || {};
   const { userProfile, orders, setOrders } = useApp();
 
-  // ดึงชื่อผู้ใช้ปัจจุบัน
   const customerName = userProfile?.fullName || userProfile?.name || 'คุณลูกค้า';
-  const customerPhone = userProfile?.phone || '08X-XXX-XXXX';
+  const customerPhone = userProfile?.phone || '';
 
-  const orderData = location.state?.order || {
-    id: `NN-${Math.floor(100000 + Math.random() * 900000)}`,
-    serviceName: 'ซัก อบ พับ',
-    packageName: 'ไซส์ M (ผ้าไม่เกิน 35 ชิ้น)',
-    pickupTime: '14:00 - 16:00 น.',
-    address: 'หอพักใจดี ห้อง 204 (ซอยพหลโยธิน 34)',
-    totalPrice: 180,
-  };
+  // ดึงข้อมูลจริงจาก State ที่ NewOrderPage ส่งมา
+  const orderData = location.state?.order;
+
+  // ตรวจสอบความถูกต้อง หากไม่มีข้อมูลจริงส่งมา ให้พากลับไปหน้าสร้างออเดอร์
+  useEffect(() => {
+    if (!orderData) {
+      navigate('/order/new', { replace: true });
+    }
+  }, [orderData, navigate]);
 
   const [paymentMethod, setPaymentMethod] = useState('qrcode');
   const [copied, setCopied] = useState(false);
@@ -40,13 +41,22 @@ export default function PaymentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
+  const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
+
+  const showAlert = (title, message) => {
+    setAlertModal({ isOpen: true, title, message });
+  };
+
   const bankAccount = {
     bankName: 'ธนาคารกสิกรไทย (KBANK)',
     accountNumber: '123-4-56789-0',
     accountName: 'บริษัท เอ็นแอนด์เอ็น ลอนดรอแมท จำกัด',
   };
 
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${orderData.totalPrice}THB`;
+  // สร้าง QR Code จากยอดเงินและรหัสออเดอร์จริง
+  const qrCodeUrl = orderData 
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${orderData.totalPrice}THB`
+    : '';
 
   const handleCopyAccount = () => {
     navigator.clipboard.writeText(bankAccount.accountNumber.replace(/-/g, ''));
@@ -55,6 +65,7 @@ export default function PaymentPage() {
   };
 
   const handleDownloadQr = () => {
+    if (!qrCodeUrl || !orderData) return;
     const link = document.createElement('a');
     link.href = qrCodeUrl;
     link.download = `QR_NN_Laundromat_${orderData.id}.png`;
@@ -64,36 +75,49 @@ export default function PaymentPage() {
   };
 
   const handleSlipChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setSlipImage(URL.createObjectURL(e.target.files[0]));
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSlipImage(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleConfirmPayment = (e) => {
     e.preventDefault();
     if (!slipImage) {
-      alert('กรุณาอัปโหลดสลิปหลักฐานการโอนเงิน');
+      showAlert('ยังไม่ได้แนบสลิป', 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงินก่อนกดยืนยัน');
       return;
     }
+
+    if (!orderData) return;
 
     setIsSubmitting(true);
 
     setTimeout(() => {
-      // สร้าง Object ออเดอร์ใหม่ที่ผูกกับชื่อผู้ใช้ที่กำลังล็อกอินอยู่
+      // บันทึกออเดอร์จริงเข้าสู่ระบบ
       const newOrder = {
         id: orderData.id,
-        customerName: customerName,
-        customerPhone: customerPhone,
+        customerName: orderData.customerName || customerName,
+        customerPhone: orderData.customerPhone || customerPhone,
         status: 'in_progress',
-        statusStep: 1, // ขั้นตอนที่ 1: ตรวจสอบยอดเงิน
+        statusStep: 1,
         statusTitle: 'ตรวจสอบยอดเงิน',
         estimatedTime: 'รอเจ้าหน้าที่ยืนยันยอดเงิน',
         serviceName: orderData.serviceName,
         packageName: orderData.packageName,
+        specialItems: orderData.specialItems || [],
+        plasticBagCount: orderData.plasticBagCount || 0,
         price: orderData.totalPrice,
-        createdAt: 'วันนี้ เพิ่งสร้าง',
+        createdAt: orderData.createdAt,
         pickupTime: orderData.pickupTime,
+        deliveryTime: orderData.deliveryTime,
         address: orderData.address,
+        lat: orderData.lat,
+        lng: orderData.lng,
+        basketImage: orderData.basketImage || null,
         note: orderData.note || 'ไม่มีหมายเหตุเพิ่มเติม',
         paymentStatus: 'รอตรวจสอบยอด',
         slipImage: slipImage,
@@ -113,25 +137,20 @@ export default function PaymentPage() {
         ]
       };
 
-      // บันทึกออเดอร์ใหม่เข้าสู่ AppContext (ให้อยู่รายการแรกสุด)
-      setOrders([newOrder, ...orders.filter(o => o.id !== newOrder.id)]);
-
-      console.log(
-        `%c [N&N LAUNDROMAT] ORDER CREATED %c\n` +
-        `+--------------------------------------------------------+\n` +
-        `| รหัสออเดอร์      : ${newOrder.id.padEnd(36)}|\n` +
-        `| ลูกค้าผู้สั่งซื้อ : ${newOrder.customerName.padEnd(36)}|\n` +
-        `| ยอดชำระ        : ${(newOrder.price + ' บาท').padEnd(36)}|\n` +
-        `| สถานะ          : ${newOrder.statusTitle.padEnd(36)}|\n` +
-        `+--------------------------------------------------------+`,
-        'background: #1d61f2; color: #ffffff; font-weight: bold; padding: 4px 10px; border-radius: 4px; font-size: 11px;',
-        'color: #0c4a7e; font-family: monospace; font-size: 12px; line-height: 1.5;'
-      );
+      const existingOrders = orders || [];
+      const updatedOrders = [newOrder, ...existingOrders.filter(o => o.id !== newOrder.id)];
+      
+      setOrders(updatedOrders);
+      localStorage.setItem('orders', JSON.stringify(updatedOrders));
 
       setIsSubmitting(false);
       setIsSuccessModalOpen(true);
     }, 800);
   };
+
+  if (!orderData) {
+    return null;
+  }
 
   return (
     <div style={{
@@ -155,7 +174,7 @@ export default function PaymentPage() {
         position: 'relative',
         overflowX: 'hidden',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-      }} className="font-body">
+      }} className="font-body text-base">
 
         {/* Header */}
         <div style={{
@@ -172,60 +191,97 @@ export default function PaymentPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <p className="text-white/80 text-xs font-medium">N&N Laundromat</p>
-            <h1 className="font-display font-bold text-white text-xl tracking-tight">ชำระเงิน</h1>
+            <h1 className="font-bold text-white text-xl leading-tight tracking-tight">ชำระเงิน</h1>
           </div>
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 pb-32 flex flex-col gap-5">
+        <div className="flex-1 overflow-y-auto px-6 py-6 pb-36 flex flex-col gap-5">
           
-          {/* สรุปคำสั่งซื้อ */}
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
-              <span className="font-display font-bold text-gray-900 text-sm">สรุปคำสั่งซื้อ</span>
-              <span className="text-xs font-semibold text-[#1d61f2] bg-blue-50 px-2.5 py-0.5 rounded-full">
+          {/* ส่วนสรุปคำสั่งซื้อ (ตัวหนังสือสีดำชัดเจน) */}
+          <div className="bg-white p-4.5 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <span className="font-bold text-slate-900 text-sm">สรุปคำสั่งซื้อ</span>
+              <span className="text-xs font-bold text-slate-900 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
                 #{orderData.id}
               </span>
             </div>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2.5 text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-gray-500 font-medium">ผู้สั่งบริการ</span>
-                <span className="text-gray-800 font-bold flex items-center gap-1">
-                  <User size={13} className="text-[#1d61f2]" /> {customerName}
+                <span className="text-slate-500 font-medium">ผู้สั่งบริการ</span>
+                <span className="text-slate-900 font-bold flex items-center gap-1.5">
+                  <User size={13} className="text-slate-700" /> {orderData.customerName || customerName}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 font-medium">บริการ</span>
-                <span className="text-gray-800 font-bold">{orderData.serviceName}</span>
+
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">บริการ</span>
+                <span className="text-slate-900 font-bold">{orderData.serviceName}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 font-medium">แพ็กเกจ</span>
-                <span className="text-gray-800 font-semibold">{orderData.packageName}</span>
+              
+              {/* แพ็กเกจหลัก */}
+              <div className="flex justify-between items-start">
+                <span className="text-slate-500 font-medium">แพ็กเกจหลัก</span>
+                <span className="text-slate-900 font-bold text-right">{orderData.packageName}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 font-medium">รอบเวลาเข้ารับ</span>
-                <span className="text-gray-800 font-semibold">{orderData.pickupTime}</span>
+
+              {/* รายการพิเศษ */}
+              {orderData.specialItems && orderData.specialItems.length > 0 && (
+                <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 mt-1">
+                  <span className="text-[11px] font-bold text-slate-900 block">รายการความต้องการพิเศษ:</span>
+                  {orderData.specialItems.map(item => (
+                    <div key={item.id} className="flex justify-between text-[11px] text-slate-800">
+                      <span>• {item.name} x {item.count}</span>
+                      <span className="font-bold">{item.total}฿</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ถุงพลาสติกเสริม */}
+              {orderData.plasticBagCount > 0 && (
+                <div className="flex justify-between items-center text-[11.5px]">
+                  <span className="text-slate-500 font-medium">ถุงพลาสติกใส่ผ้า</span>
+                  <span className="text-slate-900 font-bold">{orderData.plasticBagCount} ใบ (+{orderData.plasticBagPrice}฿)</span>
+                </div>
+              )}
+
+              {/* รอบเวลารับผ้า */}
+              <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                <span className="text-slate-500 font-medium">รอบเวลาเข้ารับผ้า</span>
+                <span className="text-slate-900 font-bold flex items-center gap-1">
+                  <Clock size={12} className="text-slate-700" /> {orderData.pickupTime}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 font-medium">จุดรับ-ส่งผ้า</span>
-                <span className="text-gray-800 font-semibold truncate max-w-[200px] text-right">{orderData.address}</span>
+
+              {/* รอบเวลาส่งผ้าคืน */}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">รอบเวลาส่งผ้าคืน</span>
+                <span className="text-slate-900 font-bold flex items-center gap-1">
+                  <Clock size={12} className="text-slate-700" /> {orderData.deliveryTime}
+                </span>
+              </div>
+
+              {/* จุดรับ-ส่งผ้า */}
+              <div className="flex justify-between items-start pt-1 border-t border-slate-100">
+                <span className="text-slate-500 font-medium shrink-0 mr-2">จุดรับ-ส่งผ้า</span>
+                <span className="text-slate-900 font-bold text-right leading-relaxed">{orderData.address}</span>
               </div>
             </div>
           </div>
 
           {/* วิธีชำระเงิน */}
           <div>
-            <label className="block text-sm font-bold text-gray-900 mb-2">เลือกวิธีชำระเงิน</label>
+            <label className="block text-sm font-bold text-slate-900 mb-2">เลือกวิธีชำระเงิน</label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setPaymentMethod('qrcode')}
-                className={`py-3 px-4 rounded-2xl border flex items-center justify-center gap-2 font-display text-xs font-bold transition cursor-pointer ${
+                className={`py-3 px-4 rounded-2xl border flex items-center justify-center gap-2 text-xs font-bold transition cursor-pointer ${
                   paymentMethod === 'qrcode'
-                    ? 'bg-blue-50/70 border-[#1d61f2] text-[#1d61f2] shadow-sm'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-blue-200'
+                    ? 'bg-blue-50/70 border-[#1d61f2] text-[#1d61f2] shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-blue-200'
                 }`}
               >
                 <QrCode size={16} />
@@ -235,10 +291,10 @@ export default function PaymentPage() {
               <button
                 type="button"
                 onClick={() => setPaymentMethod('bank')}
-                className={`py-3 px-4 rounded-2xl border flex items-center justify-center gap-2 font-display text-xs font-bold transition cursor-pointer ${
+                className={`py-3 px-4 rounded-2xl border flex items-center justify-center gap-2 text-xs font-bold transition cursor-pointer ${
                   paymentMethod === 'bank'
-                    ? 'bg-blue-50/70 border-[#1d61f2] text-[#1d61f2] shadow-sm'
-                    : 'bg-white border-gray-200 text-gray-600 hover:border-blue-200'
+                    ? 'bg-blue-50/70 border-[#1d61f2] text-[#1d61f2] shadow-xs'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-blue-200'
                 }`}
               >
                 <CreditCard size={16} />
@@ -248,15 +304,15 @@ export default function PaymentPage() {
           </div>
 
           {/* รายละเอียด QR / บัญชี */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center text-center">
+          <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center text-center">
             {paymentMethod === 'qrcode' ? (
               <>
-                <p className="text-xs text-gray-500 font-medium mb-3">สแกน QR Code ผ่านแอปธนาคารใดก็ได้</p>
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-2xl mb-3 shadow-inner">
+                <p className="text-xs text-slate-500 font-medium mb-3">สแกน QR Code ผ่านแอปพลิเคชันธนาคาร</p>
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl mb-3 shadow-inner">
                   <img
                     src={qrCodeUrl}
                     alt="PromptPay QR Code"
-                    className="w-44 h-44 object-contain rounded-lg"
+                    className="w-48 h-48 object-contain rounded-xl"
                   />
                 </div>
                 <button
@@ -270,29 +326,29 @@ export default function PaymentPage() {
               </>
             ) : (
               <div className="w-full text-left space-y-3">
-                <div className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2.5">
                   <div>
-                    <span className="text-[11px] text-gray-400 font-medium">ธนาคาร</span>
-                    <p className="text-xs font-bold text-gray-800">{bankAccount.bankName}</p>
+                    <span className="text-[11px] text-slate-400 font-medium">ธนาคาร</span>
+                    <p className="text-xs font-bold text-slate-900">{bankAccount.bankName}</p>
                   </div>
                   <div>
-                    <span className="text-[11px] text-gray-400 font-medium">ชื่อบัญชี</span>
-                    <p className="text-xs font-bold text-gray-800">{bankAccount.accountName}</p>
+                    <span className="text-[11px] text-slate-400 font-medium">ชื่อบัญชี</span>
+                    <p className="text-xs font-bold text-slate-900">{bankAccount.accountName}</p>
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <div>
-                      <span className="text-[11px] text-gray-400 font-medium">เลขที่บัญชี</span>
-                      <p className="font-display text-base font-extrabold text-[#1d61f2] tracking-wider">
+                      <span className="text-[11px] text-slate-400 font-medium">เลขที่บัญชี</span>
+                      <p className="text-lg font-black text-slate-900 tracking-wider">
                         {bankAccount.accountNumber}
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={handleCopyAccount}
-                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-bold transition cursor-pointer ${
+                      className={`flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border font-bold transition cursor-pointer ${
                         copied
                           ? 'bg-emerald-50 border-emerald-300 text-emerald-600'
-                          : 'bg-white border-blue-200 text-[#1d61f2] hover:bg-blue-50'
+                          : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -306,44 +362,50 @@ export default function PaymentPage() {
 
           {/* แนบสลิป */}
           <div>
-            <label className="block text-sm font-bold text-gray-900 mb-1">แนบสลิปหลักฐานการโอนเงิน</label>
-            <p className="text-xs text-gray-500 mb-2">กรุณาแนบรูปภาพสลิปเพื่อส่งให้แอดมินตรวจสอบ</p>
+            <label className="block text-sm font-bold text-slate-900 mb-1">แนบสลิปหลักฐานการโอนเงิน</label>
+            <p className="text-xs text-slate-500 mb-2.5">กรุณาแนบภาพสลิปเพื่อส่งให้ทางร้านตรวจสอบยอดเงิน</p>
             
-            <label className="border-2 border-dashed border-gray-200 rounded-2xl p-4 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-[#1d61f2] transition group">
+            <label className="border-2 border-dashed border-slate-200 rounded-3xl p-5 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-[#1d61f2] transition group min-h-[220px]">
               {slipImage ? (
-                <div className="relative w-full h-48 flex flex-col items-center">
-                  <img src={slipImage} alt="Payment Slip" className="w-full h-full object-contain rounded-xl" />
-                  <span className="mt-2 text-xs font-bold text-[#1d61f2] underline">แตะเพื่อเปลี่ยนรูปสลิป</span>
+                <div className="relative w-full min-h-[260px] max-h-[320px] rounded-2xl overflow-hidden bg-slate-900/5 p-2 flex flex-col items-center justify-center border border-slate-100">
+                  <img 
+                    src={slipImage} 
+                    alt="Payment Slip" 
+                    className="w-full h-full max-h-[250px] object-contain rounded-xl" 
+                  />
+                  <span className="mt-3 text-xs font-bold text-[#1d61f2] underline flex items-center gap-1">
+                    <Upload size={13} /> แตะเพื่อเปลี่ยนรูปสลิปใหม่
+                  </span>
                 </div>
               ) : (
-                <>
-                  <div className="w-11 h-11 rounded-full bg-blue-50 text-[#1d61f2] flex items-center justify-center mb-2 group-hover:scale-105 transition">
-                    <Upload size={20} />
+                <div className="py-6 flex flex-col items-center justify-center">
+                  <div className="w-13 h-13 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center mb-3 group-hover:scale-105 transition shadow-xs">
+                    <Upload size={24} />
                   </div>
-                  <span className="text-xs font-bold text-gray-700">แตะเพื่ออัปโหลดรูปสลิป</span>
-                  <span className="text-[11px] text-gray-400 mt-0.5">รองรับไฟล์ JPG, PNG</span>
-                </>
+                  <span className="text-xs font-bold text-slate-700">แตะเพื่ออัปโหลดรูปภาพสลิป</span>
+                  <span className="text-[11px] text-slate-400 mt-1">รองรับไฟล์ JPG, PNG</span>
+                </div>
               )}
               <input type="file" accept="image/*" onChange={handleSlipChange} className="hidden" />
             </label>
           </div>
 
-          <div className="flex items-center gap-2 px-1 text-[11px] text-gray-400">
-            <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
-            <span>หลักฐานการโอนจะถูกส่งไปยังระบบตรวจสอบของแอดมิน</span>
+          <div className="flex items-center gap-2 px-1 text-xs text-slate-400 font-medium">
+            <ShieldCheck size={16} className="text-[#1d61f2] shrink-0" />
+            <span>หลักฐานการโอนจะถูกตรวจสอบก่อนจัดส่งไรเดอร์เข้ารับผ้า</span>
           </div>
 
         </div>
 
-        {/* ปุ่มยืนยันชำระเงิน */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3.5 shadow-[0_-6px_20px_rgba(0,0,0,0.08)] flex flex-col gap-2.5 z-30">
+        {/* ส่วนสรุปราคาและปุ่มยืนยัน (ตัวเลขยอดชำระเป็นสีน้ำเงิน #1d61f2) */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3.5 shadow-[0_-6px_20px_rgba(0,0,0,0.08)] flex flex-col gap-2.5 z-30">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-2 text-slate-600">
               <ShoppingBag size={16} className="text-[#1d61f2]" />
-              <span className="text-xs font-semibold">ยอดที่ต้องชำระ</span>
+              <span className="text-xs font-semibold text-slate-700">ยอดที่ต้องชำระ</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="font-display font-bold text-2xl text-[#1d61f2]">{orderData.totalPrice}</span>
+              <span className="font-bold text-2xl text-[#1d61f2]">{orderData.totalPrice}</span>
               <span className="text-xs font-bold text-gray-500">บาท</span>
             </div>
           </div>
@@ -352,7 +414,7 @@ export default function PaymentPage() {
             type="button"
             onClick={handleConfirmPayment}
             disabled={isSubmitting}
-            className="w-full py-3.5 rounded-xl bg-[#1d61f2] text-white font-display font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-xl bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <FileCheck2 size={18} />
             {isSubmitting ? 'กำลังส่งหลักฐาน...' : 'ส่งหลักฐานการโอนเงิน'}
@@ -361,21 +423,41 @@ export default function PaymentPage() {
 
         {/* Modal แจ้งเตือนส่งสลิปสำเร็จ */}
         {isSuccessModalOpen && (
-          <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl flex flex-col items-center">
+          <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-6 text-center shadow-2xl flex flex-col items-center animate-in zoom-in-95 duration-200">
               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-[#1d61f2] mb-3">
                 <Clock size={34} className="animate-pulse" />
               </div>
-              <h3 className="font-display font-bold text-lg text-gray-900 mb-1">ส่งหลักฐานเรียบร้อยแล้ว</h3>
-              <p className="text-xs text-gray-500 leading-relaxed mb-6 font-medium">
+              <h3 className="font-bold text-lg text-slate-900 mb-1">ส่งหลักฐานเรียบร้อยแล้ว</h3>
+              <p className="text-xs text-slate-500 leading-relaxed mb-6 font-medium">
                 สลิปของคุณถูกส่งไปยังเจ้าหน้าที่เพื่อตรวจสอบยอดเงิน เมื่อผ่านการตรวจสอบ ไรเดอร์จะเข้ารับผ้าตามรอบเวลาที่คุณเลือก
               </p>
               <button
                 type="button"
                 onClick={() => navigate('/home')}
-                className="w-full py-3.5 rounded-xl bg-[#1d61f2] text-white font-display font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
+                className="w-full py-3.5 rounded-xl bg-[#1d61f2] text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer hover:bg-blue-700"
               >
                 กลับสู่หน้าหลัก
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal แจ้งเตือนข้อผิดพลาด */}
+        {alertModal.isOpen && (
+          <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150">
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#1d61f2] flex items-center justify-center mb-3">
+                <AlertCircle size={24} />
+              </div>
+              <h4 className="font-bold text-base text-slate-900 mb-1">{alertModal.title}</h4>
+              <p className="text-xs text-gray-500 leading-relaxed mb-5">{alertModal.message}</p>
+              <button
+                type="button"
+                onClick={() => setAlertModal({ isOpen: false, title: '', message: '' })}
+                className="w-full py-2.5 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer hover:bg-blue-700 transition"
+              >
+                ตกลง
               </button>
             </div>
           </div>
