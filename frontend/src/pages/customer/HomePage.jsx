@@ -25,9 +25,7 @@ import {
   QrCode,
   Star,
   Receipt,
-  Ban,
-  MessageCircle,
-  ExternalLink
+  Ban
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
@@ -54,6 +52,13 @@ export default function HomePage() {
   // State สำหรับ Modal ยกเลิกออเดอร์
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้');
+
+  const cancelReasonsList = [
+    'เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้',
+    'ต้องการเปลี่ยนที่อยู่รับ-ส่งผ้า',
+    'เลือกรายการหรือแพ็กเกจผิด',
+    'อื่นๆ'
+  ];
 
   // ดึงสถานะร้านและวันหยุด
   useEffect(() => {
@@ -108,7 +113,7 @@ export default function HomePage() {
   const hasOngoingOrder = Boolean(activeOrder);
   const isSlipRejected = Boolean(activeOrder && activeOrder.paymentRejected);
 
-  // เช็กว่าออเดอร์อยู่ในขั้นตอนที่ยังสามารถยกเลิกได้หรือไม่ (ต้องก่อน Step 3: กำลังมารับ)
+  // เช็กว่าออเดอร์อยู่ในขั้นตอนที่ยังสามารถยกเลิกได้หรือไม่ (ก่อน Step 3: กำลังมารับ)
   const currentStepNum = Number(activeOrder?.statusStep) || 1;
   const canCancelOrder = hasOngoingOrder && currentStepNum < 3;
 
@@ -197,7 +202,7 @@ export default function HomePage() {
     }
   };
 
-  // ✅ ฟังก์ชันดำเนินการยกเลิกออเดอร์
+  // ยืนยันยกเลิกออเดอร์
   const handleConfirmCancelOrder = () => {
     if (!activeOrder) return;
 
@@ -236,13 +241,12 @@ export default function HomePage() {
       });
       localStorage.setItem('orders', JSON.stringify(updated));
 
-      // แจ้งเตือนในกล่องข้อความ
       const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
       const cancelNotice = {
         id: Date.now(),
         orderId: activeOrder.id,
         title: 'ยกเลิกคำสั่งซื้อเรียบร้อยแล้ว',
-        message: `ออเดอร์ #${activeOrder.id} ได้รับการยกเลิกเรียบร้อยแล้ว หากชำระเงินแล้วสามารถส่งหลักฐานขอคืนเงินทาง LINE Official ได้เลยครับ`,
+        message: `ออเดอร์ #${activeOrder.id} ได้รับการยกเลิกเรียบร้อยแล้ว (เหตุผล: ${cancelReason}) หากชำระเงินแล้วสามารถส่งหลักฐานขอคืนเงินทาง LINE Official`,
         time: cancelTimestamp,
         type: 'info',
         isRead: false
@@ -402,7 +406,7 @@ export default function HomePage() {
               </h2>
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-sm text-xs text-blue-100 font-bold mt-2.5">
                 <Clock size={14} className="text-sky-300" />
-                รับ-ส่งวันเดียวกัน เปิด 08:00 - ปิด 22:00 น.
+                รับ-ส่งวันเดียวกัน เปิด 08:00 - 22:00 น.
               </span>
             </div>
             <div className="w-13 h-13 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white shrink-0 ml-2 shadow-xs">
@@ -455,7 +459,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* ส่วนแสดงสถานะผ้า พร้อมปุ่มยกเลิกออเดอร์ตามเงื่อนไข */}
+          {/* ส่วนแสดงสถานะผ้า */}
           {hasOngoingOrder ? (
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -541,20 +545,19 @@ export default function HomePage() {
                     <span>กดดูใบเสร็จรับเงิน &amp; สรุปรายการผ้า</span>
                   </div>
                 ) : (
-                  /* ✅ เงื่อนไขการยกเลิกออเดอร์: ยกเลิกได้เฉพาะก่อนไรเดอร์ออกมารับผ้า (Step 1 และ Step 2) */
                   <div className="pt-2 border-t border-slate-100 flex flex-col gap-1.5">
                     {canCancelOrder ? (
                       <button
                         type="button"
                         onClick={() => setShowCancelModal(true)}
-                        className="w-full py-2 px-3 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5"
+                        className="w-full py-2.5 px-3 rounded-xl border border-red-200 bg-red-50/60 hover:bg-red-100/80 text-red-600 text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
                       >
-                        <Ban size={14} /> ยกเลิกออเดอร์นี้
+                        <Ban size={14} className="text-red-500" /> ยกเลิกออเดอร์นี้
                       </button>
                     ) : (
                       <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-center">
                         <span className="text-[11px] text-slate-500 font-semibold block">
-                          🛵 ไรเดอร์ออกเดินทางมารับผ้าแล้ว จึงไม่สามารถยกเลิกออเดอร์ได้
+                          ไรเดอร์ออกเดินทางไปรับผ้าแล้ว จึงไม่สามารถยกเลิกออเดอร์ได้
                         </span>
                       </div>
                     )}
@@ -706,7 +709,7 @@ export default function HomePage() {
                   <Shirt size={26} />
                 </div>
                 <span className="font-bold text-sm text-slate-900">ซัก อบ พับ</span>
-                <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 160฿</span>
+                <span className="text-xs font-semibold text-slate-500 mt-1">เริ่มต้น 100฿</span>
               </div>
 
               <div
@@ -748,79 +751,78 @@ export default function HomePage() {
 
         </div>
 
-        {/* ✅ Modal ยืนยันการยกเลิกออเดอร์ & นโยบายขอคืนเงินผ่าน LINE Official */}
+        {/* Modal ยืนยันการยกเลิกออเดอร์ */}
         {showCancelModal && (
-          <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-5 backdrop-blur-xs">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div className="flex items-center gap-2 text-red-600">
-                  <AlertTriangle size={20} />
-                  <h3 className="font-bold text-base text-slate-900">ยืนยันการยกเลิกออเดอร์</h3>
+          <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150 border border-slate-100">
+              
+              {/* Header Modal แบบคลีน ไม่ใช้ไอคอนรกตา */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 leading-tight">ยกเลิกคำสั่งซื้อ</h3>
+                  <span className="text-xs text-slate-400 font-medium">หมายเลขออเดอร์ #{activeOrder?.id}</span>
                 </div>
                 <button 
                   type="button" 
                   onClick={() => setShowCancelModal(false)}
-                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition cursor-pointer"
                 >
                   <X size={16} />
                 </button>
               </div>
 
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  คุณกำลังจะยกเลิกออเดอร์ <b className="text-slate-900">#{activeOrder?.id}</b> ก่อนที่ไรเดอร์จะออกเดินทางไปรับผ้า
-                </p>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">ระบุเหตุผลการยกเลิก</label>
-                  <select 
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none"
-                  >
-                    <option value="เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้">เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้</option>
-                    <option value="ต้องการเปลี่ยนที่อยู่รับ-ส่งผ้า">ต้องการเปลี่ยนที่อยู่รับ-ส่งผ้า</option>
-                    <option value="เลือกรายการหรือแพ็กเกจผิด">เลือกรายการหรือแพ็กเกจผิด</option>
-                    <option value="อื่นๆ">อื่นๆ</option>
-                  </select>
-                </div>
-
-                {/* กล่องข้อความแจ้งเตือนขอคืนเงินผ่าน LINE Official */}
-                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col gap-2 text-left">
-                  <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
-                    <MessageCircle size={16} className="text-emerald-600 shrink-0" />
-                    <span>นโยบายการคืนเงิน (Refund)</span>
-                  </div>
-                  <p className="text-[11.5px] text-amber-900 leading-relaxed">
-                    หากคุณได้ชำระเงินเรียบร้อยแล้ว โปรดส่งสลิปหลักฐานและแจ้งหมายเลขออเดอร์เพื่อขอรับเงินคืนผ่านทาง <b>LINE Official</b> ของทางร้าน
-                  </p>
-                  <a
-                    href="https://line.me/ti/p/@nnlaundromat"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl text-[11px] font-bold shadow-xs transition"
-                  >
-                    <ExternalLink size={12} /> แอด LINE: @nnlaundromat
-                  </a>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-700 block">
+                  กรุณาเลือกเหตุผลในการยกเลิก:
+                </label>
+                <div className="flex flex-col gap-1.5">
+                  {cancelReasonsList.map((reason) => {
+                    const isSelected = cancelReason === reason;
+                    return (
+                      <div
+                        key={reason}
+                        onClick={() => setCancelReason(reason)}
+                        className={`py-3 px-3.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                          isSelected 
+                            ? 'bg-grey-50/80 border-[#1d61f2] text-[#1d61f2] font-bold shadow-xs' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {reason}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2 border-t border-slate-100">
+              {/* ข้อมูลการขอคืนเงิน: เรียบง่าย ไม่มีไอคอนรก */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex flex-col gap-1">
+                <span className="text-xs font-bold text-slate-800">
+                  ขั้นตอนการขอรับเงินคืน
+                </span>
+                <p className="text-[11.5px] text-slate-500 leading-relaxed">
+                  หากท่านได้ชำระเงินแล้ว โปรดส่งหลักฐานสลิปและรหัสออเดอร์เพื่อขอรับเงินคืนผ่านทาง LINE Official: <b>@nnlaundromat</b>
+                </p>
+              </div>
+
+              {/* ปุ่มดำเนินการ */}
+              <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setShowCancelModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
                 >
                   ย้อนกลับ
                 </button>
                 <button
                   type="button"
                   onClick={handleConfirmCancelOrder}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 transition cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-red-500/20 transition cursor-pointer"
                 >
-                  ยืนยันยกเลิก
+                  ยืนยันการยกเลิก
                 </button>
               </div>
+
             </div>
           </div>
         )}
