@@ -15,33 +15,91 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
-// โลโก้ทางการของร้าน N&N Laundromat สำหรับหัวใบเสร็จ
-const LaundromatLogo = () => (
+// โลโก้ทางการ N&N LAUNDROMAT DELIVERY ตามแบบจริงเป๊ะๆ
+const OfficialNnLogo = () => (
   <svg
-    viewBox="0 0 120 120"
-    width="58"
-    height="58"
+    viewBox="0 0 200 200"
+    width="88"
+    height="88"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M21 26C21 23.2 23.2 21 26 21H72C74.8 21 77 23.2 77 26V63H21V26Z" fill="#0c4a7e" />
-    <path d="M77 35H92C93.3 35 94.5 35.5 95.4 36.4L101.6 42.6C102.5 43.5 103 44.8 103 46.1V63H77V35Z" fill="#0c4a7e" />
-    <path d="M82 40H90C90.7 40 91.3 40.3 91.8 40.7L95.8 44.7C96.2 45.2 96.5 45.8 96.5 46.5V52H82V40Z" fill="#ffffff" />
-    <rect x="29" y="26" width="13" height="4.5" rx="1.5" fill="#ffffff" />
-    <circle cx="56" cy="28" r="2.2" fill="#ffffff" />
-    <circle cx="66" cy="28" r="2.2" fill="#ffffff" />
-    <circle cx="49" cy="44.5" r="14" fill="#ffffff" />
-    <circle cx="49" cy="44.5" r="11" fill="#0c4a7e" />
-    <path d="M38 45.5C40 43 44.5 42 48 45.5C51.5 49 56 48 60 44V54C60 54 54.5 55.5 49 55.5C43.5 55.5 38 54 38 54V45.5Z" fill="#ffffff" />
-    <circle cx="52.5" cy="40" r="1.5" fill="#ffffff" />
-    <circle cx="56.5" cy="43" r="1" fill="#ffffff" />
-    <rect x="19" y="62" width="86" height="4.5" rx="2" fill="#0c4a7e" />
-    <circle cx="35" cy="67.5" r="9" fill="#0c4a7e" />
-    <circle cx="35" cy="67.5" r="6.5" fill="#ffffff" />
-    <circle cx="35" cy="67.5" r="4" fill="#0c4a7e" />
-    <circle cx="87" cy="67.5" r="9" fill="#0c4a7e" />
-    <circle cx="87" cy="67.5" r="6.5" fill="#ffffff" />
-    <circle cx="87" cy="67.5" r="4" fill="#0c4a7e" />
+    {/* วงกลมพื้นหลังสีฟ้าอ่อน */}
+    <circle cx="100" cy="100" r="100" fill="#e8f3ff" />
+
+    {/* ตัวรถสีน้ำเงินเข้ม (Navy) */}
+    {/* ตัวตู้ซักผ้าด้านหลัง */}
+    <path 
+      d="M37 58C37 53.6 40.6 50 45 50H112C116.4 50 120 53.6 120 58V103H37V58Z" 
+      fill="#0c4a7e" 
+    />
+    
+    {/* หน้ารถคนขับ */}
+    <path 
+      d="M120 66.5H138C140.8 66.5 143.4 67.9 144.9 70.2L153 82.5C154.3 84.5 155 86.8 155 89.2V103H120V66.5Z" 
+      fill="#0c4a7e" 
+    />
+
+    {/* กระจกหน้ารถสีขาว */}
+    <path 
+      d="M125 72.5H136.5C138.2 72.5 139.7 73.4 140.6 74.8L146.4 84C147.1 85.1 147.5 86.4 147.5 87.7V89.5H125V72.5Z" 
+      fill="#ffffff" 
+    />
+
+    {/* ช่องใส่ผงซักฟอกและปุ่มกดบนตัวเครื่อง */}
+    <rect x="45" y="56" width="13" height="6" rx="2" fill="#ffffff" />
+    <circle cx="97.5" cy="59" r="2.8" fill="#ffffff" />
+    <circle cx="109" cy="59" r="2.8" fill="#ffffff" />
+
+    {/* ฝาถังซักผ้าสีขาว */}
+    <circle cx="92" cy="85" r="18" fill="#ffffff" />
+    {/* ขอบด้านใน */}
+    <circle cx="92" cy="85" r="14.5" fill="#0c4a7e" />
+    {/* น้ำและฟองอากาศในถัง */}
+    <path 
+      d="M77.5 85C77.5 80 81.5 76.5 86 79C90.5 81.5 94.5 88 100 85C104.5 82.5 106.5 85 106.5 85C106.5 93 100 99.5 92 99.5C84 99.5 77.5 93 77.5 85Z" 
+      fill="#ffffff" 
+    />
+    <circle cx="94.5" cy="78" r="1.8" fill="#ffffff" />
+    <circle cx="101" cy="82" r="1.3" fill="#ffffff" />
+
+    {/* ล้อรถด้านซ้าย */}
+    <circle cx="56" cy="113.5" r="11.5" fill="#0c4a7e" />
+    <circle cx="56" cy="113.5" r="7.5" fill="#ffffff" />
+    <circle cx="56" cy="113.5" r="4.2" fill="#0c4a7e" />
+
+    {/* ล้อรถด้านขวา */}
+    <circle cx="130" cy="113.5" r="11.5" fill="#0c4a7e" />
+    <circle cx="130" cy="113.5" r="7.5" fill="#ffffff" />
+    <circle cx="130" cy="113.5" r="4.2" fill="#0c4a7e" />
+
+    {/* ข้อความ N&N LAUNDROMAT */}
+    <text 
+      x="100" 
+      y="140" 
+      fill="#0c4a7e" 
+      fontSize="12.5" 
+      fontWeight="900" 
+      fontFamily="system-ui, -apple-system, sans-serif" 
+      textAnchor="middle" 
+      letterSpacing="1"
+    >
+      N&amp;N LAUNDROMAT
+    </text>
+
+    {/* ข้อความ DELIVERY */}
+    <text 
+      x="100" 
+      y="153" 
+      fill="#0c4a7e" 
+      fontSize="7.5" 
+      fontWeight="800" 
+      fontFamily="system-ui, -apple-system, sans-serif" 
+      textAnchor="middle" 
+      letterSpacing="3"
+    >
+      DELIVERY
+    </text>
   </svg>
 );
 
@@ -50,7 +108,6 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const { orders } = useApp ? useApp() : {};
 
-  // ค้นหาออเดอร์จริงจาก ID
   const matchedOrder = (orders || []).find((o) => String(o.id) === String(id));
 
   const order = matchedOrder || {
@@ -59,10 +116,9 @@ export default function OrderDetailPage() {
     statusStep: 1,
     statusTitle: 'กำลังดำเนินการ',
     serviceName: 'ซัก อบ พับ',
-    packageName: 'ตามที่เลือก',
-    servicePrice: 0,
-    price: 0,
-    totalPrice: 0,
+    packageName: 'ตะกร้า M',
+    basePrice: 180,
+    totalPrice: 180,
     createdAt: '-',
     deliveredAt: null,
     pickupTime: '-',
@@ -71,6 +127,7 @@ export default function OrderDetailPage() {
     paymentStatus: 'ชำระเงินแล้ว',
     specialItems: [],
     plasticBagCount: 0,
+    plasticBagPrice: 0,
     rider: {
       name: 'กำลังจัดสรรไรเดอร์',
       phone: '-',
@@ -92,11 +149,19 @@ export default function OrderDetailPage() {
 
   const currentStep = Number(order.statusStep) || (isCompleted ? 7 : 1);
 
-  // ดึงเวลาจริงจาก Object โดยตรง ไม่คำนวณใหม่
   const displayCreatedAt = order.createdAt || '-';
   const displayDeliveredAt = order.deliveredAt ? order.deliveredAt : (isCompleted ? 'ส่งมอบแล้ว' : '-');
 
-  // ไทม์ไลน์ขั้นตอน
+  const packagePrice = Number(order.basePrice || (
+    order.packageName?.includes('3.5') ? 200 :
+    order.packageName?.includes('5') ? 230 :
+    order.packageName?.includes('6') ? 250 :
+    order.packageName?.includes('S') ? 160 :
+    order.packageName?.includes('M') ? 180 :
+    order.packageName?.includes('L') ? 240 :
+    (order.packageName && !order.packageName.includes('เฉพาะ') ? (order.price || 0) : 0)
+  ));
+
   const steps = useMemo(() => {
     return [
       { 
@@ -220,7 +285,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* ภาพถ่ายยืนยันจากไรเดอร์ (แสดงเฉพาะในหน้ารายละเอียดนี้) */}
+            {/* ภาพถ่ายยืนยันจากไรเดอร์ */}
             {order.riderBasketImage ? (
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
@@ -357,20 +422,19 @@ export default function OrderDetailPage() {
             
             <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200 flex flex-col gap-4 relative">
               
-              {/* หัวใบเสร็จเป็นโลโก้ร้าน N&N Laundromat */}
+              {/* หัวใบเสร็จพร้อมโลโก้ N&N LAUNDROMAT DELIVERY ตามรูปจริง */}
               <div className="flex flex-col items-center text-center pb-4 border-b border-dashed border-slate-200">
-                <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mb-1.5 shadow-2xs border border-blue-100">
-                  <LaundromatLogo />
+                <div className="mb-2">
+                  <OfficialNnLogo />
                 </div>
-                <h2 className="font-extrabold text-base text-slate-900 tracking-tight">N&amp;N Laundromat</h2>
-                <p className="text-[11px] text-slate-400">บริการรับ-ส่ง ซัก อบ พับ ถึงหน้าห้องพักคุณ</p>
+                <p className="text-[11.5px] text-slate-400 mt-1">บริการรับ-ส่ง ซัก อบ พับ ถึงหน้าห้องพักคุณ</p>
                 
-                <div className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                <div className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
                   <CheckCircle2 size={13} className="text-emerald-600" /> จัดส่งผ้าคืนสำเร็จ
                 </div>
               </div>
 
-              {/* ข้อมูลเวลา: แสดงตามที่บันทึกจริงจากออเดอร์ */}
+              {/* ข้อมูลเวลา */}
               <div className="flex flex-col gap-2.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-400">หมายเลขออเดอร์</span>
@@ -392,49 +456,56 @@ export default function OrderDetailPage() {
 
               <div className="h-[1px] bg-slate-100"></div>
 
-              {/* รายการบริการและรายละเอียด */}
+              {/* สรุปรายการค่าบริการ */}
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-900">รายการบริการและรายละเอียด</span>
+                <span className="text-xs font-bold text-slate-900">สรุปรายการค่าบริการ</span>
                 
-                <div className="bg-slate-50 p-3.5 rounded-2xl flex flex-col gap-2 border border-slate-100">
-                  <div className="flex justify-between items-start text-xs">
-                    <div>
-                      <span className="font-bold text-slate-900 block">{order.serviceName}</span>
-                      <span className="text-[11px] text-slate-500">{order.packageName || 'แพ็กเกจมาตรฐาน'}</span>
+                <div className="bg-slate-50 p-3.5 rounded-2xl flex flex-col gap-2.5 border border-slate-100">
+                  
+                  {/* แถวที่ 1: แพ็กเกจหลัก */}
+                  {order.packageName && !order.packageName.includes('เฉพาะรายการพิเศษ') && (
+                    <div className="flex justify-between items-start text-xs">
+                      <div className="pr-2">
+                        <span className="font-bold text-slate-900 block">{order.serviceName}</span>
+                        <span className="text-[11px] text-slate-500">{order.packageName}</span>
+                      </div>
+                      <span className="font-bold text-slate-900 shrink-0">{packagePrice.toLocaleString()} ฿</span>
                     </div>
-                    <span className="font-bold text-slate-900">{Number(order.basePrice || order.price || order.totalPrice || 0).toLocaleString()} ฿</span>
-                  </div>
+                  )}
 
+                  {/* แถวที่ 2: รายการพิเศษ */}
                   {order.specialItems && order.specialItems.length > 0 && (
-                    <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1">
-                      <span className="text-[11px] font-bold text-slate-700">รายการพิเศษเพิ่มเติม:</span>
+                    <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1.5">
+                      <span className="text-[11px] font-bold text-slate-700">รายการพิเศษ (แยกชิ้น):</span>
                       {order.specialItems.map((item) => (
-                        <div key={item.id} className="flex justify-between text-[11px] text-slate-600">
-                          <span>• {item.name} ({item.count} {item.unit || 'ชิ้น'})</span>
-                          <span className="font-medium text-slate-900">{item.total || (item.price * item.count)} ฿</span>
+                        <div key={item.id} className="flex justify-between text-xs text-slate-600">
+                          <span>• {item.name} x {item.count} {item.unit || 'ชิ้น'}</span>
+                          <span className="font-semibold text-slate-900">{Number(item.total || (item.price * item.count)).toLocaleString()} ฿</span>
                         </div>
                       ))}
                     </div>
                   )}
 
+                  {/* แถวที่ 3: ถุงพลาสติกเสริม */}
                   {order.plasticBagCount > 0 && (
-                    <div className="flex justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-200/60">
-                      <span>• ถุงพลาสติกใส่ผ้า ({order.plasticBagCount} ใบ)</span>
-                      <span className="font-medium text-slate-900">{order.plasticBagCount * 5} ฿</span>
+                    <div className="flex justify-between items-center text-xs text-slate-600 pt-2 border-t border-slate-200/60">
+                      <span>• ถุงพลาสติกใส่ผ้า x {order.plasticBagCount} ใบ</span>
+                      <span className="font-semibold text-slate-900">{order.plasticBagCount * 5} ฿</span>
                     </div>
                   )}
                   
-                  <div className="flex justify-between items-center text-xs text-slate-500 pt-1 border-t border-slate-200/60">
-                    <span>ค่าบริการรับ-ส่ง</span>
+                  {/* แถวที่ 4: ค่าจัดส่งเป็นสีดำ */}
+                  <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-200/60">
+                    <span>ค่าบริการจัดส่ง Delivery</span>
                     <span className="font-bold text-slate-900">ฟรี</span>
                   </div>
                 </div>
               </div>
 
-              {/* ยอดชำระสุทธิเป็นสีดำ */}
+              {/* ยอดชำระสุทธิ: ฟอนต์ขนาดพอดีตา */}
               <div className="flex justify-between items-center pt-2 border-t border-dashed border-slate-200">
-                <span className="font-bold text-sm text-slate-900">ยอดชำระสุทธิ</span>
-                <span className="font-black text-xl text-slate-900">{Number(order.totalPrice || order.price || 0).toLocaleString()} บาท</span>
+                <span className="font-bold text-xs text-slate-700">ยอดชำระสุทธิ</span>
+                <span className="font-bold text-base text-slate-900">{Number(order.totalPrice || order.price || 0).toLocaleString()} บาท</span>
               </div>
 
               <div className="h-[1px] bg-slate-100"></div>
