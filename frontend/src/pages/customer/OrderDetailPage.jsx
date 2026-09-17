@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -11,92 +11,96 @@ import {
   Bike, 
   Phone, 
   UserCheck, 
-  Camera 
+  Camera,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
-// โลโก้ทางการ N&N LAUNDROMAT DELIVERY ตามแบบจริงเป๊ะๆ
+/// โลโก้ทางการ N&N LAUNDROMAT DELIVERY (ปรับขนาดตัวรถให้กะทัดรัดลง ตรงตามต้นฉบับ)
 const OfficialNnLogo = () => (
   <svg
-    viewBox="0 0 200 200"
-    width="88"
-    height="88"
+    viewBox="0 0 240 240"
+    width="96"
+    height="96"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    {/* วงกลมพื้นหลังสีฟ้าอ่อน */}
-    <circle cx="100" cy="100" r="100" fill="#e8f3ff" />
+    {/* 1. วงกลมพื้นหลังสีฟ้าอ่อน */}
+    <circle cx="120" cy="120" r="110" fill="#dbeefd" />
 
-    {/* ตัวรถสีน้ำเงินเข้ม (Navy) */}
-    {/* ตัวตู้ซักผ้าด้านหลัง */}
-    <path 
-      d="M37 58C37 53.6 40.6 50 45 50H112C116.4 50 120 53.6 120 58V103H37V58Z" 
-      fill="#0c4a7e" 
-    />
-    
-    {/* หน้ารถคนขับ */}
-    <path 
-      d="M120 66.5H138C140.8 66.5 143.4 67.9 144.9 70.2L153 82.5C154.3 84.5 155 86.8 155 89.2V103H120V66.5Z" 
-      fill="#0c4a7e" 
-    />
+    {/* กลุ่มตัวรถ: ปรับ Scale ให้เล็กลงและจัดกึ่งกลางวงกลม */}
+    <g transform="translate(14, 12) scale(0.88)">
+      {/* ตัวถังตู้ซักผ้าด้านหลัง */}
+      <path 
+        d="M50 56C50 50 54 46 60 46H138C144 46 148 50 148 56V130H50V56Z" 
+        fill="#004b7a" 
+      />
 
-    {/* กระจกหน้ารถสีขาว */}
-    <path 
-      d="M125 72.5H136.5C138.2 72.5 139.7 73.4 140.6 74.8L146.4 84C147.1 85.1 147.5 86.4 147.5 87.7V89.5H125V72.5Z" 
-      fill="#ffffff" 
-    />
+      {/* ส่วนหัวรถคนขับด้านหน้า */}
+      <path 
+        d="M148 72H168C172 72 175.5 74 177.5 77L189 94C190.5 96.5 191.5 99.5 191.5 102.5V130H148V72Z" 
+        fill="#004b7a" 
+      />
 
-    {/* ช่องใส่ผงซักฟอกและปุ่มกดบนตัวเครื่อง */}
-    <rect x="45" y="56" width="13" height="6" rx="2" fill="#ffffff" />
-    <circle cx="97.5" cy="59" r="2.8" fill="#ffffff" />
-    <circle cx="109" cy="59" r="2.8" fill="#ffffff" />
+      {/* กระจกหน้าต่างห้องคนขับ */}
+      <path 
+        d="M156 80H166C168.5 80 170.8 81.3 172 83.5L179.5 95C180.5 96.5 181 98.2 181 100V104H156V80Z" 
+        fill="#ffffff" 
+      />
 
-    {/* ฝาถังซักผ้าสีขาว */}
-    <circle cx="92" cy="85" r="18" fill="#ffffff" />
-    {/* ขอบด้านใน */}
-    <circle cx="92" cy="85" r="14.5" fill="#0c4a7e" />
-    {/* น้ำและฟองอากาศในถัง */}
-    <path 
-      d="M77.5 85C77.5 80 81.5 76.5 86 79C90.5 81.5 94.5 88 100 85C104.5 82.5 106.5 85 106.5 85C106.5 93 100 99.5 92 99.5C84 99.5 77.5 93 77.5 85Z" 
-      fill="#ffffff" 
-    />
-    <circle cx="94.5" cy="78" r="1.8" fill="#ffffff" />
-    <circle cx="101" cy="82" r="1.3" fill="#ffffff" />
+      {/* รายละเอียดบนตัวตู้: ช่องผงซักฟอก และปุ่มควบคุม 2 จุด */}
+      <rect x="62" y="55" width="20" height="9" rx="3.5" fill="#ffffff" />
+      <circle cx="122" cy="59.5" r="4" fill="#ffffff" />
+      <circle cx="136" cy="59.5" r="4" fill="#ffffff" />
 
-    {/* ล้อรถด้านซ้าย */}
-    <circle cx="56" cy="113.5" r="11.5" fill="#0c4a7e" />
-    <circle cx="56" cy="113.5" r="7.5" fill="#ffffff" />
-    <circle cx="56" cy="113.5" r="4.2" fill="#0c4a7e" />
+      {/* ถังเครื่องซักผ้าฝาหน้าทรงกลมใหญ่ */}
+      <circle cx="106" cy="98" r="26" fill="#ffffff" />
 
-    {/* ล้อรถด้านขวา */}
-    <circle cx="130" cy="113.5" r="11.5" fill="#0c4a7e" />
-    <circle cx="130" cy="113.5" r="7.5" fill="#ffffff" />
-    <circle cx="130" cy="113.5" r="4.2" fill="#0c4a7e" />
+      {/* คลื่นน้ำสีน้ำเงินเข้มด้านในถังซัก */}
+      <path 
+        d="M84 98C84 91 89.5 85.5 96 87C102.5 88.5 106.5 97.5 114 96C119.5 94.8 123.5 98 123.5 98C123.5 110.5 113.5 120 101 120C88.5 120 84 110 84 98Z" 
+        fill="#004b7a" 
+      />
+      {/* ฟองอากาศสีขาว */}
+      <circle cx="112" cy="90" r="2.8" fill="#ffffff" />
+      <circle cx="121" cy="95" r="2" fill="#ffffff" />
 
-    {/* ข้อความ N&N LAUNDROMAT */}
+      {/* ล้อรถด้านซ้าย */}
+      <circle cx="76" cy="144" r="15" fill="#004b7a" />
+      <circle cx="76" cy="144" r="9.5" fill="#ffffff" />
+      <circle cx="76" cy="144" r="5.5" fill="#004b7a" />
+
+      {/* ล้อรถด้านขวา */}
+      <circle cx="166" cy="144" r="15" fill="#004b7a" />
+      <circle cx="166" cy="144" r="9.5" fill="#ffffff" />
+      <circle cx="166" cy="144" r="5.5" fill="#004b7a" />
+    </g>
+
+    {/* 2. ข้อความ N&N LAUNDROMAT */}
     <text 
-      x="100" 
-      y="140" 
-      fill="#0c4a7e" 
-      fontSize="12.5" 
+      x="120" 
+      y="178" 
+      fill="#004b7a" 
+      fontSize="15" 
       fontWeight="900" 
-      fontFamily="system-ui, -apple-system, sans-serif" 
+      fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
       textAnchor="middle" 
-      letterSpacing="1"
+      letterSpacing="1.2"
     >
       N&amp;N LAUNDROMAT
     </text>
 
-    {/* ข้อความ DELIVERY */}
+    {/* 3. ข้อความ DELIVERY */}
     <text 
-      x="100" 
-      y="153" 
-      fill="#0c4a7e" 
-      fontSize="7.5" 
+      x="120" 
+      y="196" 
+      fill="#004b7a" 
+      fontSize="9.5" 
       fontWeight="800" 
-      fontFamily="system-ui, -apple-system, sans-serif" 
+      fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
       textAnchor="middle" 
-      letterSpacing="3"
+      letterSpacing="4"
     >
       DELIVERY
     </text>
@@ -106,51 +110,64 @@ const OfficialNnLogo = () => (
 export default function OrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { orders } = useApp ? useApp() : {};
 
-  const matchedOrder = (orders || []).find((o) => String(o.id) === String(id));
+  // ค้นหาออเดอร์จริงจาก Context หรือ localStorage
+  const order = useMemo(() => {
+    const list = orders && orders.length > 0 
+      ? orders 
+      : JSON.parse(localStorage.getItem('orders') || '[]');
+    return list.find((o) => String(o.id) === String(id)) || {
+      id: id || 'NN-1024',
+      status: 'completed',
+      statusStep: 7,
+      statusTitle: 'จัดส่งผ้าคืนสำเร็จ',
+      serviceName: 'ซัก อบ พับ',
+      packageName: 'ตะกร้า M',
+      basePrice: 180,
+      totalPrice: 180,
+      createdAt: '-',
+      deliveredAt: '-',
+      pickupTime: '-',
+      deliveryTime: '-',
+      address: '-',
+      paymentStatus: 'ชำระเงินแล้ว',
+      specialItems: [],
+      plasticBagCount: 0,
+      rider: { name: 'วรรณา สีดา', phone: '089-111-2233', vehicle: 'ฮอนด้า เวฟ สีน้ำเงิน' }
+    };
+  }, [orders, id]);
 
-  const order = matchedOrder || {
-    id: id || 'NN-XXXXXX',
-    status: 'in_progress',
-    statusStep: 1,
-    statusTitle: 'กำลังดำเนินการ',
-    serviceName: 'ซัก อบ พับ',
-    packageName: 'ตะกร้า M',
-    basePrice: 180,
-    totalPrice: 180,
-    createdAt: '-',
-    deliveredAt: null,
-    pickupTime: '-',
-    deliveryTime: '-',
-    address: '-',
-    paymentStatus: 'ชำระเงินแล้ว',
-    specialItems: [],
-    plasticBagCount: 0,
-    plasticBagPrice: 0,
-    rider: {
-      name: 'กำลังจัดสรรไรเดอร์',
-      phone: '-',
-      vehicle: '-'
+  // เช็คสถานะเสร็จสมบูรณ์
+  const isCompleted = useMemo(() => {
+    return (
+      order.status === 'completed' || 
+      Number(order.statusStep) >= 7 || 
+      order.isCompleted === true ||
+      String(order.statusTitle || '').includes('สำเร็จ')
+    );
+  }, [order]);
+
+  // State สำหรับ Modal รูปหลักฐานส่งมอบ
+  const [showDeliveryProofModal, setShowDeliveryProofModal] = useState(false);
+
+  // ถ้าส่ง state: { openProof: true } มาจาก Notification ให้เปิด Modal อัตโนมัติทันที
+  useEffect(() => {
+    if (location.state?.openProof && isCompleted) {
+      setShowDeliveryProofModal(true);
     }
-  };
-
-  const riderInfo = order.rider || {
-    name: 'กำลังจัดสรรไรเดอร์',
-    phone: '-',
-    vehicle: '-'
-  };
-
-  const isCompleted = 
-    order.status === 'completed' || 
-    Number(order.statusStep) >= 7 || 
-    order.isCompleted === true ||
-    order.statusTitle?.includes('สำเร็จ');
+  }, [location.state, isCompleted]);
 
   const currentStep = Number(order.statusStep) || (isCompleted ? 7 : 1);
-
   const displayCreatedAt = order.createdAt || '-';
   const displayDeliveredAt = order.deliveredAt ? order.deliveredAt : (isCompleted ? 'ส่งมอบแล้ว' : '-');
+
+  const riderInfo = order.rider || {
+    name: order.deliveryRiderName || 'วรรณา สีดา',
+    phone: '089-111-2233',
+    vehicle: 'ไรเดอร์ประจำร้าน N&N'
+  };
 
   const packagePrice = Number(order.basePrice || (
     order.packageName?.includes('3.5') ? 200 :
@@ -164,48 +181,13 @@ export default function OrderDetailPage() {
 
   const steps = useMemo(() => {
     return [
-      { 
-        step: 1, 
-        title: 'ตรวจสอบยอดเงิน', 
-        desc: 'ระบบยืนยันสลิปการโอนเงินเรียบร้อย', 
-        time: displayCreatedAt 
-      },
-      { 
-        step: 2, 
-        title: 'จัดสรรไรเดอร์', 
-        desc: `มอบหมายงานให้คุณ ${riderInfo.name}`, 
-        time: currentStep >= 2 ? 'ดำเนินการแล้ว' : 'รอดำเนินการ' 
-      },
-      { 
-        step: 3, 
-        title: 'กำลังมารับผ้า', 
-        desc: 'ไรเดอร์กำลังเดินทางไปยังที่อยู่ของคุณ', 
-        time: currentStep >= 3 ? (order.pickupTime || 'กำลังเดินทาง') : 'ตามรอบเวลา' 
-      },
-      { 
-        step: 4, 
-        title: 'รับผ้าแล้วนำส่งร้าน', 
-        desc: 'ผ้าถึงร้าน N&N Laundromat แผนกซักอบ', 
-        time: currentStep >= 4 ? 'ถึงร้านแล้ว' : 'รอส่งมอบ' 
-      },
-      { 
-        step: 5, 
-        title: 'กำลังซักอบ', 
-        desc: 'แยกผ้าและซักอบด้วยเครื่องมาตรฐาน สะอาด ปลอดภัย', 
-        time: currentStep >= 5 ? 'กำลังดำเนินการ' : 'รอเริ่มซัก' 
-      },
-      { 
-        step: 6, 
-        title: 'อยู่ระหว่างส่งคืนผ้า', 
-        desc: 'ไรเดอร์นำผ้าพับเรียบร้อยไปส่งคืนลูกค้า', 
-        time: currentStep >= 6 ? 'กำลังนำส่ง' : (order.deliveryTime || '-') 
-      },
-      { 
-        step: 7, 
-        title: 'ส่งคืนผ้าสำเร็จ', 
-        desc: 'ไรเดอร์ได้ส่งมอบผ้าสะอาดเรียบร้อยแล้ว', 
-        time: order.deliveredAt ? order.deliveredAt : (isCompleted ? 'ส่งมอบแล้ว' : 'รอส่งมอบ') 
-      },
+      { step: 1, title: 'ตรวจสอบยอดเงิน', desc: 'ระบบยืนยันสลิปการโอนเงินเรียบร้อย', time: displayCreatedAt },
+      { step: 2, title: 'จัดสรรไรเดอร์', desc: `มอบหมายงานให้คุณ ${riderInfo.name}`, time: currentStep >= 2 ? 'ดำเนินการแล้ว' : 'รอดำเนินการ' },
+      { step: 3, title: 'กำลังมารับผ้า', desc: 'ไรเดอร์กำลังเดินทางไปยังที่อยู่ของคุณ', time: currentStep >= 3 ? (order.pickupTime || 'กำลังเดินทาง') : 'ตามรอบเวลา' },
+      { step: 4, title: 'รับผ้าแล้วนำส่งร้าน', desc: 'ผ้าถึงร้าน N&N Laundromat แผนกซักอบ', time: currentStep >= 4 ? 'ถึงร้านแล้ว' : 'รอส่งมอบ' },
+      { step: 5, title: 'กำลังซักอบ', desc: 'แยกผ้าและซักอบด้วยเครื่องมาตรฐาน สะอาด ปลอดภัย', time: currentStep >= 5 ? 'กำลังดำเนินการ' : 'รอเริ่มซัก' },
+      { step: 6, title: 'อยู่ระหว่างส่งคืนผ้า', desc: 'ไรเดอร์นำผ้าพับเรียบร้อยไปส่งคืนลูกค้า', time: currentStep >= 6 ? 'กำลังนำส่ง' : (order.deliveryTime || '-') },
+      { step: 7, title: 'ส่งคืนผ้าสำเร็จ', desc: 'ไรเดอร์ได้ส่งมอบผ้าสะอาดเรียบร้อยแล้ว', time: order.deliveredAt ? order.deliveredAt : (isCompleted ? 'ส่งมอบแล้ว' : 'รอส่งมอบ') },
     ];
   }, [currentStep, order, displayCreatedAt, riderInfo.name, isCompleted]);
 
@@ -266,7 +248,7 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {/* ================= แบบที่ 1: กำลังดำเนินการ ================= */}
+        {/* ================= แบบที่ 1: กำลังดำเนินการ (Step 1-6) ================= */}
         {!isCompleted ? (
           <div className="flex-1 overflow-y-auto px-5 py-5 pb-28 flex flex-col gap-4">
             
@@ -285,7 +267,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* ภาพถ่ายยืนยันจากไรเดอร์ */}
+            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า */}
             {order.riderBasketImage ? (
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
@@ -341,15 +323,13 @@ export default function OrderDetailPage() {
               )}
             </div>
 
-            {/* ไทม์ไลน์สถานะผ้า */}
+            {/* ไทม์ไลน์ขั้นตอน */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-3">
               <h3 className="font-bold text-xs text-slate-900">ไทม์ไลน์ขั้นตอนการให้บริการ</h3>
-
               <div className="flex flex-col gap-4 relative pl-3 border-l-2 border-slate-100 ml-2 mt-1">
                 {steps.map((s, idx) => {
                   const isCurrent = s.step === currentStep;
                   const isDone = s.step <= currentStep;
-
                   return (
                     <div key={idx} className="relative flex flex-col">
                       <div className={`absolute -left-[19px] top-0.5 w-3 h-3 rounded-full ${
@@ -359,7 +339,6 @@ export default function OrderDetailPage() {
                           ? 'bg-[#1d61f2]'
                           : 'bg-slate-200'
                       }`}></div>
-
                       <div className="flex items-center justify-between">
                         <span className={`text-xs ${
                           isCurrent ? 'font-bold text-[#1d61f2]' : isDone ? 'font-bold text-slate-800' : 'text-slate-400'
@@ -375,38 +354,28 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* ข้อมูลคำสั่งซื้อและสถานที่ */}
+            {/* ข้อมูลคำสั่งซื้อ */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-3 text-xs">
               <span className="font-bold text-slate-900">ข้อมูลคำสั่งซื้อ</span>
-              
               <div className="flex justify-between text-slate-600 pb-2 border-b border-slate-100">
                 <span>สร้างคำสั่งซื้อเมื่อ</span>
                 <span className="font-bold text-slate-900">{displayCreatedAt}</span>
               </div>
-
               <div className="flex justify-between text-slate-600 pb-2 border-b border-slate-100">
                 <span>บริการ</span>
                 <span className="font-bold text-slate-900">{order.serviceName} ({order.packageName})</span>
               </div>
-              
               <div className="flex justify-between text-slate-600 pb-2 border-b border-slate-100">
                 <span>รอบเวลารับผ้า</span>
                 <span className="font-bold text-slate-900">{order.pickupTime}</span>
               </div>
-
               <div className="flex items-start gap-2 text-slate-600 pt-1">
                 <MapPin size={15} className="text-[#1d61f2] shrink-0 mt-0.5" />
                 <span className="text-slate-800">{order.address}</span>
               </div>
-
-              {order.note && (
-                <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-[11px] text-slate-700">
-                  <span className="font-bold text-slate-900">หมายเหตุ: </span>{order.note}
-                </div>
-              )}
             </div>
 
-            {/* ปุ่มแจ้งปัญหาเป็นสีแดง */}
+            {/* ปุ่มแจ้งปัญหา */}
             <button
               type="button"
               onClick={() => navigate('/profile')}
@@ -417,12 +386,12 @@ export default function OrderDetailPage() {
 
           </div>
         ) : (
-          /* ================= แบบที่ 2: ใบเสร็จรับเงิน ================= */
+          /* ================= แบบที่ 2: ใบเสร็จรับเงิน (Step 7 ส่งสำเร็จแล้ว) ================= */
           <div className="flex-1 overflow-y-auto px-5 py-5 pb-28 flex flex-col gap-4">
             
             <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-200 flex flex-col gap-4 relative">
               
-              {/* หัวใบเสร็จพร้อมโลโก้ N&N LAUNDROMAT DELIVERY ตามรูปจริง */}
+              {/* หัวใบเสร็จพร้อมโลโก้ทางการ */}
               <div className="flex flex-col items-center text-center pb-4 border-b border-dashed border-slate-200">
                 <div className="mb-2">
                   <OfficialNnLogo />
@@ -432,6 +401,16 @@ export default function OrderDetailPage() {
                 <div className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
                   <CheckCircle2 size={13} className="text-emerald-600" /> จัดส่งผ้าคืนสำเร็จ
                 </div>
+
+                {/* ✅ ปุ่มเปิดดูรูปภาพหลักฐานการส่งมอบผ้าจากไรเดอร์ (เห็นเด่นชัด สวยงาม) */}
+                <button
+                  type="button"
+                  onClick={() => setShowDeliveryProofModal(true)}
+                  className="mt-3 py-2.5 px-4 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#1d61f2] text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer shadow-2xs w-full active:scale-[0.99]"
+                >
+                  <Camera size={16} className="text-[#1d61f2]" />
+                  <span>ดูภาพถ่ายหลักฐานส่งมอบผ้าจากไรเดอร์</span>
+                </button>
               </div>
 
               {/* ข้อมูลเวลา */}
@@ -459,10 +438,7 @@ export default function OrderDetailPage() {
               {/* สรุปรายการค่าบริการ */}
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-slate-900">สรุปรายการค่าบริการ</span>
-                
                 <div className="bg-slate-50 p-3.5 rounded-2xl flex flex-col gap-2.5 border border-slate-100">
-                  
-                  {/* แถวที่ 1: แพ็กเกจหลัก */}
                   {order.packageName && !order.packageName.includes('เฉพาะรายการพิเศษ') && (
                     <div className="flex justify-between items-start text-xs">
                       <div className="pr-2">
@@ -473,7 +449,6 @@ export default function OrderDetailPage() {
                     </div>
                   )}
 
-                  {/* แถวที่ 2: รายการพิเศษ */}
                   {order.specialItems && order.specialItems.length > 0 && (
                     <div className="pt-2 border-t border-slate-200/60 flex flex-col gap-1.5">
                       <span className="text-[11px] font-bold text-slate-700">รายการพิเศษ (แยกชิ้น):</span>
@@ -486,7 +461,6 @@ export default function OrderDetailPage() {
                     </div>
                   )}
 
-                  {/* แถวที่ 3: ถุงพลาสติกเสริม */}
                   {order.plasticBagCount > 0 && (
                     <div className="flex justify-between items-center text-xs text-slate-600 pt-2 border-t border-slate-200/60">
                       <span>• ถุงพลาสติกใส่ผ้า x {order.plasticBagCount} ใบ</span>
@@ -494,7 +468,7 @@ export default function OrderDetailPage() {
                     </div>
                   )}
                   
-                  {/* แถวที่ 4: ค่าจัดส่งเป็นสีดำ */}
+                  {/* ค่าจัดส่งเป็นสีดำ */}
                   <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-200/60">
                     <span>ค่าบริการจัดส่ง Delivery</span>
                     <span className="font-bold text-slate-900">ฟรี</span>
@@ -502,7 +476,7 @@ export default function OrderDetailPage() {
                 </div>
               </div>
 
-              {/* ยอดชำระสุทธิ: ฟอนต์ขนาดพอดีตา */}
+              {/* ยอดชำระสุทธิ */}
               <div className="flex justify-between items-center pt-2 border-t border-dashed border-slate-200">
                 <span className="font-bold text-xs text-slate-700">ยอดชำระสุทธิ</span>
                 <span className="font-bold text-base text-slate-900">{Number(order.totalPrice || order.price || 0).toLocaleString()} บาท</span>
@@ -510,7 +484,7 @@ export default function OrderDetailPage() {
 
               <div className="h-[1px] bg-slate-100"></div>
 
-              {/* ข้อมูลผู้ดูแลการจัดส่ง */}
+              {/* ผู้ดูแลการจัดส่ง */}
               <div className="flex flex-col gap-2 text-xs">
                 <span className="font-bold text-slate-900">ผู้ดูแลการจัดส่ง</span>
                 <div className="bg-slate-50 p-3 rounded-2xl flex items-center justify-between border border-slate-100">
@@ -532,7 +506,6 @@ export default function OrderDetailPage() {
               {/* กำหนดการรับ-ส่งและที่อยู่ */}
               <div className="flex flex-col gap-2 text-xs">
                 <span className="font-bold text-slate-900">กำหนดการรับ-ส่ง</span>
-                
                 <div className="flex items-start gap-2.5 text-slate-600">
                   <Clock size={15} className="text-slate-700 shrink-0 mt-0.5" />
                   <div className="space-y-0.5">
@@ -544,7 +517,6 @@ export default function OrderDetailPage() {
                     </span>
                   </div>
                 </div>
-
                 <div className="flex items-start gap-2.5 text-slate-600 mt-1">
                   <MapPin size={15} className="text-slate-700 shrink-0 mt-0.5" />
                   <span className="text-slate-800">{order.address}</span>
@@ -571,6 +543,74 @@ export default function OrderDetailPage() {
               <AlertCircle size={14} className="text-red-500" /> แจ้งปัญหาเกี่ยวกับออเดอร์นี้
             </button>
 
+          </div>
+        )}
+
+        {/* ✅ Popup Modal แสดงหลักฐานส่งมอบผ้า (ใช้ Fixed Overlay ปรากฏทับหน้าจอ 100%) */}
+        {showDeliveryProofModal && (
+          <div className="fixed inset-0 bg-slate-950/75 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-[390px] rounded-3xl p-5 shadow-2xl flex flex-col gap-3.5 border border-slate-100">
+              
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center">
+                    <Camera size={16} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900 leading-tight">ภาพถ่ายหลักฐานการส่งมอบผ้า</h3>
+                    <span className="text-[11px] text-slate-400">ออเดอร์ #{order.id}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowDeliveryProofModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* รูปภาพจากไรเดอร์ */}
+              <div className="w-full h-56 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
+                {order.proofImage || order.riderBasketImage ? (
+                  <img
+                    src={order.proofImage || order.riderBasketImage}
+                    alt="Delivery Confirmation"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center text-slate-400 gap-2">
+                    <ImageIcon size={32} />
+                    <span className="text-xs font-medium">ไรเดอร์ได้ส่งมอบผ้าเรียบร้อยแล้ว</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ข้อมูลจุดส่งมอบ */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">ผู้ส่งมอบ:</span>
+                  <span className="font-bold text-slate-800">{riderInfo.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">เวลาส่งมอบสำเร็จ:</span>
+                  <span className="font-bold text-slate-900">{displayDeliveredAt}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">สถานที่จัดส่ง:</span>
+                  <span className="font-medium text-slate-800 truncate max-w-[200px]">{order.address}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowDeliveryProofModal(false)}
+                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
+
+            </div>
           </div>
         )}
 
