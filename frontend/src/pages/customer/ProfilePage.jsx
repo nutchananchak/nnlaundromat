@@ -8,6 +8,7 @@ import {
   AlertCircle, 
   LogOut, 
   ChevronRight, 
+  ChevronDown,
   X, 
   Check, 
   ShieldCheck, 
@@ -15,7 +16,6 @@ import {
   Plus, 
   Trash2, 
   Navigation, 
-  ExternalLink,
   LocateFixed,
   Search,
   Layers,
@@ -29,12 +29,11 @@ import {
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
 
-
-const GOOGLE_MAPS_API_KEY = '';
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 // 📍 พิกัดร้าน N&N Laundromat (ตรงข้ามอ่อนนุช 25)
 const STORE_COORDS = { lat: 13.709648150061998, lng: 100.62401489583843 };
-const MAX_DELIVERY_RADIUS_KM = 3.0; // รัศมีบริการไม่เกิน 3 กม.
+const MAX_DELIVERY_RADIUS_KM = 3.0; // รัศมีบริการ 3 กม.
 
 const libraries = ['places'];
 
@@ -53,7 +52,15 @@ const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { userProfile, setUserProfile, addresses, setAddresses, setSelectedAddressId, logoutUser } = useApp();
+  const { 
+    userProfile, 
+    setUserProfile, 
+    addresses, 
+    setAddresses, 
+    selectedAddressId, 
+    setSelectedAddressId, 
+    logoutUser 
+  } = useApp();
 
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [editName, setEditName] = useState(userProfile?.fullName || userProfile?.name || '');
@@ -66,6 +73,30 @@ export default function ProfilePage() {
     }
   }, [userProfile]);
 
+  // โหลดที่อยู่จาก localStorage
+  useEffect(() => {
+    const savedAddresses = localStorage.getItem('nn_customer_addresses');
+    if (savedAddresses) {
+      try {
+        const parsed = JSON.parse(savedAddresses);
+        if (Array.isArray(parsed) && parsed.length > 0 && (!addresses || addresses.length === 0)) {
+          setAddresses(parsed);
+          const defaultAddr = parsed.find(a => a.isDefault) || parsed[0];
+          if (setSelectedAddressId) {
+            setSelectedAddressId(defaultAddr.id);
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing stored addresses', e);
+      }
+    }
+  }, []);
+
+  const updateAndPersistAddresses = (newList) => {
+    setAddresses(newList);
+    localStorage.setItem('nn_customer_addresses', JSON.stringify(newList));
+  };
+
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
   const [addressTitle, setAddressTitle] = useState('');
@@ -77,13 +108,13 @@ export default function ProfilePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // พิกัดหมุดของลูกค้า (เริ่มต้นที่จุดร้าน)
-  const [addressCoords, setAddressCoords] = useState({ lat: STORE_COORDS.lat, lng: STORE_COORDS.lng });
+  // สถานะแผนที่ & พิกัด
+  const [addressCoords, setAddressCoords] = useState(null);
   const [distanceFromStore, setDistanceFromStore] = useState(0);
   const [isWithinRange, setIsWithinRange] = useState(true);
-
   const [mapType, setMapType] = useState('roadmap');
   const [isLocating, setIsLocating] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   const mapRef = useRef(null);
 
@@ -92,7 +123,6 @@ export default function ProfilePage() {
   const [reportDetail, setReportDetail] = useState('');
   const [reportSuccess, setReportSuccess] = useState(false);
 
-  // โหลด Google Maps SDK
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries,
@@ -106,7 +136,7 @@ export default function ProfilePage() {
     setIsWithinRange(dist <= MAX_DELIVERY_RADIUS_KM);
   };
 
-  // ดึงชื่อที่อยู่ภาษาไทยจากพิกัด (Google Geocoding)
+  // Geocoding แปลงพิกัดเป็นชื่อที่อยู่
   const reverseGeocode = (lat, lng) => {
     updateDistance(lat, lng);
     if (!window.google || !window.google.maps) return;
@@ -123,11 +153,16 @@ export default function ProfilePage() {
 
   const onMapLoad = useCallback((map) => {
     mapRef.current = map;
-  }, []);
+    if (addressCoords) {
+      map.panTo(addressCoords);
+      map.setZoom(17);
+    }
+    setTimeout(() => setIsMapReady(true), 600);
+  }, [addressCoords]);
 
-  // เมื่อเลื่อนแผนที่เสร็จ ให้เอาพิกัดกึ่งกลางจอมาคำนวณและดึงที่อยู่
+  // เมื่อผู้ใช้เลื่อนแผนที่เสร็จสิ้น
   const onCameraIdle = () => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !isMapReady) return;
     const center = mapRef.current.getCenter();
     const lat = center.lat();
     const lng = center.lng();
@@ -135,7 +170,7 @@ export default function ProfilePage() {
     reverseGeocode(lat, lng);
   };
 
-  // ค้นหาผ่าน Autocomplete Service ของ Places Library
+  // ค้นหาสถานที่ Places Autocomplete
   useEffect(() => {
     if (!isLoaded || !searchQuery.trim() || !window.google?.maps?.places) {
       setSuggestions([]);
@@ -150,8 +185,8 @@ export default function ProfilePage() {
         input: searchQuery,
         componentRestrictions: { country: 'th' },
         locationBias: new window.google.maps.Circle({
-          center: STORE_COORDS,
-          radius: 5000
+          center: addressCoords || STORE_COORDS,
+          radius: 6000
         })
       }, (predictions, status) => {
         setIsSearching(false);
@@ -165,9 +200,9 @@ export default function ProfilePage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, isLoaded]);
+  }, [searchQuery, isLoaded, addressCoords]);
 
-  // ค้นหาโดยตรงเมื่อกดปุ่ม "ค้นหา" หรือกด Enter บนคีย์บอร์ด
+  // ค้นหาโดยตรง
   const handleDirectSearch = (e) => {
     if (e) e.preventDefault();
     if (!searchQuery.trim() || !window.google?.maps) return;
@@ -177,22 +212,21 @@ export default function ProfilePage() {
 
     const query = searchQuery.includes('อ่อนนุช') || searchQuery.includes('กรุงเทพ')
       ? searchQuery
-      : `${searchQuery} อ่อนนุช กรุงเทพ`;
+      : `${searchQuery} กรุงเทพ`;
 
     const geocoder = new window.google.maps.Geocoder();
     geocoder.geocode({ address: query, componentRestrictions: { country: 'th' } }, (results, status) => {
       setIsSearching(false);
       if (status === 'OK' && results && results[0]?.geometry?.location) {
         const loc = results[0].geometry.location;
-        const lat = loc.lat();
-        const lng = loc.lng();
+        const target = { lat: loc.lat(), lng: loc.lng() };
 
-        setAddressCoords({ lat, lng });
+        setAddressCoords(target);
         setAddressDetail(results[0].formatted_address);
-        updateDistance(lat, lng);
+        updateDistance(target.lat, target.lng);
 
         if (mapRef.current) {
-          mapRef.current.panTo({ lat, lng });
+          mapRef.current.panTo(target);
           mapRef.current.setZoom(18);
         }
       } else {
@@ -201,7 +235,7 @@ export default function ProfilePage() {
     });
   };
 
-  // เมื่อผู้ใช้เลือกผลการค้นหาจากรายการ Dropdown
+  // แตะเลือกผลการค้นหา
   const handleSelectPrediction = (prediction) => {
     setShowDropdown(false);
     setSearchQuery(prediction.structured_formatting?.main_text || prediction.description);
@@ -212,22 +246,21 @@ export default function ProfilePage() {
     geocoder.geocode({ placeId: prediction.place_id }, (results, status) => {
       if (status === 'OK' && results && results[0]?.geometry?.location) {
         const loc = results[0].geometry.location;
-        const lat = loc.lat();
-        const lng = loc.lng();
+        const target = { lat: loc.lat(), lng: loc.lng() };
 
-        setAddressCoords({ lat, lng });
+        setAddressCoords(target);
         setAddressDetail(results[0].formatted_address);
-        updateDistance(lat, lng);
+        updateDistance(target.lat, target.lng);
 
         if (mapRef.current) {
-          mapRef.current.panTo({ lat, lng });
+          mapRef.current.panTo(target);
           mapRef.current.setZoom(18);
         }
       }
     });
   };
 
-  // ดึงตำแหน่ง GPS ของเครื่อง
+  // ดึง GPS สดของเครื่อง
   const handleGetLiveGPS = () => {
     if (!navigator.geolocation) {
       alert('อุปกรณ์ของคุณไม่รองรับ GPS');
@@ -237,52 +270,85 @@ export default function ProfilePage() {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const { latitude, longitude } = pos.coords;
+        const target = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setIsLocating(false);
+        setAddressCoords(target);
+        updateDistance(target.lat, target.lng);
 
-        setAddressCoords({ lat: latitude, lng: longitude });
         if (mapRef.current) {
-          mapRef.current.panTo({ lat: latitude, lng: longitude });
+          mapRef.current.panTo(target);
           mapRef.current.setZoom(18);
         }
-        reverseGeocode(latitude, longitude);
+        reverseGeocode(target.lat, target.lng);
       },
-      () => {
+      (err) => {
         setIsLocating(false);
-        alert('ไม่สามารถดึงตำแหน่ง GPS ได้ กรุณาเลื่อนแผนที่เพื่อกำหนดจุดรับ-ส่งผ้า');
+        if (err.code === 1) {
+          alert('กรุณากดอนุญาตให้สิทธิ์ Location/GPS ในเบราว์เซอร์ เพื่อระบุตำแหน่งบ้านอัตโนมัติ');
+        } else {
+          alert('สัญญาณ GPS ขัดข้อง กรุณาเลื่อนหมุดบนแผนที่เพื่อระบุตำแหน่ง');
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
     );
   };
 
+  // เมื่อกดปุ่ม "ปักหมุด"
   const handleOpenAddressForm = (addr = null) => {
+    setIsMapReady(false);
+    setSearchQuery('');
+    setShowDropdown(false);
+
     if (addr) {
       setEditingAddressId(addr.id);
       setAddressTitle(addr.title.replace(' (ค่าเริ่มต้น)', ''));
       setAddressDetail(addr.detail);
-      const lat = addr.lat || STORE_COORDS.lat;
-      const lng = addr.lng || STORE_COORDS.lng;
-      setAddressCoords({ lat, lng });
-      updateDistance(lat, lng);
-    } else {
-      if ((addresses || []).length >= 3) {
-        alert('คุณสามารถบันทึกที่อยู่ได้สูงสุด 3 ตำแหน่ง');
-        return;
-      }
-      setEditingAddressId(null);
-      setAddressTitle('');
-      setAddressDetail('');
-      setAddressCoords({ lat: STORE_COORDS.lat, lng: STORE_COORDS.lng });
-      updateDistance(STORE_COORDS.lat, STORE_COORDS.lng);
+      const target = { lat: addr.lat || STORE_COORDS.lat, lng: addr.lng || STORE_COORDS.lng };
+      setAddressCoords(target);
+      updateDistance(target.lat, target.lng);
+      setShowAddressModal(true);
+      return;
     }
-    setSearchQuery('');
-    setShowDropdown(false);
-    setShowAddressModal(true);
+
+    if ((addresses || []).length >= 3) {
+      alert('คุณสามารถบันทึกที่อยู่ได้สูงสุด 3 ตำแหน่ง');
+      return;
+    }
+
+    setEditingAddressId(null);
+    setAddressTitle('');
+    setAddressDetail('');
+    setIsLocating(true);
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setIsLocating(false);
+          const userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setAddressCoords(userPos);
+          updateDistance(userPos.lat, userPos.lng);
+          reverseGeocode(userPos.lat, userPos.lng);
+          setShowAddressModal(true);
+        },
+        () => {
+          setIsLocating(false);
+          setAddressCoords(STORE_COORDS);
+          updateDistance(STORE_COORDS.lat, STORE_COORDS.lng);
+          setShowAddressModal(true);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      setIsLocating(false);
+      setAddressCoords(STORE_COORDS);
+      updateDistance(STORE_COORDS.lat, STORE_COORDS.lng);
+      setShowAddressModal(true);
+    }
   };
 
   const handleSaveAddress = (e) => {
     e.preventDefault();
-    if (!addressTitle.trim() || !addressDetail.trim()) {
+    if (!addressTitle.trim() || !addressDetail.trim() || !addressCoords) {
       alert('กรุณากรอกข้อมูลที่อยู่ให้ครบถ้วน');
       return;
     }
@@ -295,14 +361,15 @@ export default function ProfilePage() {
     const currentList = addresses || [];
 
     if (editingAddressId) {
-      setAddresses(currentList.map(a => a.id === editingAddressId ? {
+      const updatedList = currentList.map(a => a.id === editingAddressId ? {
         ...a,
         title: addressTitle.trim(),
         detail: addressDetail.trim(),
         lat: addressCoords.lat,
         lng: addressCoords.lng,
         distanceKm: distanceFromStore.toFixed(2)
-      } : a));
+      } : a);
+      updateAndPersistAddresses(updatedList);
     } else {
       const isFirst = currentList.length === 0;
       const newAddrId = 'addr-' + Date.now();
@@ -315,7 +382,8 @@ export default function ProfilePage() {
         distanceKm: distanceFromStore.toFixed(2),
         isDefault: isFirst
       };
-      setAddresses([...currentList, newAddr]);
+      const updatedList = [...currentList, newAddr];
+      updateAndPersistAddresses(updatedList);
       if (isFirst && setSelectedAddressId) {
         setSelectedAddressId(newAddrId);
       }
@@ -327,10 +395,11 @@ export default function ProfilePage() {
     if (setSelectedAddressId) {
       setSelectedAddressId(id);
     }
-    setAddresses((addresses || []).map(a => ({
+    const updatedList = (addresses || []).map(a => ({
       ...a,
       isDefault: a.id === id
-    })));
+    }));
+    updateAndPersistAddresses(updatedList);
   };
 
   const handleDeleteAddress = (id) => {
@@ -342,7 +411,7 @@ export default function ProfilePage() {
           setSelectedAddressId(remaining[0].id);
         }
       }
-      setAddresses(remaining);
+      updateAndPersistAddresses(remaining);
     }
   };
 
@@ -428,7 +497,7 @@ export default function ProfilePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body">
 
-        {/* Header */}
+        {/* Header จัดชิดซ้าย */}
         <div style={{
           background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
           color: '#ffffff',
@@ -535,7 +604,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <span className="text-xs font-bold text-slate-800 block">ยังไม่ได้บันทึกที่อยู่จัดส่ง</span>
-                  <span className="text-[11px] text-slate-400 block mt-0.5">เปิด Google Maps เพื่อค้นหาบ้านของคุณ</span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">เปิด Google Maps เพื่อระบุตำแหน่งบ้านของคุณ</span>
                 </div>
                 <button
                   type="button"
@@ -554,7 +623,7 @@ export default function ProfilePage() {
                       backgroundColor: addr.isDefault ? '#f8faff' : '#ffffff',
                       borderColor: addr.isDefault ? '#bfdbfe' : '#f1f5f9'
                     }}
-                    className="p-3.5 rounded-2xl border flex flex-col gap-2 transition"
+                    className="p-3.5 rounded-2xl border flex flex-col gap-2 transition shadow-xs"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
@@ -595,6 +664,7 @@ export default function ProfilePage() {
                       {addr.detail}
                     </p>
 
+                    {/* ✅ ส่วนจัดการสถานะที่อยู่ (เอาปุ่มนำทางออก เพื่อให้หน้าจอลูกค้าคลีนขึ้น) */}
                     <div className="flex items-center justify-between pt-1 border-t border-slate-100">
                       {!addr.isDefault ? (
                         <button
@@ -608,17 +678,6 @@ export default function ProfilePage() {
                         <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
                           <Check size={12} /> เลือกใช้อยู่ในปัจจุบัน
                         </span>
-                      )}
-
-                      {addr.lat && addr.lng && (
-                        <a
-                          href={`https://www.google.com/maps/dir/?api=1&destination=${addr.lat},${addr.lng}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[10.5px] text-slate-400 hover:text-[#1d61f2] flex items-center gap-1"
-                        >
-                          <ExternalLink size={11} /> นำทางไรเดอร์
-                        </a>
                       )}
                     </div>
                   </div>
@@ -640,7 +699,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <span style={{ color: '#1e293b' }} className="text-xs font-bold block">รายงานปัญหา / ติดต่อร้าน</span>
-                  <span style={{ color: '#94a3b8' }} className="text-[11px]">แจ้งปัญหาการซัก, ไรเดอร์, หรือแอปพลิเคชัน</span>
+                  <span style={{ color: '#94a3b8' }} className="text-[11px]">แจ้งปัญหาการซัก, ไรเดอร์, หรือการชำระเงิน</span>
                 </div>
               </div>
               <ChevronRight size={16} className="text-gray-400" />
@@ -659,7 +718,7 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* Modal แผนที่ Google Maps พร้อมระบบ Places API (New) */}
+        {/* Modal แผนที่ Google Maps */}
         {showAddressModal && (
           <div className="absolute inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] h-[92vh] max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
@@ -681,47 +740,49 @@ export default function ProfilePage() {
               {/* คอนเทนต์เลื่อนได้ทั้งหมด */}
               <div className="flex-1 overflow-y-auto flex flex-col">
                 
-                {/* ช่องค้นหาพร้อมปุ่มค้นหาทันที */}
-                <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 shrink-0 sticky top-0 z-30">
+                {/* ช่องค้นหา */}
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0 sticky top-0 z-30">
                   <form onSubmit={handleDirectSearch} className="relative flex gap-2">
                     <div className="relative flex-1">
-                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                      <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
                       <input
                         type="text"
-                        placeholder="พิมพ์ชื่อคอนโด, อาคาร, ซอย หรือสถานที่..."
+                        placeholder="ค้นหาชื่อคอนโด, อาคาร, ซอย หรือสถานที่..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
-                        className="w-full bg-white border border-slate-200 pl-9 pr-8 py-2 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#1d61f2] shadow-2xs"
+                        className="w-full bg-white border border-slate-200 pl-9 pr-8 py-2.5 rounded-2xl text-xs font-medium text-slate-800 outline-none focus:border-[#1d61f2] focus:ring-3 focus:ring-blue-100 shadow-xs transition"
                       />
                       {isSearching && (
-                        <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1d61f2] animate-spin z-10" />
+                        <Loader2 size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#1d61f2] animate-spin z-10" />
                       )}
                     </div>
 
                     <button
                       type="submit"
                       disabled={isSearching}
-                      className="px-3.5 py-2 bg-[#1d61f2] hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl cursor-pointer transition shadow-xs shrink-0 flex items-center gap-1"
+                      className="px-4 py-2.5 bg-[#1d61f2] hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-2xl cursor-pointer transition shadow-xs shrink-0 flex items-center gap-1"
                     >
                       ค้นหา
                     </button>
 
-                    {/* รายการผลการค้นหาแบบ Dropdown */}
+                    {/* Dropdown ค้นหาสถานที่ */}
                     {showDropdown && suggestions.length > 0 && (
-                      <div className="absolute left-0 right-16 top-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-40 max-h-48 overflow-y-auto">
+                      <div className="absolute left-0 right-16 top-[calc(100%+6px)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-40 max-h-56 overflow-y-auto divide-y divide-slate-100">
                         {suggestions.map((item) => (
                           <div
                             key={item.place_id}
                             onClick={() => handleSelectPrediction(item)}
-                            className="px-3.5 py-2.5 hover:bg-blue-50/70 border-b border-slate-50 last:border-none cursor-pointer text-left transition flex items-start gap-2.5"
+                            className="px-4 py-3 hover:bg-blue-50/80 active:bg-blue-100/70 cursor-pointer text-left transition flex items-start gap-3 group"
                           >
-                            <MapPin size={14} className="text-[#1d61f2] shrink-0 mt-0.5" />
+                            <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1d61f2] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#1d61f2] group-hover:text-white transition">
+                              <MapPin size={13} />
+                            </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-bold text-slate-800 truncate">
+                              <p className="text-xs font-bold text-slate-800 truncate group-hover:text-[#1d61f2] transition">
                                 {item.structured_formatting?.main_text || item.description}
                               </p>
-                              <p className="text-[10px] text-slate-400 truncate">
+                              <p className="text-[10px] text-slate-400 truncate mt-0.5">
                                 {item.structured_formatting?.secondary_text || item.description}
                               </p>
                             </div>
@@ -734,10 +795,10 @@ export default function ProfilePage() {
 
                 {/* กล่อง Google Maps พร้อม Center Pin */}
                 <div className="relative w-full h-80 min-h-[320px] shrink-0 bg-slate-100">
-                  {isLoaded ? (
+                  {isLoaded && addressCoords ? (
                     <GoogleMap
                       mapContainerStyle={{ width: '100%', height: '100%' }}
-                      center={{ lat: addressCoords.lat, lng: addressCoords.lng }}
+                      center={addressCoords}
                       zoom={17}
                       onLoad={onMapLoad}
                       onIdle={onCameraIdle}
@@ -748,9 +809,9 @@ export default function ProfilePage() {
                         clickableIcons: false
                       }}
                     >
-                      {/* วงกลมขอบเขตรัศมี 3 กม. */}
+                      {/* วงกลมขอบเขตรัศมี 3 กม. รอบร้าน */}
                       <CircleF
-                        center={{ lat: STORE_COORDS.lat, lng: STORE_COORDS.lng }}
+                        center={STORE_COORDS}
                         radius={MAX_DELIVERY_RADIUS_KM * 1000}
                         options={{
                           fillColor: '#3b82f6',
@@ -765,11 +826,11 @@ export default function ProfilePage() {
                     <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-red-500">
                       <AlertCircle size={32} className="mb-2" />
                       <span className="font-bold text-sm">ไม่สามารถโหลด Google Maps ได้</span>
-                      <span className="text-xs text-slate-400 mt-1">กรุณาตรวจสอบว่าใส่ API Key ถูกต้อง และเปิดใช้งาน Maps JavaScript API แล้ว</span>
                     </div>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-bold">
-                      กำลังโหลด Google Maps...
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-xs font-bold gap-2">
+                      <Loader2 size={24} className="animate-spin text-[#1d61f2]" />
+                      <span>กำลังระบุพิกัดตำแหน่งบ้านของคุณ...</span>
                     </div>
                   )}
 
@@ -931,15 +992,22 @@ export default function ProfilePage() {
                 <form onSubmit={handleSubmitReport} className="flex flex-col gap-3">
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1">ประเภทปัญหา</label>
-                    <select value={reportTopic} onChange={(e) => setReportTopic(e.target.value)} className="w-full bg-gray-50 border border-gray-200 p-2.5 rounded-xl text-xs font-semibold text-gray-800 outline-none">
-                      <option value="order_issue">ปัญหาเกี่ยวกับผ้า / การซัก</option>
-                      <option value="rider_issue">ปัญหาเกี่ยวกับไรเดอร์</option>
-                      <option value="payment_issue">ปัญหาการชำระเงิน</option>
-                    </select>
+                    <div className="relative">
+                      <select 
+                        value={reportTopic} 
+                        onChange={(e) => setReportTopic(e.target.value)} 
+                        className="w-full appearance-none bg-slate-50 border border-slate-200 px-3.5 py-2.5 pr-9 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#ea580c] focus:ring-2 focus:ring-orange-100 transition cursor-pointer"
+                      >
+                        <option value="order_issue">ปัญหาเกี่ยวกับผ้า / การซัก</option>
+                        <option value="rider_issue">ปัญหาเกี่ยวกับไรเดอร์</option>
+                        <option value="payment_issue">ปัญหาการชำระเงิน</option>
+                      </select>
+                      <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1">รายละเอียดปัญหา</label>
-                    <textarea rows="3" required value={reportDetail} onChange={(e) => setReportDetail(e.target.value)} className="w-full bg-gray-50 border border-gray-200 p-2.5 rounded-xl text-xs font-semibold text-gray-800 outline-none resize-none"></textarea>
+                    <textarea rows="3" required value={reportDetail} onChange={(e) => setReportDetail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-[#ea580c] resize-none"></textarea>
                   </div>
                   <div className="flex gap-2 pt-1">
                     <button type="button" onClick={() => setShowReportModal(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-xs cursor-pointer">

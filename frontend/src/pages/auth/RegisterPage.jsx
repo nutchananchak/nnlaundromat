@@ -70,8 +70,8 @@ const ModalHeaderLogo = () => (
   </svg>
 );
 
-// ไอคอนแจ้งเตือนเตือนภัย (แทน ⚠️)
-const AlertTriangleIcon = ({ size = 16, color = '#1e40af' }) => (
+// ไอคอนแจ้งเตือนเตือนภัย
+const AlertTriangleIcon = ({ size = 16, color = '#dc2626' }) => (
   <svg
     width={size}
     height={size}
@@ -89,7 +89,43 @@ const AlertTriangleIcon = ({ size = 16, color = '#1e40af' }) => (
   </svg>
 );
 
-// ไอคอนโล่ความปลอดภัย (แทน 🛡️)
+// ไอคอนลูกตา (ดูรหัสผ่าน)
+const EyeIcon = ({ size = 18, color = '#64748b' }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+// ไอคอนปิดตา (ซ่อนรหัสผ่าน)
+const EyeOffIcon = ({ size = 18, color = '#64748b' }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={color}
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+    <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+    <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+    <line x1="2" y1="2" x2="22" y2="22" />
+  </svg>
+);
+
+// ไอคอนโล่ความปลอดภัย
 const ShieldIcon = ({ size = 16, color = '#1e40af' }) => (
   <svg
     width={size}
@@ -130,6 +166,83 @@ const CheckItem = ({ children, isWarning = false }) => (
     </span>
   </div>
 );
+
+// --- ป้ายแจ้งเตือนเมื่อสมัครสำเร็จแบบโมเดิร์น (Success Modal) ---
+const SuccessModal = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.65)',
+      backdropFilter: 'blur(5px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10000,
+      padding: '20px'
+    }}>
+      <div style={{
+        backgroundColor: '#ffffff',
+        width: '100%',
+        maxWidth: '380px',
+        borderRadius: '24px',
+        padding: '28px 24px',
+        textAlign: 'center',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center'
+      }}>
+        <div style={{
+          width: '64px',
+          height: '64px',
+          backgroundColor: '#ecfdf5',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '16px',
+          border: '4px solid #d1fae5'
+        }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+
+        <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#0f172a', margin: '0 0 6px 0' }}>
+          สมัครสมาชิกสำเร็จ!
+        </h3>
+        <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 24px 0', lineHeight: '1.5' }}>
+          บัญชีของคุณพร้อมใช้งานแล้ว
+        </p>
+
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: '#1d61f2',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '14px',
+            fontSize: '14px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            boxShadow: '0 10px 15px -3px rgba(29, 97, 242, 0.3)'
+          }}
+        >
+          ไปหน้าเข้าสู่ระบบ
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // --- คอมโพเนนต์ TermsModal ---
 const TermsModal = ({ isOpen, onClose, onAccept }) => {
@@ -212,7 +325,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ปุ่มปิดมุมขวาบน */}
         <button
           type="button"
           onClick={onClose}
@@ -277,7 +389,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
             margin: 0,
             lineHeight: '1.4'
           }}>
-            บริการรับ-ส่งผ้าถึงหน้าบ้านคุณ (ซักอบ / ซักอบพับ)
+            บริการรับ-ส่งผ้าถึงหน้าบ้านคุณ (ซักอบพับ / ชุดเครื่องนอน)
           </p>
         </div>
 
@@ -327,7 +439,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
         }}>
           {activeTab === 'terms' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* แถบแจ้งเตือนไฮไลท์ */}
               <div style={{
                 background: '#eff6ff',
                 border: '1px dashed #93c5fd',
@@ -347,7 +458,7 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <span>เพื่อการให้บริการที่ดีที่สุดและสิทธิประโยชน์ของลูกค้า กรุณาอ่านและทำความเข้าใจก่อนใช้บริการ</span>
               </div>
 
-              {/* ข้อ 1 */}
+              {/* ข้อ 1 - 9 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(1)} การรับประกันความเสียหาย</div>
                 <CheckItem>ร้านดูแลทรัพย์สินและผ้าของลูกค้าอย่างระมัดระวังที่สุด</CheckItem>
@@ -355,7 +466,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>ร้านไม่รับผิดชอบต่อความเสียหายที่เกิดจากการเสื่อมสภาพตามอายุการใช้งานเดิมของเนื้อผ้า</CheckItem>
               </div>
 
-              {/* ข้อ 2 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(2)} การตรวจสอบกระเป๋าเสื้อผ้าก่อนส่ง</div>
                 <CheckItem>ลูกค้าต้องตรวจสอบและนำสิ่งของมีค่าออกจากกระเป๋าเสื้อผ้าทุกครั้งก่อนส่งมอบ</CheckItem>
@@ -363,7 +473,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>ทางร้านไม่มีมาตรการในการค้นหาหรือล้วงเสื้อผ้าลูกค้า เนื่องจากอยู่นอกเหนือกระบวนการการให้บริการ และขอบเขตความรับผิดชอบของทางร้าน</CheckItem>
               </div>
 
-              {/* ข้อ 3 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(3)} เสื้อผ้าที่ต้องแจ้งเป็นพิเศษ</div>
                 <CheckItem>ผ้าไหม</CheckItem>
@@ -377,21 +486,18 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem isWarning={true}>หากส่งมาโดยไม่แจ้ง ร้านขอสงวนสิทธิ์ไม่รับผิดชอบต่อความเสียหายที่เกิดขึ้น</CheckItem>
               </div>
 
-              {/* ข้อ 4 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(4)} คราบฝังแน่น</div>
                 <CheckItem>ทางร้านพยายามซักขจัดคราบอย่างเต็มที่ตามกระบวนการซักมาตรฐาน</CheckItem>
                 <CheckItem>ไม่สามารถรับประกันได้ว่าคราบฝังลึกทุกประเภทจะหลุดออกได้ 100% เพื่อหลีกเลี่ยงไม่ให้เนื้อผ้าเปื่อยหรือเสียหาย</CheckItem>
               </div>
 
-              {/* ข้อ 5 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(5)} ปัญหาสีตกและผ้าหดตัว</div>
                 <CheckItem>ร้านดำเนินการตามขั้นตอนมาตรฐาน โดยแยกผ้าขาวและผ้าสีออกจากกัน</CheckItem>
                 <CheckItem>ไม่รับประกันกรณีสีตก ย้วย หรือการหดตัวจากความร้อนของการอบผ้า ซึ่งเกิดจากคุณสมบัติเฉพาะของเนื้อผ้าที่ไม่ได้มาตรฐานของผู้ผลิต</CheckItem>
               </div>
 
-              {/* ข้อ 6 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(6)} บริการรับ-ส่งผ้า</div>
                 <CheckItem>ให้บริการตามขอบเขตพื้นที่และช่วงเวลาที่ร้านกำหนด</CheckItem>
@@ -399,7 +505,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>หากพนักงานไปถึงตามนัดหมายแล้วไม่สามารถติดต่อลูกค้าได้ อาจมีค่าบริการในการจัดส่งซ้ำในรอบถัดไป</CheckItem>
               </div>
 
-              {/* ข้อ 7 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(7)} การชำระเงิน</div>
                 <CheckItem>ค่าบริการเป็นไปตามอัตราของร้าน ณ วันที่ใช้บริการ</CheckItem>
@@ -407,7 +512,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>ลูกค้าต้องชำระเงินตามช่องทางที่ระบบกำหนดก่อนหรือ ณ เวลาที่จัดส่งผ้าส่งมอบคืน</CheckItem>
               </div>
 
-              {/* ข้อ 8 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(8)} สิทธิ์ในการปฏิเสธการให้บริการ</div>
                 <CheckItem isWarning={true}>เสื้อผ้าหรือสิ่งของที่ปนเปื้อนสารเคมีอันตราย สารพิษ หรือเชื้อโรคขั้นรุนแรง</CheckItem>
@@ -415,7 +519,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem isWarning={true}>สิ่งของผิดกฎหมายทุกประเภท</CheckItem>
               </div>
 
-              {/* ข้อ 9 */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(9)} การรับเรื่องร้องเรียน</div>
                 <CheckItem>กรุณาตรวจสอบความถูกต้องและแจ้งข้อร้องเรียนภายใน <b>7 วัน</b> หลังรับมอบผ้า</CheckItem>
@@ -423,7 +526,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
               </div>
             </div>
           ) : (
-            /* แท็บ PDPA */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{
                 background: '#eff6ff',
@@ -444,7 +546,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <span>N&amp;N Laundromat ให้ความสำคัญและคุ้มครองข้อมูลส่วนบุคคลของท่านตามมาตรฐาน พ.ร.บ. PDPA</span>
               </div>
 
-              {/* ข้อ 1 PDPA */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(1)} ข้อมูลส่วนบุคคลที่เราเก็บรวบรวม</div>
                 <CheckItem>ชื่อ - นามสกุลของผู้ใช้บริการ</CheckItem>
@@ -453,7 +554,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>ประวัติรายการสั่งบริการรับ-ส่งผ้า และหลักฐานการชำระเงิน</CheckItem>
               </div>
 
-              {/* ข้อ 2 PDPA */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(2)} วัตถุประสงค์ในการนำข้อมูลไปใช้</div>
                 <CheckItem>ใช้ระบุพิกัดและเส้นทางให้พนักงานไรเดอร์เดินทางไปรับ-ส่งผ้าได้อย่างถูกต้อง</CheckItem>
@@ -462,7 +562,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>วิเคราะห์และพัฒนาคุณภาพงานบริการให้ตอบโจทย์ลูกค้ามากยิ่งขึ้น</CheckItem>
               </div>
 
-              {/* ข้อ 3 PDPA */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(3)} มาตรการความปลอดภัยของข้อมูล</div>
                 <CheckItem>ระบบจัดเก็บข้อมูลที่มีการเข้ารหัสและระบบป้องกันการเข้าถึง</CheckItem>
@@ -470,7 +569,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem isWarning={true}>ร้านไม่มีนโยบายจำหน่าย แลกเปลี่ยน หรือเผยแพร่ข้อมูลของลูกค้าแก่บุคคลภายนอกโดยเด็ดขาด</CheckItem>
               </div>
 
-              {/* ข้อ 4 PDPA */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(4)} สิทธิของเจ้าของข้อมูลส่วนบุคคล</div>
                 <CheckItem>ลูกค้ามีสิทธิ์ขอเข้าถึง ตรวจสอบ หรือคัดลอกข้อมูลส่วนบุคคลของตนเองได้</CheckItem>
@@ -478,7 +576,6 @@ const TermsModal = ({ isOpen, onClose, onAccept }) => {
                 <CheckItem>มีสิทธิ์ยื่นคำร้องขอลบหรือทำลายข้อมูลออกจากระบบเมื่อยกเลิกการใช้งานบัญชี</CheckItem>
               </div>
 
-              {/* ข้อ 5 PDPA */}
               <div style={cardItemStyle}>
                 <div style={badgeHeaderStyle}>{numberBadge(5)} ช่องทางการติดต่อด้านความเป็นส่วนตัว</div>
                 <CheckItem>หากมีข้อสงสัยเกี่ยวกับนโยบายข้อมูลส่วนบุคคล สามารถติดต่อเจ้าหน้าที่ฝ่ายดูแลระบบได้ทาง LINE Official ของทางร้าน</CheckItem>
@@ -531,8 +628,13 @@ const RegisterPage = () => {
     acceptTerms: false
   });
 
+  // State ควบคุมการแสดงรหัสผ่าน
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [errorMsg, setErrorMsg] = useState('');
   const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -597,44 +699,47 @@ const RegisterPage = () => {
       return;
     }
 
-    // บันทึกข้อมูลลง localStorage
+    // ✅ เงื่อนไขข้อ 3: ชื่อซ้ำได้ แต่เบอร์โทรศัพท์ห้ามซ้ำ
     const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    const isDuplicate = existingUsers.some((u) => u.phone === formData.phone);
-    if (isDuplicate) {
-      setErrorMsg('เบอร์โทรศัพท์นี้ถูกใช้งานแล้ว');
+    const isPhoneDuplicate = existingUsers.some((u) => u.phone === formData.phone);
+    if (isPhoneDuplicate) {
+      setErrorMsg('เบอร์โทรศัพท์นี้ถูกลงทะเบียนไว้แล้ว กรุณาใช้เบอร์อื่น');
       return;
     }
 
+    // บันทึกข้อมูล
     existingUsers.push({
-      fullName: formData.fullName,
+      fullName: formData.fullName.trim(),
       phone: formData.phone,
       password: formData.password
     });
     localStorage.setItem('users', JSON.stringify(existingUsers));
 
-    console.log('ข้อมูลลงทะเบียนสำเร็จ:', formData);
-    alert('สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ');
-    navigate('/login/customer');
+    // ✅ เงื่อนไขข้อ 1: แสดง Pop-up แจ้งเตือนสำเร็จสวยงามแทน alert()
+    setIsSuccessOpen(true);
   };
 
   return (
     <Card subtitle="สร้างบัญชีใหม่เพื่อเริ่มใช้บริการรับ-ส่งผ้า">
       <form onSubmit={handleRegister}>
+        {/* ป้าย Error ดีไซน์สวยงาม มีเงาฟุ้งและไอคอน */}
         {errorMsg && (
           <div style={{
             backgroundColor: '#fef2f2',
-            color: '#dc2626',
-            padding: '10px 14px',
-            borderRadius: '10px',
-            fontSize: '13.5px',
+            color: '#b91c1c',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: '600',
             marginBottom: '16px',
             textAlign: 'left',
-            border: '1px solid #fee2e2',
+            border: '1px solid #fecaca',
+            boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.08)',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px'
+            gap: '10px'
           }}>
-            <AlertTriangleIcon size={16} color="#dc2626" />
+            <AlertTriangleIcon size={18} color="#dc2626" />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -660,27 +765,71 @@ const RegisterPage = () => {
           required
         />
 
-        <Input
-          label="รหัสผ่าน"
-          name="password"
-          type="password"
-          placeholder="ตั้งรหัสผ่าน 6 - 10 ตัวอักษร"
-          value={formData.password}
-          onChange={handleChange}
-          required
-          autoComplete="new-password"
-        />
+        <div style={{ position: 'relative' }}>
+          <Input
+            label="รหัสผ่าน"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="ตั้งรหัสผ่าน 6 - 10 ตัวอักษร"
+            value={formData.password}
+            onChange={handleChange}
+            required
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '36px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#64748b'
+            }}
+            title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+          >
+            {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+          </button>
+        </div>
 
-        <Input
-          label="ยืนยันรหัสผ่าน"
-          name="confirmPassword"
-          type="password"
-          placeholder="กรอกรหัสผ่านอีกครั้ง"
-          value={formData.confirmPassword}
-          onChange={handleChange}
-          required
-          autoComplete="new-password"
-        />
+        <div style={{ position: 'relative' }}>
+          <Input
+            label="ยืนยันรหัสผ่าน"
+            name="confirmPassword"
+            type={showConfirmPassword ? 'text' : 'password'}
+            placeholder="กรอกรหัสผ่านอีกครั้ง"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            required
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            style={{
+              position: 'absolute',
+              right: '12px',
+              top: '36px',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#64748b'
+            }}
+            title={showConfirmPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+          >
+            {showConfirmPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+          </button>
+        </div>
 
         <div style={{
           display: 'flex',
@@ -742,6 +891,15 @@ const RegisterPage = () => {
         onAccept={() => {
           setFormData((prev) => ({ ...prev, acceptTerms: true }));
           setErrorMsg('');
+        }}
+      />
+
+      {/* ป้ายแจ้งเตือนสมัครสำเร็จแบบพรีเมียม */}
+      <SuccessModal
+        isOpen={isSuccessOpen}
+        onClose={() => {
+          setIsSuccessOpen(false);
+          navigate('/login/customer');
         }}
       />
     </Card>
