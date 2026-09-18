@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import LoginForm from '../../components/auth/LoginForm';
 import { useApp } from '../../context/AppContext';
 
@@ -66,13 +67,22 @@ const RiderLoginPage = () => {
   const navigate = useNavigate();
   const { loginRider } = useApp ? useApp() : {};
 
-  // อ่านค่าจาก localStorage ทันทีเหมือน Admin
   const isRemembered = localStorage.getItem('rememberRider') === 'true';
   const savedId = isRemembered ? (localStorage.getItem('rememberedRiderId') || '') : '';
   const savedPass = isRemembered ? (localStorage.getItem('rememberedRiderPass') || '') : '';
 
   const [rememberMe, setRememberMe] = useState(isRemembered);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+
+  // State สำหรับป้ายแจ้งเตือนโมเดิร์น
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const triggerToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 2500);
+  };
 
   const handleRiderLogin = ({ identifier, password }) => {
     const trimmedInput = (identifier || '').trim();
@@ -85,7 +95,7 @@ const RiderLoginPage = () => {
     );
 
     if (!rider) {
-      alert('เบอร์โทรศัพท์/รหัสคนขับ หรือรหัสผ่านไม่ถูกต้อง');
+      triggerToast('เบอร์โทรศัพท์/รหัสคนขับ หรือรหัสผ่านไม่ถูกต้อง', 'error');
       return;
     }
 
@@ -105,8 +115,10 @@ const RiderLoginPage = () => {
       loginRider(rider);
     }
 
-    alert(`เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ ${rider.name}`);
-    navigate('/rider/tasks');
+    triggerToast(`เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ ${rider.name}`, 'success');
+    setTimeout(() => {
+      navigate('/rider/tasks');
+    }, 600);
   };
 
   const riderFooterSlot = (
@@ -125,6 +137,33 @@ const RiderLoginPage = () => {
 
   return (
     <>
+      {/* ป้ายแจ้งเตือนดีไซน์โมเดิร์น */}
+      {toast.show && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 20px',
+          borderRadius: '16px',
+          color: '#ffffff',
+          backgroundColor: toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: toast.type === 'error' ? '0 10px 25px rgba(239, 68, 68, 0.3)' : '0 10px 25px rgba(16, 185, 129, 0.3)',
+          fontSize: '13px',
+          fontWeight: '700',
+          maxWidth: '90vw',
+          boxSizing: 'border-box'
+        }}>
+          {toast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <LoginForm
         key={`rider-form-${savedId}-${savedPass}`}
         subtitle="ระบบพนักงานรับ-ส่งผ้า"

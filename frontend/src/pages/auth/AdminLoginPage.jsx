@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import LoginForm from '../../components/auth/LoginForm';
 
 const REGISTERED_ADMINS = [
@@ -79,6 +80,16 @@ const AdminLoginPage = () => {
 
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
 
+  // State สำหรับป้ายแจ้งเตือนโมเดิร์น
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const triggerToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 2500);
+  };
+
   const handleAdminLogin = ({ identifier, password }) => {
     const trimmedInput = (identifier || '').trim();
     const trimmedPassword = (password || '').trim();
@@ -91,7 +102,7 @@ const AdminLoginPage = () => {
     );
 
     if (!admin) {
-      alert('ชื่อผู้ใช้งานหรือรหัสผ่านแอดมินไม่ถูกต้อง');
+      triggerToast('ชื่อผู้ใช้งานหรือรหัสผ่านแอดมินไม่ถูกต้อง', 'error');
       return;
     }
 
@@ -107,8 +118,10 @@ const AdminLoginPage = () => {
       localStorage.removeItem('rememberedAdminPass');
     }
 
-    alert(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${admin.name} (${admin.id})`);
-    navigate('/admin/dashboard');
+    triggerToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${admin.name} (${admin.id})`, 'success');
+    setTimeout(() => {
+      navigate('/admin/dashboard');
+    }, 600);
   };
 
   const adminFooterSlot = (
@@ -127,6 +140,33 @@ const AdminLoginPage = () => {
 
   return (
     <>
+      {/* ป้ายแจ้งเตือนดีไซน์โมเดิร์น */}
+      {toast.show && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 20px',
+          borderRadius: '16px',
+          color: '#ffffff',
+          backgroundColor: toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(16, 185, 129, 0.95)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: toast.type === 'error' ? '0 10px 25px rgba(239, 68, 68, 0.3)' : '0 10px 25px rgba(16, 185, 129, 0.3)',
+          fontSize: '13px',
+          fontWeight: '700',
+          maxWidth: '90vw',
+          boxSizing: 'border-box'
+        }}>
+          {toast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <LoginForm
         key={`${savedIdentifier}-${savedPassword}`}
         subtitle="ระบบบริหารจัดการสำหรับเจ้าหน้าที่"
@@ -149,5 +189,5 @@ const AdminLoginPage = () => {
     </>
   );
 };
-
+  
 export default AdminLoginPage;
