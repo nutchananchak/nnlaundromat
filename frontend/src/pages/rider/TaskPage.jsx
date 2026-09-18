@@ -172,7 +172,7 @@ const TaskPage = () => {
             </button>
           </div>
 
-          {/* แท็บสถานะงาน 3 หมวดหมู่ */}
+          {/* แท็บสถานะงาน 3 หมวดหมู่ พร้อมป้าย NEW สไตล์แคปซูล */}
           <div className="grid grid-cols-3 gap-1.5 bg-black/15 p-1 rounded-2xl border border-white/15 text-xs font-semibold">
             <button
               type="button"
@@ -181,9 +181,11 @@ const TaskPage = () => {
                 activeTab === 'active' ? 'bg-white text-[#1d61f2] font-bold shadow-xs' : 'text-white/90 hover:text-white'
               }`}
             >
-              รับผ้าเข้าร้าน ({myPickupOrders.length})
+              รับผ้า ({myPickupOrders.length})
               {myPickupOrders.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-blue-700 animate-ping" />
+                <span className="absolute -top-1.5 -right-1 px-1.5 py-0.2 bg-rose-500 text-white text-[8.5px] font-black rounded-full border border-white/80 shadow-xs tracking-tighter pointer-events-none animate-in zoom-in-50 duration-200">
+                  NEW
+                </span>
               )}
             </button>
 
@@ -194,9 +196,11 @@ const TaskPage = () => {
                 activeTab === 'return' ? 'bg-white text-[#1d61f2] font-bold shadow-xs' : 'text-white/90 hover:text-white'
               }`}
             >
-              ส่งคืนผ้า ({myReturnOrders.length})
+              ส่งคืน ({myReturnOrders.length})
               {myReturnOrders.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-blue-700 animate-pulse" />
+                <span className="absolute -top-1.5 -right-1 px-1.5 py-0.2 bg-rose-500 text-white text-[8.5px] font-black rounded-full border border-white/80 shadow-xs tracking-tighter pointer-events-none animate-in zoom-in-50 duration-200">
+                  NEW
+                </span>
               )}
             </button>
 
