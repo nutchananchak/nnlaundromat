@@ -22,7 +22,10 @@ import {
   CheckCheck,
   Package,
   BarChart3,
-  CalendarDays
+  CalendarDays,
+  AlertCircle,
+  MessageSquareWarning,
+  Check
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -107,14 +110,51 @@ const DashboardPage = () => {
     }
   }, [activeAdmin, navigate]);
 
+  // แท็บหลัก: 'slips' | 'washing' | 'completed' | 'analytics' | 'reports' | 'calendar'
   const [activeTab, setActiveTab] = useState('slips');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSlipModal, setSelectedSlipModal] = useState(null);
 
+  // ข้อมูลเรื่องร้องเรียนจากลูกค้า (adminReports)
+  const [reports, setReports] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('adminReports') || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // อัปเดตข้อมูลรายงานปัญหาเป็นระยะ
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        setReports(JSON.parse(localStorage.getItem('adminReports') || '[]'));
+      } catch (e) {
+        setReports([]);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const pendingReportsCount = reports.filter(r => r.status === 'pending').length;
+
+  const handleResolveReport = (reportId) => {
+    const updated = reports.map(r => r.id === reportId ? { ...r, status: 'resolved' } : r);
+    setReports(updated);
+    localStorage.setItem('adminReports', JSON.stringify(updated));
+  };
+
+  const handleDeleteReport = (reportId) => {
+    if (window.confirm('คุณต้องการลบรายการปัญหานี้หรือไม่?')) {
+      const updated = reports.filter(r => r.id !== reportId);
+      setReports(updated);
+      localStorage.setItem('adminReports', JSON.stringify(updated));
+    }
+  };
+
   // ตัวเลือกกราฟ: 'daily' | 'weekly' | 'by_month'
   const [chartViewMode, setChartViewMode] = useState('daily');
-  
-  // State เลือกเดือนที่ต้องการดูข้อมูล (ค่าเริ่มต้นเป็นเดือนปัจจุบัน)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
   const riderList = [
@@ -158,9 +198,7 @@ const DashboardPage = () => {
   const washingOrders = (orders || []).filter(o => Number(o.statusStep) === 5);
   const deliveredOrders = (orders || []).filter(o => Number(o.statusStep) === 7 || o.status === 'completed');
 
-  // =========================================================================
-  // คำนวณสรุปรายรับและข้อมูลเดือนที่เลือก
-  // =========================================================================
+  // คำนวณสรุปรายรับ
   const { 
     dailyRevenue, 
     weeklyRevenue, 
@@ -211,7 +249,6 @@ const DashboardPage = () => {
 
       const dateStr = String(o.deliveredAt || o.verifiedAt || o.createdAt || '').replace(/[\s\u00A0\u202F]+/g, ' ');
 
-      // 1. ตรวจสอบวันนี้
       const isToday = dateStr.includes(`${currentDay} ${currentMonthShort}`) || dateStr.includes('วันนี้');
       if (isToday) {
         daily += amount;
@@ -219,11 +256,8 @@ const DashboardPage = () => {
         hourlyMap[hourMatched] += amount;
       }
 
-      // 2. ตรวจสอบว่าตรงกับเดือนที่เลือกดูหรือไม่
       if (dateStr.includes(chosenMonthShort)) {
         chosenMonthTotal += amount;
-        
-        // แยกตามสัปดาห์ของเดือนที่เลือก (อิงจากวันที่สั่ง)
         const dayMatch = dateStr.match(/\b(\d{1,2})\b/);
         const dayNum = dayMatch ? parseInt(dayMatch[1], 10) : 15;
 
@@ -233,7 +267,6 @@ const DashboardPage = () => {
         else monthWeeksMap['สัปดาห์ 4'] += amount;
       }
 
-      // 3. รอบสัปดาห์ล่าสุด
       weekly += amount;
       const todayDayName = weekDays[now.getDay()];
       weeklyMap[todayDayName] = (weeklyMap[todayDayName] || 0) + amount;
@@ -296,8 +329,8 @@ const DashboardPage = () => {
       title: 'สลิปได้รับการอนุมัติเรียบร้อย',
       message: `ออเดอร์ #${orderId} ยอดเงินถูกต้อง ไรเดอร์ (${chosenRider.name}) กำลังเดินทางไปรับผ้า`,
       time: realTimeNow,
-      type: 'success',
-      isRead: true
+      type: 'info',
+      isRead: false
     };
 
     localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...clearedNotices]));
@@ -328,9 +361,9 @@ const DashboardPage = () => {
       id: Date.now(),
       orderId,
       title: 'สลิปการโอนเงินไม่ถูกต้อง',
-      message: `ออเดอร์ #${orderId} ถูกปฏิเสธเนื่องจาก "${reason}" กรุณาแนบสลิปใหม่ในหน้าแรกของแอป`,
+      message: `ออเดอร์ #${orderId} ไม่ผ่านการตรวจสอบ: "${reason}" กรุณาสแกน QR Code และแนบสลิปใหม่`,
       time: realTimeNow,
-      type: 'alert',
+      type: 'slip_rejected',
       isRead: false
     };
 
@@ -380,10 +413,10 @@ const DashboardPage = () => {
     localStorage.setItem('closedDates', JSON.stringify(updated));
   };
 
+  // ✅ แก้ไข: ลบเฉพาะ currentAdmin เพื่อไม่ให้ค่า Remember Me สูญหาย
   const handleLogout = () => {
     if (window.confirm('ต้องการออกจากระบบผู้ดูแลหรือไม่?')) {
       localStorage.removeItem('currentAdmin');
-      localStorage.removeItem('rememberAdmin');
       navigate('/login/admin', { replace: true });
     }
   };
@@ -426,7 +459,7 @@ const DashboardPage = () => {
             )}
           </div>
 
-          <nav className="p-3 space-y-2">
+          <nav className="p-3 space-y-1.5">
             <button
               onClick={() => setActiveTab('slips')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -496,6 +529,26 @@ const DashboardPage = () => {
               {isSidebarOpen && <span className="truncate">สรุปรายรับ &amp; กราฟ</span>}
             </button>
 
+            {/* ✅ แท็บรายงานปัญหาจากลูกค้า */}
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
+                activeTab === 'reports' 
+                  ? 'bg-[#1d61f2] text-white shadow-md shadow-blue-500/20' 
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <MessageSquareWarning size={20} className="shrink-0" />
+                {isSidebarOpen && <span className="truncate">ปัญหาจากลูกค้า</span>}
+              </div>
+              {pendingReportsCount > 0 && (
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px]'} bg-orange-500 text-white font-black rounded-full`}>
+                  {pendingReportsCount}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setActiveTab('calendar')}
               className={`w-full flex items-center ${isSidebarOpen ? 'gap-3 px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -554,6 +607,7 @@ const DashboardPage = () => {
                 {activeTab === 'washing' && 'แผนกซัก-อบผ้าของทางร้าน'}
                 {activeTab === 'completed' && 'รายการที่ไรเดอร์ส่งมอบผ้าสำเร็จแล้ว'}
                 {activeTab === 'analytics' && 'ภาพรวมรายรับและกราฟสถิติ'}
+                {activeTab === 'reports' && 'รายการแจ้งปัญหาและข้อร้องเรียนจากลูกค้า'}
                 {activeTab === 'calendar' && 'จัดการตารางเวลาและวันหยุดบริการ'}
               </h1>
               <p className="text-xs text-slate-500 font-normal">
@@ -857,10 +911,7 @@ const DashboardPage = () => {
           {activeTab === 'analytics' && (
             <div className="space-y-6">
               
-              {/* แถวการ์ดสรุปยอดเงิน 3 การ์ด */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* 1. รายรับประจำวัน */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-slate-400 block tracking-wide">รายรับประจำวัน (วันนี้)</span>
@@ -876,7 +927,6 @@ const DashboardPage = () => {
                   </div>
                 </div>
 
-                {/* 2. รายรับรอบสัปดาห์ */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-slate-400 block tracking-wide">รอบสัปดาห์ (7 วันล่าสุด)</span>
@@ -892,7 +942,6 @@ const DashboardPage = () => {
                   </div>
                 </div>
 
-                {/* 3. รายรับตามเดือนที่เลือก */}
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-1.5">
@@ -913,7 +962,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* ================= กราฟสถิติรายรับแบบ Visual Bar Chart ================= */}
+              {/* กราฟสถิติรายรับ */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 flex flex-col gap-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-3">
@@ -928,7 +977,6 @@ const DashboardPage = () => {
                     </div>
                   </div>
 
-                  {/* ตัวควบคุมกราฟ: ปุ่มสลับโหมด + Dropdown เลือกเดือน */}
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="bg-slate-100 p-1 rounded-2xl flex gap-1">
                       <button
@@ -966,7 +1014,6 @@ const DashboardPage = () => {
                       </button>
                     </div>
 
-                    {/* Dropdown เลือกเดือน */}
                     <div className="relative inline-flex items-center">
                       <select
                         value={selectedMonth}
@@ -987,7 +1034,6 @@ const DashboardPage = () => {
                   </div>
                 </div>
 
-                {/* ตัวกราฟแท่ง */}
                 <div className="w-full pt-4">
                   <div className="h-60 w-full flex items-end justify-between gap-3 sm:gap-6 px-2 sm:px-6 border-b border-slate-200 pb-2">
                     {activeGraphList.map((item, idx) => {
@@ -1026,7 +1072,6 @@ const DashboardPage = () => {
                   </div>
                 </div>
 
-                {/* สถิติย่อยใต้กราฟ */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
                   <div className="p-3.5 bg-slate-50 rounded-2xl flex items-center justify-between">
                     <span className="text-slate-500">ออเดอร์ที่สร้างรายได้</span>
@@ -1101,7 +1146,106 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 5: ปฏิทินร้าน ======================= */}
+          {/* ======================= แท็บ 5: รายการปัญหาจากลูกค้า ======================= */}
+          {activeTab === 'reports' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
+                <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">รายการแจ้งปัญหาและข้อร้องเรียนจากลูกค้า</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">เรื่องที่ลูกค้าส่งรายงานปัญหาผ่านหน้าโปรไฟล์ในแอปพลิเคชัน</p>
+                  </div>
+                  <span className="bg-orange-50 text-orange-700 font-bold text-xs px-3 py-1 rounded-full">
+                    {reports.length} รายการทั้งหมด
+                  </span>
+                </div>
+
+                {reports.length === 0 ? (
+                  <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
+                    <CheckCircle2 size={40} className="text-emerald-400" />
+                    <span>ไม่มีรายการแจ้งปัญหาจากลูกค้าในขณะนี้</span>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider whitespace-nowrap">
+                          <th className="py-3.5 px-4">รหัสเรื่อง</th>
+                          <th className="py-3.5 px-4">ข้อมูลลูกค้า</th>
+                          <th className="py-3.5 px-4">หมวดหมู่ปัญหา</th>
+                          <th className="py-3.5 px-4">รายละเอียดข้อความ</th>
+                          <th className="py-3.5 px-4">วันเวลาที่แจ้ง</th>
+                          <th className="py-3.5 px-4">สถานะ</th>
+                          <th className="py-3.5 px-4 text-center">จัดการ</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {reports.map((rep) => {
+                          const isPending = rep.status === 'pending';
+
+                          return (
+                            <tr key={rep.id} className="hover:bg-slate-50/50 transition">
+                              <td className="py-4 px-4 whitespace-nowrap">
+                                <span className="font-extrabold text-slate-800 text-xs">{rep.id}</span>
+                              </td>
+                              <td className="py-4 px-4 whitespace-nowrap">
+                                <span className="font-bold text-slate-900 text-xs block">{rep.customerName}</span>
+                                <span className="text-[11px] text-slate-400">{rep.customerPhone}</span>
+                              </td>
+                              <td className="py-4 px-4 whitespace-nowrap">
+                                <span className="text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-lg">
+                                  {rep.topic}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 max-w-xs">
+                                <p className="text-xs text-slate-700 leading-relaxed truncate" title={rep.detail}>
+                                  {rep.detail}
+                                </p>
+                              </td>
+                              <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-500">
+                                {rep.createdAt}
+                              </td>
+                              <td className="py-4 px-4 whitespace-nowrap">
+                                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                                  isPending 
+                                    ? 'bg-amber-100 text-amber-800' 
+                                    : 'bg-emerald-100 text-emerald-800'
+                                }`}>
+                                  {isPending ? 'รอดำเนินการ' : 'แก้ไขเรียบร้อย'}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 text-center whitespace-nowrap space-x-1.5">
+                                {isPending && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResolveReport(rep.id)}
+                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition cursor-pointer"
+                                    title="ทำเครื่องหมายว่าแก้ไขแล้ว"
+                                  >
+                                    <Check size={15} />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteReport(rep.id)}
+                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition cursor-pointer"
+                                  title="ลบรายงานนี้"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ======================= แท็บ 6: ปฏิทินร้าน ======================= */}
           {activeTab === 'calendar' && (
             <div className="max-w-4xl space-y-6">
               <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between">

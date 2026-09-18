@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card from '../common/Card';
 import Input from '../common/Input';
 import Button from '../common/Button';
@@ -8,6 +8,8 @@ const LoginForm = ({
   identifierLabel = "เบอร์โทรศัพท์",
   identifierPlaceholder = "กรอกเบอร์โทรศัพท์",
   identifierType = "text",
+  initialIdentifier = "",
+  initialPassword = "",
   buttonText = "เข้าสู่ระบบ",
   buttonVariant = "primary",
   forgotPasswordHref = null,
@@ -18,8 +20,21 @@ const LoginForm = ({
   footerLinkHref = null,
   onSubmit,
 }) => {
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState(initialIdentifier);
+  const [password, setPassword] = useState(initialPassword);
+
+  // บังคับ Sync ค่าลงช่องกรอกทันทีที่ได้รับค่าจากหน้า Login
+  useEffect(() => {
+    if (initialIdentifier !== undefined) {
+      setIdentifier(initialIdentifier);
+    }
+  }, [initialIdentifier]);
+
+  useEffect(() => {
+    if (initialPassword !== undefined) {
+      setPassword(initialPassword);
+    }
+  }, [initialPassword]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -52,7 +67,6 @@ const LoginForm = ({
           autoComplete="current-password"
         />
 
-        {/* แถบลิงก์ลืมรหัสผ่าน */}
         {hasForgotPassword && (
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px', marginBottom: '24px' }}>
             <a
@@ -67,15 +81,12 @@ const LoginForm = ({
 
         {!hasForgotPassword && <div style={{ marginBottom: '20px' }} />}
 
-        {/* ปุ่ม Submit */}
         <Button type="submit" variant={buttonVariant}>
           {buttonText}
         </Button>
 
-        {/* ส่วนขยายใต้ปุ่ม เช่น แถบจดจำบัญชี */}
         {customFooter}
 
-        {/* ฟุตเตอร์ลิงก์สมัครสมาชิกของลูกค้า (ถ้ามี) */}
         {footerText && (
           <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '24px', marginBottom: '0' }}>
             {footerText}

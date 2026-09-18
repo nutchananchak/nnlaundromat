@@ -36,11 +36,14 @@ const TaskPage = () => {
 
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'return' | 'history'
 
+  // จัดการออกจากระบบ โดยเก็บค่า Remember Me ไว้ตามเดิม
   const handleLogout = () => {
-    if (window.confirm('คุณต้องการออกจากระบบหรือไม่?')) {
+    if (window.confirm('คุณต้องการออกจากระบบพนักงานใช่หรือไม่?')) {
+      // 1. ลบเฉพาะ Session การเข้าใช้งานปัจจุบันเท่านั้น
       localStorage.removeItem('currentRider');
-      localStorage.removeItem('rememberRider');
       setActiveRider(null);
+
+      // 2. นำทางกลับไปยังหน้า Login ทันที (ไม่เรียก logoutRider() เพื่อป้องกันการเคลียร์ remember storage)
       navigate('/login/rider', { replace: true });
     }
   };
@@ -119,13 +122,14 @@ const TaskPage = () => {
               </div>
             </div>
 
+            {/* ปุ่มออกจากระบบ: ชี้เมาส์แล้วเปลี่ยนเป็นสีแดง */}
             <button
               type="button"
               onClick={handleLogout}
-              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-white transition cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-red-500 active:bg-red-600 text-white flex items-center justify-center transition-colors duration-200 cursor-pointer shadow-xs"
               title="ออกจากระบบ"
             >
-              <LogOut size={16} />
+              <LogOut size={18} />
             </button>
           </div>
 
@@ -203,7 +207,7 @@ const TaskPage = () => {
                     <button
                       type="button"
                       onClick={() => navigate(`/rider/tasks/${order.id}`)}
-                      className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-[#1d61f2] font-bold text-xs rounded-xl border border-blue-100 flex items-center justify-center gap-1.5"
+                      className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-[#1d61f2] font-bold text-xs rounded-xl border border-blue-100 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <FileText size={14} /> รายละเอียดงานและ GPS
                     </button>
@@ -212,7 +216,7 @@ const TaskPage = () => {
                       <button
                         type="button"
                         onClick={() => handleAdvanceStep(order.id, 4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
-                        className="w-full py-2.5 rounded-xl bg-[#1d61f2] text-white font-bold text-xs hover:bg-blue-700"
+                        className="w-full py-2.5 rounded-xl bg-[#1d61f2] text-white font-bold text-xs hover:bg-blue-700 cursor-pointer"
                       >
                         รับผ้าจากลูกค้าแล้ว (กำลังนำส่งร้าน)
                       </button>
@@ -222,7 +226,7 @@ const TaskPage = () => {
                       <button
                         type="button"
                         onClick={() => handleAdvanceStep(order.id, 5, 'ร้านกำลังดำเนินการซักอบ')}
-                        className="w-full py-2.5 rounded-xl bg-blue-800 text-white font-bold text-xs hover:bg-blue-900"
+                        className="w-full py-2.5 rounded-xl bg-blue-800 text-white font-bold text-xs hover:bg-blue-900 cursor-pointer"
                       >
                         ผ้าถึงร้านแล้ว (ส่งต่อแผนกซักอบ)
                       </button>
@@ -270,7 +274,7 @@ const TaskPage = () => {
                     <button
                       type="button"
                       onClick={() => navigate(`/rider/tasks/${order.id}`)}
-                      className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5"
+                      className="w-full py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <FileText size={14} /> ดูที่อยู่ส่งคืน &amp; นำทาง GPS
                     </button>
@@ -278,7 +282,7 @@ const TaskPage = () => {
                     <button
                       type="button"
                       onClick={() => handleAdvanceStep(order.id, 7, 'จัดส่งผ้าคืนสำเร็จ')}
-                      className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-sm"
+                      className="w-full py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 shadow-sm cursor-pointer"
                     >
                       ส่งมอบผ้าคืนลูกค้าเรียบร้อย (ปิดงาน)
                     </button>
