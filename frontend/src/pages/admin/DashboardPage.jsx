@@ -124,7 +124,6 @@ const DashboardPage = () => {
     }
   });
 
-  // อัปเดตข้อมูลรายงานปัญหาเป็นระยะ
   useEffect(() => {
     const handleStorageChange = () => {
       try {
@@ -153,7 +152,6 @@ const DashboardPage = () => {
     }
   };
 
-  // ตัวเลือกกราฟ: 'daily' | 'weekly' | 'by_month'
   const [chartViewMode, setChartViewMode] = useState('daily');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
@@ -198,7 +196,6 @@ const DashboardPage = () => {
   const washingOrders = (orders || []).filter(o => Number(o.statusStep) === 5);
   const deliveredOrders = (orders || []).filter(o => Number(o.statusStep) === 7 || o.status === 'completed');
 
-  // คำนวณสรุปรายรับ
   const { 
     dailyRevenue, 
     weeklyRevenue, 
@@ -286,28 +283,37 @@ const DashboardPage = () => {
     };
   }, [orders, selectedMonth]);
 
+  // อนุมัติสลิป: ผูก userId ชัดเจน + ล้างแจ้งเตือนเก่าของออเดอร์นี้
   const handleApproveSlip = (orderId) => {
     const chosenRiderId = selectedRiders[orderId] || riderList[0].id;
     const chosenRider = riderList.find(r => r.id === chosenRiderId) || riderList[0];
     const realTimeNow = getThaiRealTimestamp();
 
-    if (!setOrders) return;
-    setOrders(prev => prev.map(order => {
-      if (String(order.id) === String(orderId)) {
-        return {
-          ...order,
-          statusStep: 3,
-          statusTitle: 'ไรเดอร์ได้รับมอบหมาย กำลังไปรับผ้า',
-          status: 'in_progress',
-          paymentVerified: true,
-          paymentRejected: false,
-          rejectReason: null,
-          verifiedAt: realTimeNow,
-          rider: chosenRider
-        };
-      }
-      return order;
-    }));
+    let targetOrder = null;
+    if (setOrders) {
+      setOrders(prev => prev.map(order => {
+        if (String(order.id) === String(orderId)) {
+          targetOrder = order;
+          return {
+            ...order,
+            statusStep: 3,
+            statusTitle: 'ไรเดอร์ได้รับมอบหมาย กำลังไปรับผ้า',
+            status: 'in_progress',
+            paymentVerified: true,
+            paymentRejected: false,
+            rejectReason: null,
+            verifiedAt: realTimeNow,
+            rider: chosenRider
+          };
+        }
+        return order;
+      }));
+    }
+
+    if (!targetOrder && orders) {
+      targetOrder = orders.find(o => String(o.id) === String(orderId));
+    }
+    const orderOwnerPhone = targetOrder?.customerPhone || targetOrder?.userPhone || '';
 
     let currentNotices = [];
     try {
@@ -316,16 +322,17 @@ const DashboardPage = () => {
       currentNotices = [];
     }
 
-    const clearedNotices = currentNotices.map(n => {
-      if (String(n.orderId) === String(orderId) && n.type === 'alert') {
-        return { ...n, isRead: true };
-      }
-      return n;
-    });
+    // ลบการแจ้งเตือนสลิปเก่าของออเดอร์นี้ออกก่อน เพื่อไม่ให้ขึ้นซ้ำ
+    const cleanedNotices = currentNotices.filter(
+      n => String(n.orderId) !== String(orderId) || (!String(n.title).includes('สลิป') && n.type !== 'alert')
+    );
 
     const newNotice = {
       id: Date.now(),
+      uniqueKey: `payment_verified_${orderId}`,
       orderId,
+      userId: orderOwnerPhone,
+      customerPhone: orderOwnerPhone,
       title: 'สลิปได้รับการอนุมัติเรียบร้อย',
       message: `ออเดอร์ #${orderId} ยอดเงินถูกต้อง ไรเดอร์ (${chosenRider.name}) กำลังเดินทางไปรับผ้า`,
       time: realTimeNow,
@@ -333,39 +340,38 @@ const DashboardPage = () => {
       isRead: false
     };
 
-    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...clearedNotices]));
+    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
     alert(`อนุมัติคำสั่งซื้อ #${orderId} เรียบร้อยแล้ว มอบหมายให้ไรเดอร์ "${chosenRider.name}" ดูแลงาน`);
   };
 
+  // ปฏิเสธสลิป: ผูก userId ชัดเจน + ล้างของเก่าก่อนบันทึก
   const handleRejectSlip = (orderId) => {
     const reason = prompt('ระบุสาเหตุที่ปฏิเสธสลิป (เช่น ยอดไม่ตรง, ภาพไม่ชัดเจน, สลิปซ้ำ):');
     if (!reason) return;
 
     const realTimeNow = getThaiRealTimestamp();
 
-    if (!setOrders) return;
-    setOrders(prev => prev.map(order => {
-      if (String(order.id) === String(orderId)) {
-        return {
-          ...order,
-          paymentRejected: true,
-          rejectReason: reason,
-          rejectedAt: realTimeNow,
-          statusTitle: 'สลิปไม่ถูกต้อง (รอแนบสลิปใหม่)'
-        };
-      }
-      return order;
-    }));
+    let targetOrder = null;
+    if (setOrders) {
+      setOrders(prev => prev.map(order => {
+        if (String(order.id) === String(orderId)) {
+          targetOrder = order;
+          return {
+            ...order,
+            paymentRejected: true,
+            rejectReason: reason,
+            rejectedAt: realTimeNow,
+            statusTitle: 'สลิปไม่ถูกต้อง (รอแนบสลิปใหม่)'
+          };
+        }
+        return order;
+      }));
+    }
 
-    const newNotice = {
-      id: Date.now(),
-      orderId,
-      title: 'สลิปการโอนเงินไม่ถูกต้อง',
-      message: `ออเดอร์ #${orderId} ไม่ผ่านการตรวจสอบ: "${reason}" กรุณาสแกน QR Code และแนบสลิปใหม่`,
-      time: realTimeNow,
-      type: 'slip_rejected',
-      isRead: false
-    };
+    if (!targetOrder && orders) {
+      targetOrder = orders.find(o => String(o.id) === String(orderId));
+    }
+    const orderOwnerPhone = targetOrder?.customerPhone || targetOrder?.userPhone || '';
 
     let currentNotices = [];
     try {
@@ -374,7 +380,22 @@ const DashboardPage = () => {
       currentNotices = [];
     }
 
-    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...currentNotices]));
+    const cleanedNotices = currentNotices.filter(n => String(n.orderId) !== String(orderId));
+
+    const newNotice = {
+      id: Date.now(),
+      uniqueKey: `slip_rejected_${orderId}`,
+      orderId,
+      userId: orderOwnerPhone,
+      customerPhone: orderOwnerPhone,
+      title: 'สลิปการโอนเงินไม่ถูกต้อง',
+      message: `ออเดอร์ #${orderId} ไม่ผ่านการตรวจสอบ: "${reason}" กรุณาสแกน QR Code และแนบสลิปใหม่`,
+      time: realTimeNow,
+      type: 'slip_rejected',
+      isRead: false
+    };
+
+    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
     alert(`ปฏิเสธสลิป #${orderId} เรียบร้อยแล้ว ระบบได้ส่งการแจ้งเตือนไปยังลูกค้าแล้ว`);
   };
 
@@ -413,7 +434,6 @@ const DashboardPage = () => {
     localStorage.setItem('closedDates', JSON.stringify(updated));
   };
 
-  // ✅ แก้ไข: ลบเฉพาะ currentAdmin เพื่อไม่ให้ค่า Remember Me สูญหาย
   const handleLogout = () => {
     if (window.confirm('ต้องการออกจากระบบผู้ดูแลหรือไม่?')) {
       localStorage.removeItem('currentAdmin');
@@ -529,7 +549,6 @@ const DashboardPage = () => {
               {isSidebarOpen && <span className="truncate">สรุปรายรับ &amp; กราฟ</span>}
             </button>
 
-            {/* ✅ แท็บรายงานปัญหาจากลูกค้า */}
             <button
               onClick={() => setActiveTab('reports')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -1340,10 +1359,10 @@ const DashboardPage = () => {
 
             <div className="w-full min-h-[360px] max-h-[500px] bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex items-center justify-center p-2">
               {(selectedSlipModal.slipImage || selectedSlipModal.paymentSlip || selectedSlipModal.proofImage) ? (
-                <img
-                  src={selectedSlipModal.slipImage || selectedSlipModal.paymentSlip || selectedSlipModal.proofImage}
-                  alt={`หลักฐาน #${selectedSlipModal.id}`}
-                  className="w-full h-auto max-h-[480px] object-contain rounded-xl shadow-xs"
+                <img 
+                  src={selectedSlipModal.slipImage || selectedSlipModal.paymentSlip || selectedSlipModal.proofImage} 
+                  alt={`หลักฐาน #${selectedSlipModal.id}`} 
+                  className="w-full h-auto max-h-[480px] object-contain rounded-xl shadow-xs" 
                 />
               ) : (
                 <div className="w-full h-full p-6 flex flex-col items-center justify-center text-center bg-white rounded-xl border border-dashed border-slate-300">

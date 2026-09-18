@@ -95,7 +95,11 @@ export default function NewOrderPage() {
   const [pickupTime, setSelectedPickupTime] = useState(defaultPickup);
 
   const selectedPickupConfig = timeSlotsConfig.find(s => s.label === pickupTime);
-  const minDeliveryHour = selectedPickupConfig ? selectedPickupConfig.startHour + 2 : currentDecimalHour + 2;
+
+  // แก้ไข: ถ้าเลือกรอบรับผ้า 20:00 - 21:00 น. ให้รอบส่งผ้าเริ่มได้ตั้งแต่ 21:00 น.
+  const minDeliveryHour = selectedPickupConfig 
+    ? (selectedPickupConfig.startHour >= 20 ? 21 : selectedPickupConfig.startHour + 2) 
+    : currentDecimalHour + 2;
 
   const availableDeliverySlots = useMemo(() => {
     return deliveryTimeSlotsConfig.map(slot => ({
@@ -110,7 +114,9 @@ export default function NewOrderPage() {
   const handleSelectPickup = (slotLabel) => {
     setSelectedPickupTime(slotLabel);
     const chosenSlot = timeSlotsConfig.find(s => s.label === slotLabel);
-    const requiredMinDelivery = chosenSlot ? chosenSlot.startHour + 2 : 0;
+    const requiredMinDelivery = chosenSlot 
+      ? (chosenSlot.startHour >= 20 ? 21 : chosenSlot.startHour + 2) 
+      : 0;
     const currentDeliveryConfig = deliveryTimeSlotsConfig.find(s => s.label === deliveryTime);
 
     if (!currentDeliveryConfig || currentDeliveryConfig.startHour < requiredMinDelivery) {

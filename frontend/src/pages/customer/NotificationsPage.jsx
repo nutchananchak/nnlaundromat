@@ -23,7 +23,8 @@ export default function NotificationPage() {
   const { orders, userProfile } = useApp ? useApp() : {};
   const [notifications, setNotifications] = useState([]);
 
-  const currentUserId = userProfile?.phone || userProfile?.id || userProfile?.email;
+  // ดึง ID/เบอร์โทรของผู้ใช้ปัจจุบันเพื่อใช้แยกแยะ
+  const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
 
   const getThaiNow = () => {
     const now = new Date();
@@ -40,42 +41,32 @@ export default function NotificationPage() {
       stored = [];
     }
 
-    const newNotices = [...stored];
     const timestampNow = getThaiNow();
 
     const allOrders = orders && orders.length > 0 
       ? orders 
       : JSON.parse(localStorage.getItem('orders') || '[]');
 
+    // 1. คัดกรองเฉพาะออเดอร์ที่เป็นของ User ปัจจุบัน
     const myOrders = allOrders.filter(o => {
       if (!currentUserId) return true;
-      const orderOwner = o.customerPhone || o.userPhone || o.userId || o.customerId;
+      const orderOwner = String(o.customerPhone || o.userPhone || o.userId || o.customerId || '').trim();
       return orderOwner === currentUserId;
     });
 
+    const newNotices = [...stored];
+
+    // 2. สร้างแจ้งเตือนอัตโนมัติเฉพาะออเดอร์ของ User นี้เท่านั้น
     myOrders.forEach(o => {
       const step = Number(o.statusStep) || 1;
 
-      // 1. สลิปไม่ผ่าน
-      if (o.paymentRejected && !newNotices.some(n => n.uniqueKey === `slip_rejected_${o.id}`)) {
-        newNotices.unshift({
-          id: Date.now() + Math.random(),
-          uniqueKey: `slip_rejected_${o.id}`,
-          orderId: o.id,
-          title: 'สลิปการโอนเงินไม่ถูกต้อง',
-          message: `ออเดอร์ #${o.id} ไม่ผ่านการตรวจสอบ: "${o.rejectReason || 'ยอดเงินไม่ตรง หรือสลิปไม่ชัดเจน'}" กรุณาสแกน QR Code และแนบสลิปใหม่`,
-          time: o.rejectedAt || timestampNow,
-          type: 'slip_rejected',
-          isRead: false
-        });
-      }
-
-      // 2. ส่งผ้าสำเร็จ
+      // ส่งผ้าสำเร็จ
       if ((step >= 7 || o.status === 'completed') && !newNotices.some(n => n.uniqueKey === `completed_${o.id}`)) {
         newNotices.unshift({
           id: Date.now() + Math.random(),
           uniqueKey: `completed_${o.id}`,
           orderId: o.id,
+          userId: currentUserId,
           title: 'ส่งมอบผ้าสะอาดสำเร็จเรียบร้อย',
           message: `ออเดอร์ #${o.id} ได้รับการส่งมอบเรียบร้อยแล้ว แตะเพื่อดูใบเสร็จและรูปถ่ายหลักฐานการส่งมอบ`,
           time: o.deliveredAt || timestampNow,
@@ -84,12 +75,13 @@ export default function NotificationPage() {
         });
       }
 
-      // 3. ยกเลิกออเดอร์
+      // ยกเลิกออเดอร์
       if ((o.isCancelled || o.status === 'cancelled') && !newNotices.some(n => n.uniqueKey === `cancelled_${o.id}`)) {
         newNotices.unshift({
           id: Date.now() + Math.random(),
           uniqueKey: `cancelled_${o.id}`,
           orderId: o.id,
+          userId: currentUserId,
           title: 'คำสั่งซื้อถูกยกเลิกแล้ว',
           message: `ออเดอร์ #${o.id} ถูกยกเลิกเรียบร้อยแล้ว (${o.cancelReason || 'ตามคำขอของลูกค้า'}) หากชำระเงินแล้วสามารถส่งสลิปเพื่อขอรับเงินคืนทาง LINE Official`,
           time: o.cancelledAt || timestampNow,
@@ -98,40 +90,28 @@ export default function NotificationPage() {
         });
       }
 
-      // 4. สลิปอนุมัติ
-      if (step >= 2 && !o.paymentRejected && !newNotices.some(n => n.uniqueKey === `payment_verified_${o.id}`)) {
-        newNotices.unshift({
-          id: Date.now() + Math.random(),
-          uniqueKey: `payment_verified_${o.id}`,
-          orderId: o.id,
-          title: 'สลิปได้รับการอนุมัติเรียบร้อย',
-          message: `ออเดอร์ #${o.id} ยอดเงินถูกต้อง ทางร้านได้จัดสรรไรเดอร์เตรียมเข้ารับผ้าตามรอบเวลาของท่าน`,
-          time: o.verifiedAt || timestampNow,
-          type: 'info',
-          isRead: false
-        });
-      }
-
-      // 5. ไรเดอร์รับผ้าเข้าสู่ร้าน
+      // ไรเดอร์รับผ้าเข้าสู่ร้าน
       if (step >= 4 && !newNotices.some(n => n.uniqueKey === `picked_up_${o.id}`)) {
         newNotices.unshift({
           id: Date.now() + Math.random(),
           uniqueKey: `picked_up_${o.id}`,
           orderId: o.id,
-          title: 'ไรเดอร์รับผ้าเข้าสู่ร้านแล้ว',
-          message: `ผ้าของออเดอร์ #${o.id} ถูกจัดส่งถึงร้าน N&N Laundromat แผนกซักอบเรียบร้อยแล้ว`,
+          userId: currentUserId,
+          title: 'ไรเดอร์รับผ้าเรียบร้อยแล้ว',
+          message: `ผ้าของออเดอร์ #${o.id} กำลังนำส่งร้าน N&N Laundromat`,
           time: o.pickedUpAt || timestampNow,
           type: 'progress',
           isRead: false
         });
       }
 
-      // 6. กำลังนำส่งคืน
+      // กำลังนำส่งคืน
       if (step >= 6 && step < 7 && !newNotices.some(n => n.uniqueKey === `delivering_${o.id}`)) {
         newNotices.unshift({
           id: Date.now() + Math.random(),
           uniqueKey: `delivering_${o.id}`,
           orderId: o.id,
+          userId: currentUserId,
           title: 'ผ้าซักอบเสร็จแล้ว กำลังนำส่งคืน',
           message: `ออเดอร์ #${o.id} ดำเนินการเรียบร้อย ไรเดอร์กำลังเดินทางนำผ้าสะอาดไปส่งคืนให้ท่าน`,
           time: o.deliveringAt || timestampNow,
@@ -141,7 +121,7 @@ export default function NotificationPage() {
       }
     });
 
-    // ดักจับร้านปิดฉุกเฉิน
+    // ประกาศร้านปิดฉุกเฉิน (แสดงทุกคน)
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
     const isStoreClosedByAdmin = savedStoreStatus !== null && JSON.parse(savedStoreStatus) === false;
 
@@ -157,7 +137,7 @@ export default function NotificationPage() {
       });
     }
 
-    // แจ้งเตือนวันหยุดล่วงหน้า 1 วัน
+    // แจ้งเตือนวันหยุดบริการล่วงหน้า (แสดงทุกคน)
     try {
       const closedDates = JSON.parse(localStorage.getItem('closedDates') || '[]');
       const tomorrow = new Date();
@@ -179,25 +159,44 @@ export default function NotificationPage() {
       // Skip
     }
 
-    setNotifications(newNotices);
+    // 3. กรองแสดงเฉพาะข้อความของ User ปัจจุบัน หรือข้อความส่วนกลาง (ไม่มี userId)
+    const filteredForCurrentUser = newNotices.filter(n => {
+      if (!n.userId && !n.customerPhone) return true; // ข้อความประกาศทั่วไป
+      const owner = String(n.userId || n.customerPhone).trim();
+      return owner === currentUserId;
+    });
+
+    setNotifications(filteredForCurrentUser);
     localStorage.setItem('customerNotifications', JSON.stringify(newNotices));
   }, [orders, currentUserId]);
 
   const handleDeleteItem = (e, targetId) => {
     e.stopPropagation();
-    const remaining = notifications.filter(n => n.id !== targetId);
-    setNotifications(remaining);
-    localStorage.setItem('customerNotifications', JSON.stringify(remaining));
+    try {
+      const fullList = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+      const remainingFull = fullList.filter(n => n.id !== targetId);
+      localStorage.setItem('customerNotifications', JSON.stringify(remainingFull));
+    } catch (err) {}
+
+    setNotifications(prev => prev.filter(n => n.id !== targetId));
   };
 
   const handleClearAll = () => {
     if (window.confirm('คุณต้องการลบข้อความแจ้งเตือนทั้งหมดหรือไม่?')) {
-      localStorage.setItem('customerNotifications', JSON.stringify([]));
+      try {
+        const fullList = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+        // ลบเฉพาะของตัวเอง ข้อความของ User อื่นยังคงอยู่
+        const keepOthers = fullList.filter(n => {
+          const owner = String(n.userId || n.customerPhone || '').trim();
+          return owner && owner !== currentUserId;
+        });
+        localStorage.setItem('customerNotifications', JSON.stringify(keepOthers));
+      } catch (err) {}
+
       setNotifications([]);
     }
   };
 
-  // ✅ ฟังก์ชันตรวจว่าเป็นการส่งมอบผ้าสำเร็จหรือไม่ (ดักครอบคลุมทุกคีย์เวิร์ด)
   const isDeliverySuccessNotice = (item) => {
     const title = String(item.title || '');
     const msg = String(item.message || '');
@@ -214,33 +213,43 @@ export default function NotificationPage() {
     );
   };
 
-  // ✅ ฟังก์ชันตรวจว่าเรื่องสลิปไม่ผ่านหรือไม่
   const isSlipRejectedNotice = (item) => {
     const title = String(item.title || '');
     return item.type === 'slip_rejected' || (title.includes('สลิป') && title.includes('ไม่ถูกต้อง'));
   };
 
-  // ✅ จัดการการกดที่การ์ด: เข้าได้แน่นอน 100%
+  // แตะการ์ดแจ้งเตือน: นำทางไปหน้าเป้าหมาย
   const handleCardClick = (item) => {
-    // 1. มาร์กว่าอ่านแล้ว
     if (!item.isRead) {
-      const updated = notifications.map(n => n.id === item.id ? { ...n, isRead: true } : n);
-      setNotifications(updated);
-      localStorage.setItem('customerNotifications', JSON.stringify(updated));
+      const updatedLocal = notifications.map(n => n.id === item.id ? { ...n, isRead: true } : n);
+      setNotifications(updatedLocal);
+
+      try {
+        const fullList = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+        const updatedFull = fullList.map(n => n.id === item.id ? { ...n, isRead: true } : n);
+        localStorage.setItem('customerNotifications', JSON.stringify(updatedFull));
+      } catch (err) {}
     }
 
-    // ดึง Order ID (ถ้าไม่มีใน field ให้แกะจากข้อความ เช่น #NN-1234)
     let targetOrderId = item.orderId;
     if (!targetOrderId && item.message) {
       const match = String(item.message).match(/#([a-zA-Z0-9_-]+)/);
       if (match) targetOrderId = match[1];
     }
 
-    // 2. ตรวจ Action เพื่อนำทาง
-    if (isSlipRejectedNotice(item) && targetOrderId) {
-      navigate(`/orders/${targetOrderId}`, { state: { retryPayment: true } });
+    const allOrders = orders && orders.length > 0 
+      ? orders 
+      : JSON.parse(localStorage.getItem('orders') || '[]');
+    const targetOrder = allOrders.find(o => String(o.id) === String(targetOrderId));
+
+    // สลิปไม่ผ่าน: ตรงไปหน้า /order/payment เพื่อแนบใหม่
+    if (isSlipRejectedNotice(item)) {
+      if (targetOrder) {
+        navigate('/order/payment', { state: { order: targetOrder, isRetry: true } });
+      } else {
+        navigate('/home');
+      }
     } else if (isDeliverySuccessNotice(item) && targetOrderId) {
-      // พาไปหน้าใบเสร็จ พร้อมเปิด Modal ดูรูปถ่ายหลักฐานส่งมอบทันที!
       navigate(`/orders/${targetOrderId}`, { state: { openProof: true } });
     }
   };
@@ -294,7 +303,7 @@ export default function NotificationPage() {
           )}
         </div>
 
-        {/* เนื้อหารายการแจ้งเตือน */}
+        {/* รายการแจ้งเตือน */}
         <div className="flex-1 overflow-y-auto p-4 pb-28 flex flex-col gap-3">
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-28 text-center text-slate-400 gap-3">
@@ -317,7 +326,6 @@ export default function NotificationPage() {
               const isProgress = item.type === 'progress';
               const isUnread = !item.isRead;
 
-              // สามารถกดได้เฉพาะ 2 สถานะนี้เท่านั้น
               const canClick = isRejected || isDeliverySuccess;
 
               return (
@@ -332,12 +340,10 @@ export default function NotificationPage() {
                       : 'bg-white border-slate-200'
                   }`}
                 >
-                  {/* จุด Dot เมื่อยังไม่ได้อ่าน */}
                   {isUnread && (
                     <span className="absolute top-4 right-11 w-2 h-2 rounded-full bg-[#1d61f2] ring-4 ring-blue-100" />
                   )}
 
-                  {/* ไอคอนจำแนกประเภท */}
                   <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5 shadow-2xs ${
                     isRejected || isAlert
                       ? 'bg-red-500 text-white'
@@ -351,7 +357,7 @@ export default function NotificationPage() {
                       ? 'bg-[#1d61f2] text-white'
                       : isProgress
                       ? 'bg-blue-600 text-white'
-                      : 'bg-emerald-600 text-white' // สลิปอนุมัติเป็นไอคอนสีเขียว
+                      : 'bg-emerald-600 text-white'
                   }`}>
                     {isRejected && <QrCode size={20} />}
                     {!isRejected && isAlert && <AlertTriangle size={20} />}
@@ -363,7 +369,6 @@ export default function NotificationPage() {
                     {!isRejected && !isAlert && !isCancel && !isDeliverySuccess && !isWarning && !isDelivering && !isProgress && <CheckCircle2 size={20} />}
                   </div>
 
-                  {/* ข้อมูลเนื้อหา */}
                   <div className="flex-1 min-w-0 pr-7">
                     <div className="flex items-center justify-between gap-1">
                       <h4 className={`text-xs font-bold truncate ${
@@ -382,10 +387,9 @@ export default function NotificationPage() {
                         <Clock size={11} /> {item.time}
                       </span>
 
-                      {/* แสดงปุ่มลิงก์เฉพาะ 2 กรณีที่ต้องกดจริงเท่านั้น */}
                       {isRejected && (
                         <span className="text-[10.5px] font-bold text-red-600 flex items-center gap-0.5">
-                          แตะเพื่อสแกน QR ใหม่ <ChevronRight size={12} />
+                          แตะเพื่อสแกน QR และส่งสลิปใหม่ <ChevronRight size={12} />
                         </span>
                       )}
 
@@ -397,7 +401,6 @@ export default function NotificationPage() {
                     </div>
                   </div>
 
-                  {/* ปุ่มลบเฉพาะรายการ */}
                   <button
                     type="button"
                     onClick={(e) => handleDeleteItem(e, item.id)}

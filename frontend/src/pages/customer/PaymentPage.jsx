@@ -13,22 +13,26 @@ import {
   ShoppingBag,
   Clock,
   User,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export default function PaymentPage() {
   const navigate = useNavigate();
   const location = useLocation() || {};
-  const { userProfile, orders, setOrders } = useApp();
+  const { userProfile, orders, setOrders } = useApp ? useApp() : {};
 
   const customerName = userProfile?.fullName || userProfile?.name || 'คุณลูกค้า';
   const customerPhone = userProfile?.phone || '';
 
-  // ดึงข้อมูลจริงจาก State ที่ NewOrderPage ส่งมา
+  // ตรวจสอบว่ามาจากการกด "แนบสลิปใหม่" หรือสร้างออเดอร์ใหม่
   const orderData = location.state?.order;
+  const isRetry = Boolean(location.state?.isRetry || orderData?.paymentRejected);
 
-  // ตรวจสอบความถูกต้อง หากไม่มีข้อมูลจริงส่งมา ให้พากลับไปหน้าสร้างออเดอร์
+  // คำนวณยอดเงินให้ถูกต้องทั้งเคส order ใหม่และเคส retry
+  const payableAmount = orderData ? (orderData.totalPrice || orderData.price || 0) : 0;
+
   useEffect(() => {
     if (!orderData) {
       navigate('/order/new', { replace: true });
@@ -53,9 +57,9 @@ export default function PaymentPage() {
     accountName: 'บริษัท เอ็นแอนด์เอ็น ลอนดรอแมท จำกัด',
   };
 
-  // สร้าง QR Code จากยอดเงินและรหัสออเดอร์จริง
+  // สร้าง QR Code จากยอดเงินและรหัสออเดอร์
   const qrCodeUrl = orderData 
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${orderData.totalPrice}THB`
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`
     : '';
 
   const handleCopyAccount = () => {
@@ -97,60 +101,106 @@ export default function PaymentPage() {
     setIsSubmitting(true);
 
     setTimeout(() => {
-      // บันทึกออเดอร์จริงเข้าสู่ระบบ
-      const newOrder = {
-        id: orderData.id,
-        customerName: orderData.customerName || customerName,
-        customerPhone: orderData.customerPhone || customerPhone,
-        status: 'in_progress',
-        statusStep: 1,
-        statusTitle: 'ตรวจสอบยอดเงิน',
-        estimatedTime: 'รอเจ้าหน้าที่ยืนยันยอดเงิน',
-        serviceName: orderData.serviceName,
-        packageName: orderData.packageName,
-        specialItems: orderData.specialItems || [],
-        plasticBagCount: orderData.plasticBagCount || 0,
-        price: orderData.totalPrice,
-        createdAt: orderData.createdAt,
-        pickupTime: orderData.pickupTime,
-        deliveryTime: orderData.deliveryTime,
-        address: orderData.address,
-        lat: orderData.lat,
-        lng: orderData.lng,
-        basketImage: orderData.basketImage || null,
-        note: orderData.note || 'ไม่มีหมายเหตุเพิ่มเติม',
-        paymentStatus: 'รอตรวจสอบยอด',
-        slipImage: slipImage,
-        rider: {
-          name: 'กำลังจัดสรรไรเดอร์',
-          phone: '-',
-          vehicle: '-'
-        },
-        stepsHistory: [
-          { title: 'สั่งบริการเรียบร้อย', time: 'เมื่อสักครู่', done: true },
-          { title: 'ตรวจสอบยอดเงิน', time: 'กำลังตรวจสอบ', done: true, current: true },
-          { title: 'ไรเดอร์รับงาน', time: 'รอดำเนินการ', done: false },
-          { title: 'รับผ้าเข้าสู่ร้าน', time: 'รอดำเนินการ', done: false },
-          { title: 'กำลังดำเนินการซัก-อบ', time: 'รอดำเนินการ', done: false },
-          { title: 'ไรเดอร์นำส่งคืน', time: 'รอดำเนินการ', done: false },
-          { title: 'ส่งมอบผ้าสำเร็จ', time: 'รอดำเนินการ', done: false },
-        ]
-      };
+      const existingOrders = orders && orders.length > 0
+        ? orders
+        : JSON.parse(localStorage.getItem('orders') || '[]');
 
-      const existingOrders = orders || [];
-      const updatedOrders = [newOrder, ...existingOrders.filter(o => o.id !== newOrder.id)];
-      
-      setOrders(updatedOrders);
-      localStorage.setItem('orders', JSON.stringify(updatedOrders));
+      if (isRetry) {
+        // ==========================================
+        // 1. กรณี: ส่งสลิปใหม่เพื่อให้อนุมัติใหม่ (Retry Flow)
+        // ==========================================
+        const updatedOrders = existingOrders.map(o => {
+          if (String(o.id) === String(orderData.id)) {
+            return {
+              ...o,
+              slipImage: slipImage,
+              paymentSlip: slipImage,
+              paymentRejected: false, // ปลดสถานะปฏิเสธ
+              rejectReason: null,
+              statusStep: 1,
+              statusTitle: 'ตรวจสอบยอดเงิน (ส่งสลิปใหม่แล้ว)',
+              paymentStatus: 'รอตรวจสอบยอดใหม่',
+              stepsHistory: (o.stepsHistory || []).map(step => 
+                step.title === 'ตรวจสอบยอดเงิน' ? { ...step, time: 'กำลังตรวจสอบสลิปใหม่', current: true, done: true } : step
+              )
+            };
+          }
+          return o;
+        });
+
+        if (setOrders) setOrders(updatedOrders);
+        localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+        // เคลียร์การแจ้งเตือนสลิปปฏิเสธเดิมออกจาก customerNotifications
+        try {
+          const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+          const filteredNotices = currentNotices.filter(n => 
+            !(String(n.orderId) === String(orderData.id) && (n.type === 'slip_rejected' || n.type === 'alert'))
+          );
+          localStorage.setItem('customerNotifications', JSON.stringify(filteredNotices));
+        } catch (err) {
+          console.error(err);
+        }
+
+      } else {
+        // ==========================================
+        // 2. กรณี: สร้างออเดอร์ใหม่ครั้งแรก (New Order Flow)
+        // ==========================================
+        const newOrder = {
+          id: orderData.id,
+          customerName: orderData.customerName || customerName,
+          customerPhone: orderData.customerPhone || customerPhone,
+          status: 'in_progress',
+          statusStep: 1,
+          statusTitle: 'ตรวจสอบยอดเงิน',
+          estimatedTime: 'รอเจ้าหน้าที่ยืนยันยอดเงิน',
+          serviceName: orderData.serviceName,
+          packageName: orderData.packageName,
+          specialItems: orderData.specialItems || [],
+          plasticBagCount: orderData.plasticBagCount || 0,
+          plasticBagPrice: orderData.plasticBagPrice || 0,
+          price: payableAmount,
+          totalPrice: payableAmount,
+          createdAt: orderData.createdAt,
+          pickupTime: orderData.pickupTime,
+          deliveryTime: orderData.deliveryTime,
+          address: orderData.address,
+          lat: orderData.lat,
+          lng: orderData.lng,
+          basketImage: orderData.basketImage || null,
+          note: orderData.note || 'ไม่มีหมายเหตุเพิ่มเติม',
+          paymentStatus: 'รอตรวจสอบยอด',
+          slipImage: slipImage,
+          paymentSlip: slipImage,
+          paymentRejected: false,
+          rejectReason: null,
+          rider: {
+            name: 'กำลังจัดสรรไรเดอร์',
+            phone: '-',
+            vehicle: '-'
+          },
+          stepsHistory: [
+            { title: 'สั่งบริการเรียบร้อย', time: 'เมื่อสักครู่', done: true },
+            { title: 'ตรวจสอบยอดเงิน', time: 'กำลังตรวจสอบ', done: true, current: true },
+            { title: 'ไรเดอร์รับงาน', time: 'รอดำเนินการ', done: false },
+            { title: 'รับผ้าเข้าสู่ร้าน', time: 'รอดำเนินการ', done: false },
+            { title: 'กำลังดำเนินการซัก-อบ', time: 'รอดำเนินการ', done: false },
+            { title: 'ไรเดอร์นำส่งคืน', time: 'รอดำเนินการ', done: false },
+            { title: 'ส่งมอบผ้าสำเร็จ', time: 'รอดำเนินการ', done: false },
+          ]
+        };
+
+        const updatedOrders = [newOrder, ...existingOrders.filter(o => String(o.id) !== String(newOrder.id))];
+        if (setOrders) setOrders(updatedOrders);
+        localStorage.setItem('orders', JSON.stringify(updatedOrders));
+      }
 
       setIsSubmitting(false);
       setIsSuccessModalOpen(true);
     }, 800);
   };
 
-  if (!orderData) {
-    return null;
-  }
+  if (!orderData) return null;
 
   return (
     <div style={{
@@ -191,14 +241,24 @@ export default function PaymentPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="font-bold text-white text-xl leading-tight tracking-tight">ชำระเงิน</h1>
+            <h1 className="font-bold text-white text-xl leading-tight tracking-tight">
+              {isRetry ? 'ส่งสลิปชำระเงินใหม่' : 'ชำระเงิน'}
+            </h1>
           </div>
         </div>
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6 pb-36 flex flex-col gap-5">
+
+          {/* ป้ายเตือนกรณีเข้ามาส่งสลิปใหม่ */}
+          {isRetry && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-800 text-xs font-semibold shadow-2xs animate-in fade-in duration-200">
+              <RotateCcw size={18} className="text-amber-600 shrink-0" />
+              <span>โปรดสแกน QR Code เพื่อโอนเงินยอดเดิม และแนบรูปสลิปที่ถูกต้องเพื่อส่งให้ร้านตรวจสอบใหม่อีกครั้ง</span>
+            </div>
+          )}
           
-          {/* ส่วนสรุปคำสั่งซื้อ (ตัวหนังสือสีดำชัดเจน) */}
+          {/* ส่วนสรุปคำสั่งซื้อ */}
           <div className="bg-white p-4.5 rounded-3xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
               <span className="font-bold text-slate-900 text-sm">สรุปคำสั่งซื้อ</span>
@@ -243,7 +303,7 @@ export default function PaymentPage() {
               {orderData.plasticBagCount > 0 && (
                 <div className="flex justify-between items-center text-[11.5px]">
                   <span className="text-slate-500 font-medium">ถุงพลาสติกใส่ผ้า</span>
-                  <span className="text-slate-900 font-bold">{orderData.plasticBagCount} ใบ (+{orderData.plasticBagPrice}฿)</span>
+                  <span className="text-slate-900 font-bold">{orderData.plasticBagCount} ใบ (+{orderData.plasticBagPrice || orderData.plasticBagCount * 5}฿)</span>
                 </div>
               )}
 
@@ -362,8 +422,10 @@ export default function PaymentPage() {
 
           {/* แนบสลิป */}
           <div>
-            <label className="block text-sm font-bold text-slate-900 mb-1">แนบสลิปหลักฐานการโอนเงิน</label>
-            <p className="text-xs text-slate-500 mb-2.5">กรุณาแนบภาพสลิปเพื่อส่งให้ทางร้านตรวจสอบยอดเงิน</p>
+            <label className="block text-sm font-bold text-slate-900 mb-1">
+              {isRetry ? 'แนบสลิปใหม่ที่ถูกต้อง' : 'แนบสลิปหลักฐานการโอนเงิน'}
+            </label>
+            <p className="text-xs text-slate-500 mb-2.5">กรุณาแนบภาพสลิปเพื่อให้ทางร้านตรวจสอบยอดเงิน</p>
             
             <label className="border-2 border-dashed border-slate-200 rounded-3xl p-5 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-[#1d61f2] transition group min-h-[220px]">
               {slipImage ? (
@@ -397,7 +459,7 @@ export default function PaymentPage() {
 
         </div>
 
-        {/* ส่วนสรุปราคาและปุ่มยืนยัน (ตัวเลขยอดชำระเป็นสีน้ำเงิน #1d61f2) */}
+        {/* ส่วนสรุปราคาและปุ่มยืนยัน */}
         <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3.5 shadow-[0_-6px_20px_rgba(0,0,0,0.08)] flex flex-col gap-2.5 z-30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-slate-600">
@@ -405,7 +467,7 @@ export default function PaymentPage() {
               <span className="text-xs font-semibold text-slate-700">ยอดที่ต้องชำระ</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="font-bold text-2xl text-[#1d61f2]">{orderData.totalPrice}</span>
+              <span className="font-bold text-2xl text-[#1d61f2]">{payableAmount}</span>
               <span className="text-xs font-bold text-gray-500">บาท</span>
             </div>
           </div>
@@ -417,7 +479,11 @@ export default function PaymentPage() {
             className="w-full py-3.5 rounded-xl bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <FileCheck2 size={18} />
-            {isSubmitting ? 'กำลังส่งหลักฐาน...' : 'ส่งหลักฐานการโอนเงิน'}
+            {isSubmitting 
+              ? 'กำลังส่งหลักฐาน...' 
+              : isRetry 
+              ? 'ส่งสลิปใหม่เพื่อตรวจสอบอีกครั้ง' 
+              : 'ส่งหลักฐานการโอนเงิน'}
           </button>
         </div>
 
@@ -428,9 +494,13 @@ export default function PaymentPage() {
               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-[#1d61f2] mb-3">
                 <Clock size={34} className="animate-pulse" />
               </div>
-              <h3 className="font-bold text-lg text-slate-900 mb-1">ส่งหลักฐานเรียบร้อยแล้ว</h3>
+              <h3 className="font-bold text-lg text-slate-900 mb-1">
+                {isRetry ? 'ส่งสลิปใหม่เรียบร้อยแล้ว' : 'ส่งหลักฐานเรียบร้อยแล้ว'}
+              </h3>
               <p className="text-xs text-slate-500 leading-relaxed mb-6 font-medium">
-                สลิปของคุณถูกส่งไปยังเจ้าหน้าที่เพื่อตรวจสอบยอดเงิน เมื่อผ่านการตรวจสอบ ไรเดอร์จะเข้ารับผ้าตามรอบเวลาที่คุณเลือก
+                {isRetry
+                  ? 'สลิปใหม่ของคุณถูกส่งไปยังเจ้าหน้าที่แล้ว ระบบจะเร่งตรวจสอบยอดเงินและจัดสรรไรเดอร์ให้โดยเร็ว'
+                  : 'สลิปของคุณถูกส่งไปยังเจ้าหน้าที่เพื่อตรวจสอบยอดเงิน เมื่อผ่านการตรวจสอบ ไรเดอร์จะเข้ารับผ้าตามรอบเวลาที่คุณเลือก'}
               </p>
               <button
                 type="button"

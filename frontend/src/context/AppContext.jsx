@@ -3,27 +3,29 @@ import { createContext, useContext, useState, useEffect } from 'react';
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
-  // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer) ดึงจากผู้ใช้ที่ล็อกอินจริงเท่านั้น
+  // 1. ข้อมูลผู้ใช้ฝั่งลูกค้า (Customer)
   const [userProfile, setUserProfile] = useState(() => {
     try {
       const savedUser = localStorage.getItem('currentUser');
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
         return {
+          id: parsed.phone || parsed.id || '',
           name: parsed.fullName || parsed.name || '',
           fullName: parsed.fullName || parsed.name || '',
           phone: parsed.phone || '',
           avatar: parsed.avatar || null,
         };
       }
-    } catch (e) {
-      // JSON parse error handling
-    }
+    } catch (e) {}
     return null;
   });
 
+  const userKey = userProfile?.phone || userProfile?.id || 'guest';
+
   const loginUser = (userData) => {
     const formattedUser = {
+      id: userData.phone || userData.id || '',
       name: userData.fullName || userData.name || '',
       fullName: userData.fullName || userData.name || '',
       phone: userData.phone || '',
@@ -37,6 +39,8 @@ export function AppProvider({ children }) {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('userProfile');
     setUserProfile(null);
+    setAddresses([]);
+    setSelectedAddressId(null);
   };
 
   // 2. ข้อมูลพนักงานรับ-ส่งผ้า (Rider Session)
@@ -57,88 +61,80 @@ export function AppProvider({ children }) {
   const logoutRider = () => {
     setCurrentRider(null);
     localStorage.removeItem('currentRider');
-    localStorage.removeItem('rememberRider');
   };
 
-  // 3. หมุดที่อยู่ลูกค้า (เริ่มต้นเป็น Array ว่างเปล่า 100% ถ้ายังไม่มีการปักหมุด)
-  const [addresses, setAddresses] = useState(() => {
-    try {
-      const saved = localStorage.getItem('addresses');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // คัดกรองเอา Mock data เก่าที่เคยบันทึกไว้ออก
-        return parsed.filter(a => 
-          !a.detail?.includes('ปิยมนต์') && 
-          !a.detail?.includes('ลุมพินี') &&
-          a.id !== 'addr-1' &&
-          a.id !== 'addr-2'
-        );
-      }
-    } catch (e) {
-      // JSON parse error handling
-    }
-    return []; // ค่าเริ่มต้นว่างเปล่า ไม่มีการใส่ที่อยู่จำลอง
-  });
+  // 3. หมุดที่อยู่ลูกค้า: แยก Storage Key ตามผู้ใช้คนนั้นๆ
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
 
-  // รหัสหมุดที่อยู่เริ่มต้นที่เลือกใช้งาน
-  const [selectedAddressId, setSelectedAddressId] = useState(() => {
-    return localStorage.getItem('selectedAddressId') || null;
-  });
-
-  // ซิงค์ addresses และ selectedAddressId ลง localStorage
+  // ดึงที่อยู่เฉพาะของ User เมื่อสลับบัญชีหรือล็อกอิน
   useEffect(() => {
-    try {
-      localStorage.setItem('addresses', JSON.stringify(addresses));
+    if (!userProfile?.phone && !userProfile?.id) {
+      setAddresses([]);
+      setSelectedAddressId(null);
+      return;
+    }
 
-      if (addresses.length > 0) {
-        const hasSelected = addresses.some(a => a.id === selectedAddressId);
-        if (!hasSelected) {
-          const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
-          setSelectedAddressId(defaultAddr.id);
-          localStorage.setItem('selectedAddressId', defaultAddr.id);
-        }
+    const currentKey = `addresses_${userProfile.phone || userProfile.id}`;
+    const currentSelectKey = `selectedAddressId_${userProfile.phone || userProfile.id}`;
+
+    try {
+      const saved = localStorage.getItem(currentKey);
+      const parsed = saved ? JSON.parse(saved) : [];
+      setAddresses(parsed);
+
+      const savedSelected = localStorage.getItem(currentSelectKey);
+      if (savedSelected && parsed.some(a => a.id === savedSelected)) {
+        setSelectedAddressId(savedSelected);
+      } else if (parsed.length > 0) {
+        const def = parsed.find(a => a.isDefault) || parsed[0];
+        setSelectedAddressId(def.id);
       } else {
         setSelectedAddressId(null);
-        localStorage.removeItem('selectedAddressId');
       }
     } catch (e) {
-      // Storage error handling
+      setAddresses([]);
+      setSelectedAddressId(null);
     }
-  }, [addresses, selectedAddressId]);
+  }, [userProfile?.phone, userProfile?.id]);
 
-  // 4. รายการออเดอร์ (ล้าง Mock Data ทิ้งทั้งหมด เริ่มต้นเป็น Array ว่างเปล่า)
+  // ซิงค์ที่อยู่ลง localStorage แยกตาม Key ของ User นั้นๆ
+  const updateAddressesForUser = (newList) => {
+    if (!userProfile?.phone && !userProfile?.id) return;
+    const currentKey = `addresses_${userProfile.phone || userProfile.id}`;
+    setAddresses(newList);
+    localStorage.setItem(currentKey, JSON.stringify(newList));
+  };
+
+  const updateSelectedAddressIdForUser = (newId) => {
+    if (!userProfile?.phone && !userProfile?.id) return;
+    const currentSelectKey = `selectedAddressId_${userProfile.phone || userProfile.id}`;
+    setSelectedAddressId(newId);
+    if (newId) {
+      localStorage.setItem(currentSelectKey, newId);
+    } else {
+      localStorage.removeItem(currentSelectKey);
+    }
+  };
+
+  // 4. รายการออเดอร์
   const [orders, setOrders] = useState(() => {
     try {
       const savedOrders = localStorage.getItem('orders');
       if (savedOrders) {
-        const parsed = JSON.parse(savedOrders);
-        return parsed.filter(o => 
-          o.customerName !== 'ลูกค้าทั่วไป' && 
-          o.id !== 'NN-1024' && 
-          o.id !== 'NN-739182'
-        );
+        return JSON.parse(savedOrders);
       }
-    } catch (e) {
-      // JSON parse error handling
-    }
+    } catch (e) {}
     return [];
   });
 
   useEffect(() => {
     try {
       localStorage.setItem('orders', JSON.stringify(orders));
-    } catch (e) {
-      // Storage error handling
-    }
+    } catch (e) {}
   }, [orders]);
 
-  // ค้นหาออเดอร์ที่กำลังดำเนินงานจริง
-  const activeOrder = orders.find(o => 
-    o.status === 'in_progress' || 
-    (Number(o.statusStep) >= 1 && Number(o.statusStep) < 7)
-  );
-
-  // ดึงที่อยู่ที่เลือกใช้งานจริง (ถ้ายังไม่มีการปักหมุด จะได้ค่า null ทันที)
+  // ดึงที่อยู่ที่เลือกใช้งานจริง
   const currentAddress = addresses.length > 0 
     ? (addresses.find(a => a.id === selectedAddressId) || addresses[0]) 
     : null;
@@ -153,13 +149,12 @@ export function AppProvider({ children }) {
       loginRider,
       logoutRider,
       addresses,
-      setAddresses,
+      setAddresses: updateAddressesForUser,
       selectedAddressId,
-      setSelectedAddressId,
+      setSelectedAddressId: updateSelectedAddressIdForUser,
       currentAddress,
       orders,
-      setOrders,
-      activeOrder
+      setOrders
     }}>
       {children}
     </AppContext.Provider>

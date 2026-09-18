@@ -8,7 +8,7 @@ import {
   AlertCircle, 
   LogOut, 
   ChevronRight, 
-  ChevronDown,
+  ChevronDown, 
   X, 
   Check, 
   ShieldCheck, 
@@ -16,13 +16,13 @@ import {
   Plus, 
   Trash2, 
   Navigation, 
-  LocateFixed,
-  Search,
-  Layers,
-  Loader2,
-  KeyRound,
-  CheckCircle2,
-  AlertTriangle
+  LocateFixed, 
+  Search, 
+  Layers, 
+  Loader2, 
+  KeyRound, 
+  CheckCircle2, 
+  AlertTriangle 
 } from 'lucide-react';
 import { 
   GoogleMap, 
@@ -34,7 +34,7 @@ import { useApp } from '../../context/AppContext';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-// 📍 พิกัดร้าน N&N Laundromat (ตรงข้ามอ่อนนุช 25)
+// พิกัดร้าน N&N Laundromat
 const STORE_COORDS = { lat: 13.709648150061998, lng: 100.62401489583843 };
 const MAX_DELIVERY_RADIUS_KM = 3.0;
 
@@ -63,6 +63,8 @@ export default function ProfilePage() {
     setSelectedAddressId, 
     logoutUser 
   } = useApp();
+
+  const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
 
   // Toast Notification State
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -98,30 +100,6 @@ export default function ProfilePage() {
     }
     return () => clearInterval(timer);
   }, [otpStep, otpCountdown]);
-
-  // โหลดที่อยู่จาก localStorage
-  useEffect(() => {
-    const savedAddresses = localStorage.getItem('nn_customer_addresses');
-    if (savedAddresses) {
-      try {
-        const parsed = JSON.parse(savedAddresses);
-        if (Array.isArray(parsed) && parsed.length > 0 && (!addresses || addresses.length === 0)) {
-          setAddresses(parsed);
-          const defaultAddr = parsed.find(a => a.isDefault) || parsed[0];
-          if (setSelectedAddressId) {
-            setSelectedAddressId(defaultAddr.id);
-          }
-        }
-      } catch (e) {
-        console.error('Error parsing stored addresses', e);
-      }
-    }
-  }, []);
-
-  const updateAndPersistAddresses = (newList) => {
-    setAddresses(newList);
-    localStorage.setItem('nn_customer_addresses', JSON.stringify(newList));
-  };
 
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState(null);
@@ -388,7 +366,7 @@ export default function ProfilePage() {
         lng: addressCoords.lng,
         distanceKm: distanceFromStore.toFixed(2)
       } : a);
-      updateAndPersistAddresses(updatedList);
+      setAddresses(updatedList);
       showToast('อัปเดตตำแหน่งที่อยู่เรียบร้อยแล้ว');
     } else {
       const isFirst = currentList.length === 0;
@@ -403,7 +381,7 @@ export default function ProfilePage() {
         isDefault: isFirst
       };
       const updatedList = [...currentList, newAddr];
-      updateAndPersistAddresses(updatedList);
+      setAddresses(updatedList);
       if (isFirst && setSelectedAddressId) {
         setSelectedAddressId(newAddrId);
       }
@@ -420,7 +398,7 @@ export default function ProfilePage() {
       ...a,
       isDefault: a.id === id
     }));
-    updateAndPersistAddresses(updatedList);
+    setAddresses(updatedList);
     showToast('ตั้งเป็นที่อยู่หลักเรียบร้อย');
   };
 
@@ -433,7 +411,7 @@ export default function ProfilePage() {
           setSelectedAddressId(remaining[0].id);
         }
       }
-      updateAndPersistAddresses(remaining);
+      setAddresses(remaining);
       showToast('ลบที่อยู่เรียบร้อยแล้ว');
     }
   };
@@ -492,6 +470,7 @@ export default function ProfilePage() {
   const finalizeProfileUpdate = (name, phone) => {
     const updatedUser = {
       ...userProfile,
+      id: phone,
       name: name,
       fullName: name,
       phone: phone
@@ -504,7 +483,7 @@ export default function ProfilePage() {
     showToast('บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว');
   };
 
-  // รายงานปัญหา ส่งตรงไปที่ระบบ Admin
+  // ส่งเรื่องร้องเรียนโดยผูก userId/เบอร์โทรศัพท์ของลูกค้ากำกับชัดเจน
   const handleSubmitReport = (e) => {
     e.preventDefault();
     if (!reportDetail.trim()) {
@@ -525,7 +504,8 @@ export default function ProfilePage() {
 
     const newReport = {
       id: 'REP-' + Date.now(),
-      customerId: userProfile?.id || userProfile?.phone || 'CUST',
+      userId: currentUserId,
+      customerId: currentUserId,
       customerName: userProfile?.fullName || userProfile?.name || 'ลูกค้า',
       customerPhone: userProfile?.phone || '-',
       topic: topicLabels[reportTopic] || 'ปัญหาทั่วไป',
@@ -552,11 +532,7 @@ export default function ProfilePage() {
 
   const handleLogout = () => {
     if (window.confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
-      if (logoutUser) {
-        logoutUser();
-      } else {
-        localStorage.removeItem('currentUser');
-      }
+      logoutUser();
       navigate('/login/customer');
     }
   };
@@ -587,7 +563,7 @@ export default function ProfilePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
-        {/* ✅ ป้าย Toast Notification แบบสวยงาม ลอยจากด้านบน */}
+        {/* Toast Notification */}
         {toast.show && (
           <div className="absolute top-6 left-5 right-5 z-60 animate-in slide-in-from-top-4 duration-200">
             <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md ${
@@ -603,7 +579,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Header จัดชิดซ้าย + ปุ่มออกจากระบบชี้เมาส์แล้วแดง */}
+        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
           color: '#ffffff',

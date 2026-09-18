@@ -17,15 +17,15 @@ import {
   Check, 
   X, 
   AlertTriangle, 
-  Calendar,
-  PackageCheck,
-  Flame,
-  BadgeCheck,
-  QrCode,
-  Star,
-  Receipt,
-  Ban,
-  Bell
+  Calendar, 
+  PackageCheck, 
+  Flame, 
+  BadgeCheck, 
+  QrCode, 
+  Star, 
+  Receipt, 
+  Ban, 
+  Bell 
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
@@ -38,9 +38,9 @@ export default function HomePage() {
     selectedAddressId, 
     setSelectedAddressId, 
     currentAddress, 
-    orders,
+    orders, 
     setOrders 
-  } = useApp();
+  } = useApp ? useApp() : {};
 
   const [showAddressPicker, setShowAddressPicker] = useState(false);
   const [selectedService, setSelectedService] = useState('wash_dry_fold');
@@ -63,7 +63,9 @@ export default function HomePage() {
     'อื่นๆ'
   ];
 
-  // ดึงสถานะร้าน, วันหยุด และเช็กสถานะการแจ้งเตือน
+  const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
+
+  // ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือนเฉพาะของ User ปัจจุบัน
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
     if (savedStoreStatus !== null) {
@@ -79,15 +81,20 @@ export default function HomePage() {
       }
     }
 
-    // เช็กว่ามีข้อความที่ยังไม่ได้อ่านไหม เพื่อโชว์จุดแดงที่กระดิ่ง
+    // กรองเฉพาะการแจ้งเตือนของ User คนนี้เท่านั้น ป้องกันแจ้งเตือน User B โผล่มาที่ User A
     try {
       const storedNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-      const unreadExists = storedNotices.some(n => !n.isRead);
+      const myNotices = storedNotices.filter(n => {
+        if (!n.userId && !n.customerPhone) return true; // ข้อความส่วนกลาง
+        const owner = String(n.userId || n.customerPhone || '').trim();
+        return owner === currentUserId;
+      });
+      const unreadExists = myNotices.some(n => !n.isRead);
       setHasUnreadNotices(unreadExists);
     } catch (e) {
       setHasUnreadNotices(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   const getThaiTimestamp = () => {
     const now = new Date();
@@ -107,9 +114,8 @@ export default function HomePage() {
   };
 
   // แยก Order ตาม User
-  const currentUserId = userProfile?.phone || userProfile?.id || userProfile?.email;
   const userOrders = (orders || []).filter(o => {
-    const orderOwner = o.customerPhone || o.userPhone || o.userId || o.customerId;
+    const orderOwner = String(o.customerPhone || o.userPhone || o.userId || o.customerId || '').trim();
     return currentUserId && orderOwner === currentUserId;
   });
 
@@ -125,37 +131,9 @@ export default function HomePage() {
   const hasOngoingOrder = Boolean(activeOrder);
   const isSlipRejected = Boolean(activeOrder && activeOrder.paymentRejected);
 
-  // เช็กว่าออเดอร์อยู่ในขั้นตอนที่ยังสามารถยกเลิกได้หรือไม่ (ก่อน Step 3: กำลังมารับ)
+  // เช็กว่าออเดอร์อยู่ในขั้นตอนที่ยังสามารถยกเลิกได้หรือไม่
   const currentStepNum = Number(activeOrder?.statusStep) || 1;
   const canCancelOrder = hasOngoingOrder && currentStepNum < 3;
-
-  useEffect(() => {
-    if (isSlipRejected && activeOrder) {
-      const realTimeNow = getThaiTimestamp();
-      let currentNotices = [];
-      try {
-        currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-      } catch (e) {
-        currentNotices = [];
-      }
-
-      const alreadyNotified = currentNotices.some(n => n.orderId === activeOrder.id && n.type === 'alert' && !n.isRead);
-
-      if (!alreadyNotified) {
-        const alertNotice = {
-          id: Date.now(),
-          orderId: activeOrder.id,
-          title: 'สลิปการโอนเงินไม่ถูกต้อง',
-          message: `ออเดอร์ #${activeOrder.id} ไม่ผ่านการตรวจสอบ: "${activeOrder.rejectReason || 'ยอดเงินไม่ตรง หรือสลิปไม่ชัดเจน'}" กรุณาแนบสลิปใหม่`,
-          time: activeOrder.rejectedAt || realTimeNow,
-          type: 'alert',
-          isRead: false
-        };
-        localStorage.setItem('customerNotifications', JSON.stringify([alertNotice, ...currentNotices]));
-        setHasUnreadNotices(true);
-      }
-    }
-  }, [isSlipRejected, activeOrder]);
 
   useEffect(() => {
     if (hasOngoingOrder) return;
@@ -211,11 +189,15 @@ export default function HomePage() {
 
   const handleGoToRetryPayment = () => {
     if (activeOrder) {
-      navigate(`/orders/${activeOrder.id}`, { state: { retryPayment: true } });
+      navigate('/order/payment', { 
+        state: { 
+          order: activeOrder, 
+          isRetry: true 
+        } 
+      });
     }
   };
 
-  // ยืนยันยกเลิกออเดอร์
   const handleConfirmCancelOrder = () => {
     if (!activeOrder) return;
 
@@ -257,11 +239,14 @@ export default function HomePage() {
       const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
       const cancelNotice = {
         id: Date.now(),
+        uniqueKey: `cancelled_${activeOrder.id}`,
         orderId: activeOrder.id,
+        userId: currentUserId,
+        customerPhone: currentUserId,
         title: 'ยกเลิกคำสั่งซื้อเรียบร้อยแล้ว',
         message: `ออเดอร์ #${activeOrder.id} ได้รับการยกเลิกเรียบร้อยแล้ว (เหตุผล: ${cancelReason}) หากชำระเงินแล้วสามารถส่งหลักฐานขอคืนเงินทาง LINE Official`,
         time: cancelTimestamp,
-        type: 'info',
+        type: 'cancel',
         isRead: false
       };
       localStorage.setItem('customerNotifications', JSON.stringify([cancelNotice, ...currentNotices]));
@@ -320,7 +305,7 @@ export default function HomePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
-        {/* 1. Top Bar: ปรับมุมขวาเป็นปุ่มกระดิ่งแจ้งเตือน */}
+        {/* 1. Top Bar */}
         <div 
           style={{
             background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
@@ -355,16 +340,17 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center">
-            {/* ✅ ปุ่มกระดิ่งแจ้งเตือน นำทางไปหน้า /notifications */}
             <button 
               type="button"
               onClick={() => navigate('/notifications')}
               className="relative w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 text-white flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95"
               title="การแจ้งเตือน"
             >
-              <Bell size={18} />
+              <Bell size={19} />
               {hasUnreadNotices && (
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-red-400 ring-2 ring-blue-600 animate-pulse" />
+                <span className="absolute -top-1.5 -right-1 px-1.5 py-0.2 bg-rose-500 text-white text-[8.5px] font-black rounded-full border border-white/80 shadow-xs tracking-tighter pointer-events-none">
+                  NEW
+                </span>
               )}
             </button>
           </div>
@@ -486,8 +472,6 @@ export default function HomePage() {
               </div>
 
               <div className="bg-white p-5 rounded-3xl border border-blue-100 shadow-sm flex flex-col gap-3.5">
-                
-                {/* คลิกเพื่อไปหน้าออเดอร์ */}
                 <div 
                   onClick={handleViewOrderStatus}
                   className="cursor-pointer group flex flex-col gap-3"
@@ -545,7 +529,6 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {/* แถบแจ้งเตือนพิเศษเมื่อออเดอร์สำเร็จแล้ว */}
                 {Number(activeOrder.statusStep) >= 7 ? (
                   <div 
                     onClick={handleViewOrderStatus}
@@ -576,7 +559,7 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            /* Smart Banner เมื่อไม่มีออเดอร์ค้าง */
+            /* Smart Banner */
             <div className="bg-white p-4.5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between min-h-[195px] transition-all">
               {bannerIndex === 0 && (
                 <div className="w-full">
@@ -765,7 +748,6 @@ export default function HomePage() {
         {showCancelModal && (
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150 border border-slate-100">
-              
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
                   <h3 className="font-bold text-base text-slate-900 leading-tight">ยกเลิกคำสั่งซื้อ</h3>
@@ -829,7 +811,6 @@ export default function HomePage() {
                   ยืนยันการยกเลิก
                 </button>
               </div>
-
             </div>
           </div>
         )}
