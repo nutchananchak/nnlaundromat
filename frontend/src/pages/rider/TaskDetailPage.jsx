@@ -7,15 +7,42 @@ import {
   Navigation, 
   Camera, 
   Clock, 
-  Trash2
+  Trash2,
+  Image as ImageIcon,
+  CheckCircle2,
+  AlertTriangle,
+  ExternalLink,
+  Info,
+  Layers,
+  Smartphone
 } from 'lucide-react';
+import { 
+  GoogleMap, 
+  useJsApiLoader, 
+  MarkerF 
+} from '@react-google-maps/api';
 import { useApp } from '../../context/AppContext';
+
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+// พิกัดร้าน N&N Laundromat สำหรับเป็นจุดอ้างอิง
+const STORE_COORDS = { lat: 13.709648150061998, lng: 100.62401489583843 };
 
 export default function TaskDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { orders, setOrders } = useApp ? useApp() : {};
   const fileInputRef = useRef(null);
+
+  // State ป้ายแจ้งเตือน Toast
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const triggerToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, show: false }));
+    }, 2800);
+  };
 
   const [activeRider] = useState(() => {
     try {
@@ -34,6 +61,13 @@ export default function TaskDetailPage() {
 
   const order = (orders || []).find((o) => String(o.id) === String(id));
   const [proofImage, setProofImage] = useState(order?.riderBasketImage || order?.proofImage || null);
+  const [mapType, setMapType] = useState('roadmap');
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    language: 'th',
+    region: 'TH'
+  });
 
   if (!activeRider) return null;
 
@@ -59,14 +93,30 @@ export default function TaskDetailPage() {
     );
   }
 
+  // พิกัดเป้าหมาย (ใช้พิกัดของลูกค้า หรือถ้าไม่มีให้ใช้พิกัดร้าน)
+  const targetCoords = (order.lat && order.lng) 
+    ? { lat: Number(order.lat), lng: Number(order.lng) } 
+    : STORE_COORDS;
+
+  // นำทางด้วยแอปภายนอก (Google Maps Navigation)
   const handleOpenGoogleMaps = () => {
-    let mapsUrl = '';
+    let destination = '';
     if (order.lat && order.lng) {
-      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${order.lat},${order.lng}`;
+      destination = `${order.lat},${order.lng}`;
     } else {
-      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(order.address || '')}`;
+      destination = encodeURIComponent(order.address || '');
     }
-    window.open(mapsUrl, '_blank');
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+
+    triggerToast('เปิดแอปนำทางแล้ว เมื่อถึงจุดหมายให้สลับแอปกลับมาที่นี่', 'info');
+
+    if (isMobile) {
+      window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      window.open(mapsUrl, '_blank');
+    }
   };
 
   const handleImageCapture = (e) => {
@@ -75,6 +125,7 @@ export default function TaskDetailPage() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setProofImage(reader.result);
+        triggerToast('บันทึกรูปถ่ายหน้างานเรียบร้อย');
       };
       reader.readAsDataURL(file);
     }
@@ -85,9 +136,10 @@ export default function TaskDetailPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    triggerToast('ลบรูปถ่ายเรียบร้อยแล้ว', 'info');
   };
 
-  // เลื่อนสถานะงาน พร้อมบันทึกเวลาจริง และรูปถ่ายตะกร้าจากไรเดอร์
+  // เลื่อนสถานะงาน พร้อมบันทึกรูปถ่าย
   const handleAdvanceStep = (nextStep, nextTitle) => {
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
@@ -95,6 +147,7 @@ export default function TaskDetailPage() {
     const realNowTimestamp = `${d}, ${t} น.`;
 
     const isDone = nextStep === 7;
+    const orderOwnerPhone = order.customerPhone || order.userPhone || '';
 
     const updatedOrders = (orders || []).map((item) => {
       if (String(item.id) === String(order.id)) {
@@ -104,10 +157,8 @@ export default function TaskDetailPage() {
           statusTitle: nextTitle,
           status: isDone ? 'completed' : item.status,
           isCompleted: isDone,
-          // บันทึกรูปถ่ายของไรเดอร์เข้า riderBasketImage เมื่อรับผ้า
           riderBasketImage: proofImage || item.riderBasketImage || null,
           proofImage: proofImage || item.proofImage || null,
-          // บันทึกเวลาส่งมอบเฉพาะตอนที่ไรเดอร์กดยืนยัน Step 7 เท่านั้น
           deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
           deliveryRiderName: activeRider?.name || item.rider?.name || 'ไรเดอร์ประจำร้าน'
         };
@@ -125,21 +176,24 @@ export default function TaskDetailPage() {
         const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
         const finishNotice = {
           id: Date.now(),
+          uniqueKey: `completed_${order.id}`,
           orderId: order.id,
-          title: 'ส่งมอบผ้าสะอาดเรียบร้อยแล้ว',
+          userId: orderOwnerPhone,
+          customerPhone: orderOwnerPhone,
+          title: 'ส่งมอบผ้าสะอาดสำเร็จเรียบร้อย',
           message: `ออเดอร์ #${order.id} ได้รับการส่งมอบโดยคุณ ${activeRider?.name || 'ไรเดอร์'} เรียบร้อยแล้วเมื่อ ${realNowTimestamp}`,
           time: realNowTimestamp,
-          type: 'success',
+          type: 'delivery_success',
           isRead: false
         };
         localStorage.setItem('customerNotifications', JSON.stringify([finishNotice, ...currentNotices]));
-      } catch (e) {
-        // Storage fallback
-      }
+      } catch (e) {}
     }
 
-    alert(`อัปเดตสถานะเป็น "${nextTitle}" เรียบร้อยแล้ว`);
-    navigate('/rider/tasks');
+    triggerToast(`อัปเดตสถานะเป็น "${nextTitle}" สำเร็จ!`);
+    setTimeout(() => {
+      navigate('/rider/tasks');
+    }, 600);
   };
 
   return (
@@ -166,6 +220,24 @@ export default function TaskDetailPage() {
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
       }}>
 
+        {/* ป้ายแจ้งเตือน Floating Toast */}
+        {toast.show && (
+          <div className="absolute top-4 left-4 right-4 z-50 animate-in slide-in-from-top duration-200">
+            <div className={`p-3 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
+              toast.type === 'error'
+                ? 'bg-red-500/95 border-red-400'
+                : toast.type === 'info'
+                ? 'bg-[#1d61f2]/95 border-blue-400'
+                : 'bg-emerald-600/95 border-emerald-500'
+            }`}>
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                {toast.type === 'error' ? <AlertTriangle size={16} /> : toast.type === 'info' ? <Info size={16} /> : <CheckCircle2 size={16} />}
+              </div>
+              <span className="text-xs font-bold flex-1">{toast.message}</span>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #1d61f2 0%, #174ec2 100%)',
@@ -187,8 +259,9 @@ export default function TaskDetailPage() {
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 pb-28">
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3.5 pb-32">
           
+          {/* การ์ดสถานะงาน */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
             <div>
               <span className="text-[11px] text-gray-400 block font-medium">สถานะออเดอร์</span>
@@ -201,6 +274,7 @@ export default function TaskDetailPage() {
             </span>
           </div>
 
+          {/* ข้อมูลลูกค้า */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
               <div>
@@ -230,32 +304,104 @@ export default function TaskDetailPage() {
             )}
           </div>
 
+          {/* แผนที่แบบฝังในแอป (Embedded Map) พร้อมปุ่มเปิดแอปนำทาง */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
-            <span className="text-xs font-bold text-gray-800">สถานที่รับ-ส่งผ้า</span>
-            <div className="flex items-start gap-2 text-xs text-gray-600">
-              <MapPin size={16} className="text-[#1d61f2] shrink-0 mt-0.5" />
-              <span className="leading-normal">{order.address}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <MapPin size={15} className="text-[#1d61f2]" />
+                ตำแหน่งจุดรับ-ส่งผ้า
+              </span>
+              <button
+                type="button"
+                onClick={() => setMapType(prev => prev === 'roadmap' ? 'hybrid' : 'roadmap')}
+                className="text-[11px] font-bold text-slate-500 hover:text-[#1d61f2] flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200"
+              >
+                <Layers size={12} />
+                <span>{mapType === 'roadmap' ? 'ดูดาวเทียม' : 'ดูแผนที่'}</span>
+              </button>
+            </div>
+
+            {/* แผนที่ย่อในหน้าแอป */}
+            <div className="relative w-full h-44 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+              {isLoaded ? (
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  center={targetCoords}
+                  zoom={16}
+                  mapTypeId={mapType}
+                  options={{
+                    disableDefaultUI: true,
+                    zoomControl: false,
+                    gestureHandling: 'cooperative'
+                  }}
+                >
+                  <MarkerF position={targetCoords} />
+                </GoogleMap>
+              ) : loadError ? (
+                <div className="w-full h-full flex items-center justify-center text-xs text-red-500">
+                  ไม่สามารถโหลดแผนที่ได้
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
+                  กำลังโหลดแผนที่ตำแหน่งลูกค้า...
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-start gap-2 text-xs text-gray-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+              <MapPin size={15} className="text-[#1d61f2] shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{order.address}</span>
             </div>
 
             <button
               type="button"
               onClick={handleOpenGoogleMaps}
-              className="w-full py-2.5 bg-blue-50 text-[#1d61f2] hover:bg-blue-100 font-bold text-xs rounded-xl flex items-center justify-center gap-2 border border-blue-200 transition cursor-pointer"
+              className="w-full py-2.5 bg-[#1d61f2] text-white hover:bg-blue-700 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition cursor-pointer shadow-sm shadow-blue-500/20"
             >
               <Navigation size={15} />
               เปิดนำทางด้วย Google Maps
+              <ExternalLink size={13} className="opacity-80" />
             </button>
           </div>
 
-          {/* อัปโหลดรูปภาพหลักฐานตะกร้าผ้าจากไรเดอร์ */}
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
+          {/* รูปถ่ายจุดวางผ้าจากลูกค้า */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gray-800">รูปถ่ายยืนยันจุดรับผ้า / ตะกร้าผ้า</span>
+              <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <ImageIcon size={15} className="text-[#1d61f2]" />
+                รูปถ่ายจุดวางผ้าจากลูกค้า
+              </span>
+              <span className="text-[10.5px] text-slate-400 font-medium">ภาพตอนสั่งซื้อ</span>
+            </div>
+
+            {order.basketImage ? (
+              <div className="relative w-full min-h-[160px] max-h-72 rounded-xl overflow-hidden border border-slate-200 bg-slate-950/5 flex items-center justify-center p-1.5">
+                <img
+                  src={order.basketImage}
+                  alt="Customer basket spot"
+                  className="w-full h-auto max-h-64 object-contain rounded-lg shadow-2xs"
+                />
+              </div>
+            ) : (
+              <div className="w-full py-6 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 flex flex-col items-center justify-center text-center gap-1 text-slate-400">
+                <ImageIcon size={22} className="text-slate-300" />
+                <span className="text-xs font-medium">ลูกค้าไม่ได้แนบรูปจุดวางผ้า</span>
+              </div>
+            )}
+          </div>
+          
+                    {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <Camera size={15} className="text-[#1d61f2]" />
+                รูปถ่ายยืนยันจุดรับผ้า / ส่งมอบผ้า 
+              </span>
               {proofImage && (
                 <button
                   type="button"
                   onClick={handleRemoveImage}
-                  className="text-red-500 hover:text-red-600 text-xs flex items-center gap-1 cursor-pointer"
+                  className="text-red-500 hover:text-red-600 text-xs flex items-center gap-1 cursor-pointer font-semibold"
                 >
                   <Trash2 size={13} /> ลบรูป
                 </button>
@@ -272,25 +418,27 @@ export default function TaskDetailPage() {
             />
 
             {proofImage ? (
-              <div className="relative w-full h-44 rounded-xl overflow-hidden border border-gray-200 bg-black/5">
+              <div className="relative w-full min-h-[160px] max-h-72 rounded-xl overflow-hidden border border-blue-200 bg-slate-950/5 flex items-center justify-center p-1.5 shadow-2xs">
                 <img
                   src={proofImage}
                   alt="Proof of work"
-                  className="w-full h-full object-cover"
+                  className="w-full h-auto max-h-64 object-contain rounded-lg"
                 />
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full h-28 border-2 border-dashed border-gray-200 hover:border-[#1d61f2] rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-[#1d61f2] transition cursor-pointer bg-gray-50/50"
+                className="w-full py-7 border-2 border-dashed border-gray-200 hover:border-[#1d61f2] rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-[#1d61f2] transition cursor-pointer bg-gray-50/50 group"
               >
-                <Camera size={26} />
-                <span className="text-xs font-medium">กดเพื่อถ่ายภาพตะกร้าผ้าหน้างาน</span>
+                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1d61f2] flex items-center justify-center group-hover:scale-105 transition">
+                  <Camera size={22} />
+                </div>
+                <span className="text-xs font-bold text-slate-700">กดเพื่อถ่ายภาพตะกร้าผ้าหน้างาน</span>
+                <span className="text-[10px] text-slate-400">ใช้เป็นหลักฐานยืนยันการรับ-ส่งผ้า</span>
               </button>
             )}
           </div>
-
         </div>
 
         {/* Footer Actions ตาม Step */}
@@ -299,7 +447,7 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => handleAdvanceStep(4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
-              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md hover:bg-blue-700 cursor-pointer"
+              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition"
             >
               ยืนยันรับผ้าจากลูกค้า (นำส่งร้าน)
             </button>
@@ -309,7 +457,7 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => handleAdvanceStep(5, 'ร้านกำลังดำเนินการซักอบ')}
-              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 cursor-pointer"
+              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 active:scale-[0.99] cursor-pointer transition"
             >
               ผ้าถึงร้านแล้ว (ส่งมอบแผนกซักอบ)
             </button>
@@ -319,14 +467,14 @@ export default function TaskDetailPage() {
             <button
               type="button"
               onClick={() => handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ')}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md hover:bg-emerald-700 cursor-pointer"
+              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer transition"
             >
-              ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย (จบงาน)
+              ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย
             </button>
           )}
 
           {Number(order.statusStep) >= 7 && (
-            <div className="w-full py-3 text-center text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl">
+            <div className="w-full py-3 text-center text-xs font-bold text-emerald-600 bg-emerald-50 rounded-xl border border-emerald-100">
               ออเดอร์นี้เสร็จสิ้นกระบวนการเรียบร้อยแล้ว {order.deliveredAt ? `(${order.deliveredAt})` : ''}
             </div>
           )}
