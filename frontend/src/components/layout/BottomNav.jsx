@@ -88,7 +88,7 @@ export default function BottomNav() {
                 <Icon size={22} strokeWidth={menu.isActive ? 2.5 : 2} />
               </div>
 
-              <span className={`text-[11px] ${menu.isActive ? 'font-bold text-[#1d61f2]' : isBell && menu.hasAlert ? 'font-bold text-amber-600' : 'font-medium'}`}>
+              <span className={`text-[11px] ${menu.isActive ? 'font-bold text-[#1d61f2]' : isBell && menu.hasAlert ? 'font-bold text-blue-600' : 'font-medium'}`}>
                 {menu.label}
               </span>
             </button>
