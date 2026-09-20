@@ -6,7 +6,6 @@ import {
   Phone, 
   Navigation, 
   Camera, 
-  Clock, 
   Trash2,
   Image as ImageIcon,
   CheckCircle2,
@@ -14,7 +13,7 @@ import {
   ExternalLink,
   Info,
   Layers,
-  Smartphone
+  ShoppingBag
 } from 'lucide-react';
 import { 
   GoogleMap, 
@@ -274,7 +273,7 @@ export default function TaskDetailPage() {
             </span>
           </div>
 
-          {/* ข้อมูลลูกค้า */}
+          {/* ข้อมูลลูกค้า และรอบเวลารับ-ส่งผ้าคนละบรรทัด (ไม่มีไอคอนด้านหน้า) */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
               <div>
@@ -286,22 +285,74 @@ export default function TaskDetailPage() {
               {order.customerPhone && (
                 <a
                   href={`tel:${order.customerPhone}`}
-                  className="flex items-center gap-1.5 bg-blue-50 text-[#1d61f2] px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-blue-100"
+                  className="flex items-center gap-1.5 bg-blue-50 text-[#1d61f2] px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-blue-100 transition"
                 >
                   <Phone size={13} /> โทรออก
                 </a>
               )}
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <Clock size={14} className="text-[#1d61f2] shrink-0" />
-              <span>เวลานัดรับผ้า: {order.pickupTime || '-'}</span>
+            {/* รอบเวลารับผ้า และรอบเวลาส่งผ้าคืน แยกคนละบรรทัด ไม่มีไอคอน */}
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500 font-medium">รอบเวลารับผ้า:</span>
+                <span className="font-bold text-slate-800">{order.pickupTime || 'ไม่ระบุ'}</span>
+              </div>
+
+              <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200/60">
+                <span className="text-slate-500 font-medium">รอบเวลาส่งผ้าคืน:</span>
+                <span className="font-bold text-slate-800">{order.deliveryTime || 'ไม่ระบุ'}</span>
+              </div>
             </div>
+
             {order.note && (
               <div className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-100">
                 <span className="font-bold">หมายเหตุลูกค้า: </span>{order.note}
               </div>
             )}
+          </div>
+
+          {/* รายละเอียดบริการ & รายการผ้าในออเดอร์ (ไม่แสดงยอดรวม) */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
+            <div className="border-b border-gray-100 pb-2">
+              <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                <ShoppingBag size={15} className="text-[#1d61f2]" />
+                รายละเอียดออเดอร์
+              </span>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="text-slate-500 font-medium">ประเภทบริการ</span>
+                <span className="font-bold text-slate-800">{order.serviceName}</span>
+              </div>
+
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="text-slate-500 font-medium">แพ็กเกจหลัก</span>
+                <span className="font-bold text-slate-800">{order.packageName || 'ตามที่ระบุ'}</span>
+              </div>
+
+              {/* รายการความต้องการพิเศษ (Special Items) แสดงเฉพาะชื่อและจำนวน ไม่แสดงราคา */}
+              {order.specialItems && order.specialItems.length > 0 && (
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
+                  <span className="text-[11px] font-bold text-slate-800 block">รายการความต้องการพิเศษ (แยกชิ้น):</span>
+                  {order.specialItems.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-[11px] text-slate-700">
+                      <span>• {item.name}</span>
+                      <span className="font-bold">{item.count} ชิ้น</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* รายการถุงพลาสติกเสริม ไม่แสดงราคา */}
+              {order.plasticBagCount > 0 && (
+                <div className="flex justify-between items-center text-slate-700 pt-1 border-t border-slate-100">
+                  <span className="text-slate-500 font-medium">ถุงพลาสติกใส่ผ้าเสริม</span>
+                  <span className="font-bold text-slate-800">{order.plasticBagCount} ใบ</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* แผนที่แบบฝังในแอป (Embedded Map) พร้อมปุ่มเปิดแอปนำทาง */}
@@ -364,7 +415,7 @@ export default function TaskDetailPage() {
             </button>
           </div>
 
-          {/* รูปถ่ายจุดวางผ้าจากลูกค้า */}
+          {/* รูปถ่ายจุดวางผ้าจากลูกค้า (ใช้ object-contain ไม่โดนตัดขอบ) */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -390,7 +441,7 @@ export default function TaskDetailPage() {
             )}
           </div>
           
-                    {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ */}
+          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ (ใช้ object-contain ไม่โดนตัดขอบ) */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">

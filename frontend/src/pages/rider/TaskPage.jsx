@@ -14,7 +14,9 @@ import {
   Sparkles,
   BellRing,
   AlertTriangle,
-  Flame
+  Flame,
+  Calendar,
+  Filter
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -49,7 +51,19 @@ const TaskPage = () => {
 
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'return' | 'history'
 
-  // จัดการออกจากระบบ โดยเก็บค่า Remember Me ไว้ตามเดิม
+  // ฟอร์แมตวันที่ปัจจุบันเป็นรูปแบบ YYYY-MM-DD
+  const getTodayDateStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // State ตัวกรองวันที่สำหรับแท็บ 'สำเร็จแล้ว' ('today' | 'all' | 'custom')
+  const [historyFilterType, setHistoryFilterType] = useState('today');
+  const [selectedCustomDate, setSelectedCustomDate] = useState(getTodayDateStr());
+
   const handleLogout = () => {
     if (window.confirm('คุณต้องการออกจากระบบพนักงานใช่หรือไม่?')) {
       localStorage.removeItem('currentRider');
@@ -59,6 +73,12 @@ const TaskPage = () => {
   };
 
   if (!activeRider) return null;
+
+  // วันที่ปัจจุบันภาษาไทย
+  const now = new Date();
+  const todayDay = now.getDate();
+  const todayMonthShort = new Intl.DateTimeFormat('th-TH', { month: 'short' }).format(now);
+  const todayIdentifier = `${todayDay} ${todayMonthShort}`;
 
   // 1. งานรับผ้าเข้าร้าน (Step 3: กำลังไปรับ, Step 4: ได้รับผ้าแล้วกำลังมาร้าน)
   const myPickupOrders = (orders || []).filter(
@@ -70,12 +90,36 @@ const TaskPage = () => {
     o => o.statusStep === 6 && (o.rider?.id === activeRider.id || !o.rider)
   );
 
-  // 3. งานที่สำเร็จแล้ว (Step 7)
-  const completedOrders = (orders || []).filter(
-    o => o.statusStep === 7 && o.rider?.id === activeRider.id
-  );
+  // แปลง string วันที่จาก custom date picker เป็นรูปแบบย่อ เช่น "2026-09-20" -> "20 ก.ย."
+  const getFormattedDateFromPicker = (dateStr) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+    const day = dateObj.getDate();
+    const monthShort = new Intl.DateTimeFormat('th-TH', { month: 'short' }).format(dateObj);
+    return `${day} ${monthShort}`;
+  };
 
-  // ตรวจจับงานใหม่เพื่อแจ้งเตือนให้เด่นขึ้น
+  // 3. กรองงานที่สำเร็จแล้วตามตัวเลือกวันที่
+  const completedOrders = (orders || []).filter(o => {
+    if (o.statusStep !== 7 || o.rider?.id !== activeRider.id) return false;
+    const finishedTimeStr = String(o.deliveredAt || o.completedAt || o.createdAt || '');
+
+    if (historyFilterType === 'all') return true;
+
+    if (historyFilterType === 'today') {
+      return finishedTimeStr.includes(todayIdentifier) || finishedTimeStr.includes('วันนี้');
+    }
+
+    if (historyFilterType === 'custom') {
+      const targetDateShort = getFormattedDateFromPicker(selectedCustomDate);
+      return finishedTimeStr.includes(targetDateShort);
+    }
+
+    return true;
+  });
+
+  // ตรวจจับงานใหม่เพื่อแจ้งเตือน
   const prevPickupCount = useRef(myPickupOrders.length);
   useEffect(() => {
     if (myPickupOrders.length > prevPickupCount.current) {
@@ -86,13 +130,16 @@ const TaskPage = () => {
 
   const handleAdvanceStep = (orderId, nextStep, nextTitle) => {
     if (!setOrders) return;
+    const realTimeNow = `${todayDay} ${todayMonthShort}, ${new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} น.`;
+
     setOrders(prev => prev.map(order => {
       if (order.id === orderId) {
         return {
           ...order,
           statusStep: nextStep,
           statusTitle: nextTitle,
-          status: nextStep === 7 ? 'completed' : order.status
+          status: nextStep === 7 ? 'completed' : order.status,
+          deliveredAt: nextStep === 7 ? realTimeNow : order.deliveredAt
         };
       }
       return order;
@@ -126,7 +173,7 @@ const TaskPage = () => {
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
       }}>
 
-        {/* ป้ายแจ้งเตือนแบบ Modern Floating Toast */}
+        {/* ป้ายแจ้งเตือน Floating Toast */}
         {toast.show && (
           <div className="absolute top-4 left-4 right-4 z-50 animate-in slide-in-from-top duration-200">
             <div className={`p-3 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
@@ -172,7 +219,7 @@ const TaskPage = () => {
             </button>
           </div>
 
-          {/* แท็บสถานะงาน 3 หมวดหมู่ พร้อมป้าย NEW สไตล์แคปซูล */}
+          {/* แท็บสถานะงาน 3 หมวดหมู่ */}
           <div className="grid grid-cols-3 gap-1.5 bg-black/15 p-1 rounded-2xl border border-white/15 text-xs font-semibold">
             <button
               type="button"
@@ -248,7 +295,6 @@ const TaskPage = () => {
               ) : (
                 myPickupOrders.map(order => (
                   <div key={order.id} className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
-                    {/* ขีดสัญลักษณ์งานด่วนด้านข้าง */}
                     <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#1d61f2]" />
 
                     <div className="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -323,7 +369,6 @@ const TaskPage = () => {
               ) : (
                 myReturnOrders.map(order => (
                   <div key={order.id} className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
-                    {/* ขีดสัญลักษณ์งานส่งคืน */}
                     <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
 
                     <div className="flex justify-between items-center border-b border-gray-100 pb-2">
@@ -375,31 +420,95 @@ const TaskPage = () => {
             </>
           )}
 
-          {/* แท็บ 3: งานที่สำเร็จแล้ว (Step 7) */}
+          {/* แท็บ 3: งานที่สำเร็จแล้ว (Step 7) พร้อมตัวเลือกดูตามวันที่ */}
           {activeTab === 'history' && (
-            <>
+            <div className="flex flex-col gap-3">
+              
+              {/* ตัวเลือกฟิลเตอร์วันที่ */}
+              <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Filter size={14} className="text-[#1d61f2]" />
+                    เลือกวันที่สำเร็จงาน
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">
+                    พบ {completedOrders.length} รายการ
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold text-slate-600">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilterType('today')}
+                    className={`py-1.5 rounded-lg transition cursor-pointer text-center ${
+                      historyFilterType === 'today' ? 'bg-white text-[#1d61f2] shadow-2xs' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    วันนี้
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilterType('all')}
+                    className={`py-1.5 rounded-lg transition cursor-pointer text-center ${
+                      historyFilterType === 'all' ? 'bg-white text-[#1d61f2] shadow-2xs' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    ทั้งหมด
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryFilterType('custom')}
+                    className={`py-1.5 rounded-lg transition cursor-pointer text-center ${
+                      historyFilterType === 'custom' ? 'bg-white text-[#1d61f2] shadow-2xs' : 'hover:text-slate-900'
+                    }`}
+                  >
+                    เลือกวัน
+                  </button>
+                </div>
+
+                {/* กล่องเลือกวันที่แบบ Custom */}
+                {historyFilterType === 'custom' && (
+                  <div className="flex items-center gap-2 pt-1 animate-in fade-in duration-150">
+                    <Calendar size={14} className="text-[#1d61f2] shrink-0" />
+                    <input
+                      type="date"
+                      value={selectedCustomDate}
+                      onChange={(e) => setSelectedCustomDate(e.target.value)}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none focus:border-[#1d61f2]"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* รายการการ์ดงานที่สำเร็จแล้ว */}
               {completedOrders.length === 0 ? (
                 <div className="text-center py-20 text-gray-400 text-xs flex flex-col items-center gap-2">
                   <CheckCircle2 size={36} className="text-gray-300" />
-                  <span className="leading-normal">ยังไม่มีรายการงานที่เสร็จสิ้น</span>
+                  <span className="leading-normal">
+                    {historyFilterType === 'today' 
+                      ? 'ยังไม่มีงานที่สำเร็จในวันนี้' 
+                      : historyFilterType === 'custom' 
+                      ? `ไม่มีงานที่ส่งมอบในวันที่เลือก (${getFormattedDateFromPicker(selectedCustomDate)})` 
+                      : 'ยังไม่มีประวัติงานที่สำเร็จ'}
+                  </span>
                 </div>
               ) : (
                 completedOrders.map(order => (
                   <div 
                     key={order.id} 
                     onClick={() => navigate(`/rider/tasks/${order.id}`)}
-                    className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between cursor-pointer hover:border-blue-200 transition"
+                    className="bg-white p-3.5 rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between cursor-pointer hover:border-blue-200 transition active:scale-[0.99]"
                   >
                     <div className="space-y-0.5">
                       <span className="font-bold text-xs text-gray-800 block">#{order.id} - {order.serviceName}</span>
                       <span className="text-[11px] text-emerald-600 font-semibold block">ส่งมอบสำเร็จแล้ว</span>
-                      <span className="text-[10px] text-gray-400 block">{order.customerName}</span>
+                      <span className="text-[10px] text-gray-400 block">ลูกค้า: {order.customerName || 'ลูกค้าทั่วไป'} • เวลา: {order.deliveredAt || 'เสร็จสมบูรณ์'}</span>
                     </div>
                     <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
                   </div>
                 ))
               )}
-            </>
+            </div>
           )}
 
         </div>

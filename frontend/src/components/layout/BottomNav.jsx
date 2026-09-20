@@ -84,7 +84,7 @@ export default function BottomNav() {
                 menu.isActive ? 'text-[#1d61f2]' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
-              <div className={`relative ${isBell && menu.hasAlert ? 'bell-shake text-amber-500' : ''}`}>
+              <div className={`relative ${isBell && menu.hasAlert ? 'bell-shake text-blue-600' : ''}`}>
                 <Icon size={22} strokeWidth={menu.isActive ? 2.5 : 2} />
               </div>
 
