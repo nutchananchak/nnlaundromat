@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
-/// โลโก้ทางการ N&N LAUNDROMAT DELIVERY (ปรับขนาดตัวรถให้กะทัดรัดลง ตรงตามต้นฉบับ)
+// โลโก้ทางการ N&N LAUNDROMAT DELIVERY
 const OfficialNnLogo = () => (
   <svg
     viewBox="0 0 240 240"
@@ -267,7 +267,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า */}
+            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า (แก้ให้ object-contain ไม่โดนตัดขอบ) */}
             {order.riderBasketImage ? (
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
@@ -279,11 +279,11 @@ export default function OrderDetailPage() {
                     ไรเดอร์ถ่ายยืนยันแล้ว
                   </span>
                 </div>
-                <div className="w-full aspect-video rounded-2xl overflow-hidden bg-slate-900/5 border border-slate-100 flex items-center justify-center">
+                <div className="w-full min-h-[160px] max-h-72 rounded-2xl overflow-hidden bg-slate-900/5 border border-slate-100 flex items-center justify-center p-2">
                   <img 
                     src={order.riderBasketImage} 
                     alt="Rider Basket Verification" 
-                    className="w-full h-full object-contain" 
+                    className="w-full h-auto max-h-64 object-contain rounded-xl" 
                   />
                 </div>
                 <span className="text-[11px] text-slate-400 font-medium text-center">
@@ -402,7 +402,7 @@ export default function OrderDetailPage() {
                   <CheckCircle2 size={13} className="text-emerald-600" /> จัดส่งผ้าคืนสำเร็จ
                 </div>
 
-                {/* ✅ ปุ่มเปิดดูรูปภาพหลักฐานการส่งมอบผ้าจากไรเดอร์ (เห็นเด่นชัด สวยงาม) */}
+                {/* ปุ่มเปิดดูรูปภาพหลักฐานการส่งมอบผ้าจากไรเดอร์ */}
                 <button
                   type="button"
                   onClick={() => setShowDeliveryProofModal(true)}
@@ -468,7 +468,7 @@ export default function OrderDetailPage() {
                     </div>
                   )}
                   
-                  {/* ค่าจัดส่งเป็นสีดำ */}
+                  {/* ค่าจัดส่ง */}
                   <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-200/60">
                     <span>ค่าบริการจัดส่ง Delivery</span>
                     <span className="font-bold text-slate-900">ฟรี</span>
@@ -534,7 +534,7 @@ export default function OrderDetailPage() {
               <Repeat size={15} /> สั่งบริการนี้อีกครั้ง
             </button>
 
-            {/* ปุ่มแจ้งปัญหาเป็นสีแดง */}
+            {/* ปุ่มแจ้งปัญหา */}
             <button
               type="button"
               onClick={() => navigate('/profile')}
@@ -546,7 +546,7 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* ✅ Popup Modal แสดงหลักฐานส่งมอบผ้า (ใช้ Fixed Overlay ปรากฏทับหน้าจอ 100%) */}
+        {/* ✅ Popup Modal แสดงหลักฐานส่งมอบผ้า (ปรับแก้มิติภาพเป็น object-contain ไม่โดนตัดขอบทั้งบนและล่าง) */}
         {showDeliveryProofModal && (
           <div className="fixed inset-0 bg-slate-950/75 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150">
             <div className="bg-white w-full max-w-[390px] rounded-3xl p-5 shadow-2xl flex flex-col gap-3.5 border border-slate-100">
@@ -570,16 +570,16 @@ export default function OrderDetailPage() {
                 </button>
               </div>
 
-              {/* รูปภาพจากไรเดอร์ */}
-              <div className="w-full h-56 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
+              {/* รูปภาพจากไรเดอร์ (ใช้ object-contain + ความสูงยืดหยุ่น ภาพแสดงครบเต็มใบ 100%) */}
+              <div className="w-full min-h-[180px] max-h-80 rounded-2xl overflow-hidden bg-slate-900/5 border border-slate-200 flex items-center justify-center p-2">
                 {order.proofImage || order.riderBasketImage ? (
                   <img
                     src={order.proofImage || order.riderBasketImage}
                     alt="Delivery Confirmation"
-                    className="w-full h-full object-cover"
+                    className="w-full h-auto max-h-72 object-contain rounded-xl shadow-2xs"
                   />
                 ) : (
-                  <div className="flex flex-col items-center text-slate-400 gap-2">
+                  <div className="py-12 flex flex-col items-center text-slate-400 gap-2">
                     <ImageIcon size={32} />
                     <span className="text-xs font-medium">ไรเดอร์ได้ส่งมอบผ้าเรียบร้อยแล้ว</span>
                   </div>
@@ -605,7 +605,7 @@ export default function OrderDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowDeliveryProofModal(false)}
-                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+                className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shadow-xs active:scale-[0.99]"
               >
                 ปิดหน้าต่าง
               </button>
