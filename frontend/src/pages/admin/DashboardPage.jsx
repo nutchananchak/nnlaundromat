@@ -30,7 +30,8 @@ import {
   HelpCircle, 
   X,
   Calendar,
-  Filter
+  Filter,
+  ExternalLink
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -100,12 +101,10 @@ const DashboardPage = () => {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // State ตัวกรองวันที่สำหรับแต่ละแท็บ
   const [completedFilterDate, setCompletedFilterDate] = useState('');
   const [cancelledFilterDate, setCancelledFilterDate] = useState('');
   const [revenueFilterDate, setRevenueFilterDate] = useState('');
 
-  // แปลงค่า YYYY-MM-DD เป็นสตริงวันที่ย่อภาษาไทย เช่น "20 ก.ย."
   const formatPickerToThaiShort = (dateStr) => {
     if (!dateStr) return '';
     const [y, m, d] = dateStr.split('-');
@@ -115,7 +114,6 @@ const DashboardPage = () => {
     return `${day} ${monthShort}`;
   };
 
-  // Toast Notification State
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const triggerToast = (message, type = 'success') => {
@@ -125,7 +123,6 @@ const DashboardPage = () => {
     }, 2800);
   };
 
-  // บันทึกและดึงจำนวนออเดอร์ล่าสุดที่แอดมินเคยกดดูลง localStorage (รีเฟรชแล้วไม่หาย)
   const [lastSeenCounts, setLastSeenCounts] = useState(() => {
     try {
       const saved = localStorage.getItem('admin_last_seen_counts');
@@ -135,7 +132,6 @@ const DashboardPage = () => {
     }
   });
 
-  // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -156,7 +152,6 @@ const DashboardPage = () => {
     });
   };
 
-  // Reject Modal State
   const [rejectModal, setRejectModal] = useState({
     isOpen: false,
     orderId: null,
@@ -270,12 +265,10 @@ const DashboardPage = () => {
 
   const washingOrders = (orders || []).filter(o => Number(o.statusStep) === 5 && !o.isCancelled);
 
-  // รายการส่งมอบสำเร็จทั้งหมด (สำหรับนับตัวเลขแจ้งเตือน)
   const allDeliveredOrders = useMemo(() => {
     return (orders || []).filter(o => (Number(o.statusStep) === 7 || o.status === 'completed') && !o.isCancelled);
   }, [orders]);
 
-  // กรองแท็บส่งมอบสำเร็จตามตัวเลือกวันที่
   const deliveredOrders = (orders || []).filter(o => {
     const isCompleted = (Number(o.statusStep) === 7 || o.status === 'completed') && !o.isCancelled;
     if (!isCompleted) return false;
@@ -285,12 +278,10 @@ const DashboardPage = () => {
     return timeStr.includes(targetDateShort);
   });
 
-  // รายการยกเลิกทั้งหมด (สำหรับนับตัวเลขแจ้งเตือน)
   const allCancelledOrders = useMemo(() => {
     return (orders || []).filter(o => o.isCancelled || o.status === 'cancelled');
   }, [orders]);
 
-  // กรองแท็บยกเลิกออเดอร์ตามตัวเลือกวันที่
   const cancelledOrders = (orders || []).filter(o => {
     const isCancel = o.isCancelled || o.status === 'cancelled';
     if (!isCancel) return false;
@@ -300,7 +291,6 @@ const DashboardPage = () => {
     return timeStr.includes(targetDateShort);
   });
 
-  // บันทึกว่าแอดมินเคยกดดูแท็บแล้ว อิงตามยอดปัจจุบัน
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
     if (tabName === 'completed' || tabName === 'cancelled') {
@@ -314,6 +304,16 @@ const DashboardPage = () => {
         return updated;
       });
     }
+  };
+
+  const handleOpenMap = (order) => {
+    let mapsUrl = '';
+    if (order.lat && order.lng) {
+      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${order.lat},${order.lng}`;
+    } else {
+      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address || '')}`;
+    }
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
   const { 
@@ -629,7 +629,6 @@ const DashboardPage = () => {
   const activeGraphList = chartData[chartViewMode] || chartData.daily;
   const maxGraphVal = Math.max(...activeGraphList.map(item => item.val), 100);
 
-  // คำนวณจำนวนออเดอร์ใหม่ที่ยังไม่เคยกดดูจริง
   const unreadCompletedCount = Math.max(0, allDeliveredOrders.length - (lastSeenCounts.completed || 0));
   const unreadCancelledCount = Math.max(0, allCancelledOrders.length - (lastSeenCounts.cancelled || 0));
 
@@ -736,7 +735,7 @@ const DashboardPage = () => {
         </div>
       )}
       
-      {/* 1. Sidebar พร้อมปุ่มลูกศรย่อ-ขยายที่ขอบด้านข้าง */}
+      {/* 1. Sidebar */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-72' : 'w-20'
@@ -807,7 +806,6 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* แท็บส่งมอบสำเร็จ: รีเฟรชแล้วตัวเลขไม่เด้งกลับมา */}
             <button
               onClick={() => handleTabChange('completed')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -827,7 +825,6 @@ const DashboardPage = () => {
               )}
             </button>
 
-            {/* แท็บออเดอร์ที่ยกเลิก: รีเฟรชแล้วตัวเลขไม่เด้งกลับมา */}
             <button
               onClick={() => handleTabChange('cancelled')}
               className={`w-full flex items-center ${isSidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'} py-3 rounded-2xl text-sm font-bold transition cursor-pointer relative group ${
@@ -953,7 +950,7 @@ const DashboardPage = () => {
 
         <div className="flex-1 overflow-y-auto p-6">
 
-          {/* ======================= แท็บ 1: ตรวจสอบสลิป ======================= */}
+          {/* ======================= แท็บ 1: ตรวจสอบสลิป (จัดสัดส่วนและช่องว่างให้ตรงเป๊ะ 100%) ======================= */}
           {activeTab === 'slips' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -972,18 +969,18 @@ const DashboardPage = () => {
                     <span className="text-sm font-semibold">ไม่มีรายการสลิปค้างตรวจสอบในขณะนี้</span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse">
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse table-fixed min-w-[980px]">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider whitespace-nowrap">
-                          <th className="py-3.5 px-4">เลขออเดอร์ / เวลาแจ้ง</th>
-                          <th className="py-3.5 px-4">ข้อมูลลูกค้า</th>
-                          <th className="py-3.5 px-4">สถานที่รับผ้า (สำหรับจัดไรเดอร์)</th>
-                          <th className="py-3.5 px-4">บริการ</th>
-                          <th className="py-3.5 px-4">ยอดโอน</th>
-                          <th className="py-3.5 px-4 text-center">หลักฐานสลิป</th>
-                          <th className="py-3.5 px-4">มอบหมายไรเดอร์</th>
-                          <th className="py-3.5 px-4 text-center">ดำเนินการ</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+                          <th className="py-3 px-3 w-[12%]">เลขออเดอร์</th>
+                          <th className="py-3 px-3 w-[15%]">ข้อมูลลูกค้า</th>
+                          <th className="py-3 px-3 w-[20%]">สถานที่รับผ้า</th>
+                          <th className="py-3 px-3 w-[13%]">บริการ</th>
+                          <th className="py-3 px-3 w-[8%] text-right">ยอดโอน</th>
+                          <th className="py-3 px-3 w-[9%] text-center">สลิป</th>
+                          <th className="py-3 px-3 w-[13%]">ไรเดอร์</th>
+                          <th className="py-3 px-3 w-[10%] text-center">ดำเนินการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -993,80 +990,97 @@ const DashboardPage = () => {
 
                           return (
                             <tr key={order.id} className="hover:bg-blue-50/30 transition-colors">
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className="font-extrabold text-[#1d61f2] text-sm tracking-tight block">
+                              {/* 1. เลขออเดอร์ */}
+                              <td className="py-3 px-3 align-middle w-[12%]">
+                                <span className="font-extrabold text-[#1d61f2] text-xs tracking-tight block truncate">
                                   #{order.id}
                                 </span>
-                                <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                                  <Clock size={11} /> {order.createdAt || 'เมื่อสักครู่'}
+                                <span className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5 truncate">
+                                  <Clock size={10} className="shrink-0" /> {order.createdAt || 'เมื่อสักครู่'}
                                 </span>
                               </td>
 
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className="font-bold text-slate-800 text-sm block">
+                              {/* 2. ข้อมูลลูกค้า */}
+                              <td className="py-3 px-3 align-middle w-[15%]">
+                                <span className="font-bold text-slate-800 text-xs block truncate" title={order.customerName}>
                                   {order.customerName || 'คุณลูกค้า'}
                                 </span>
-                                <span className="text-xs text-slate-400 font-normal">
+                                <span className="text-[11px] text-slate-400 font-normal block truncate mt-0.5">
                                   {order.customerPhone || '-'}
                                 </span>
                               </td>
 
-                              <td className="py-4 px-4 max-w-xs">
-                                <div className="flex items-start gap-1.5 text-xs text-slate-600">
-                                  <MapPin size={14} className="text-[#1d61f2] shrink-0 mt-0.5" />
-                                  <span className="line-clamp-2" title={order.address}>
-                                    {order.address || 'ไม่ระบุที่อยู่'}
-                                  </span>
-                                </div>
+                              {/* 3. สถานที่รับผ้า (กดเพื่อเปิด Google Maps ในแท็บใหม่) */}
+                              <td className="py-3 px-3 align-middle w-[20%]">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenMap(order)}
+                                  className="group text-left flex items-start gap-1 p-1 -ml-1 rounded-lg hover:bg-blue-50/80 transition cursor-pointer w-full"
+                                  title="แตะเพื่อเปิดพิกัดนำทางบน Google Maps"
+                                >
+                                  <MapPin size={13} className="text-[#1d61f2] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-[11px] text-slate-700 font-medium line-clamp-1 leading-snug group-hover:text-[#1d61f2] transition-colors block">
+                                      {order.address || 'ไม่ระบุที่อยู่'}
+                                    </span>
+                                    <span className="text-[9px] text-[#1d61f2] font-bold inline-flex items-center gap-0.5 opacity-80 group-hover:opacity-100">
+                                      เปิดแผนที่ <ExternalLink size={7} />
+                                    </span>
+                                  </div>
+                                </button>
                               </td>
 
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className="font-semibold text-slate-700 text-xs block">
+                              {/* 4. บริการ */}
+                              <td className="py-3 px-3 align-middle w-[13%]">
+                                <span className="font-semibold text-slate-800 text-xs block truncate" title={order.serviceName}>
                                   {order.serviceName}
                                 </span>
                                 {order.packageName && (
-                                  <span className="text-[11px] text-slate-400 font-normal">
+                                  <span className="text-[10px] text-slate-400 font-normal block truncate mt-0.5">
                                     {order.packageName}
                                   </span>
                                 )}
                               </td>
 
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className="font-black text-slate-900 text-sm">
+                              {/* 5. ยอดโอน */}
+                              <td className="py-3 px-3 align-middle text-right whitespace-nowrap w-[8%]">
+                                <span className="font-black text-slate-900 text-xs">
                                   {(order.totalPrice || order.price || 0).toLocaleString()} ฿
                                 </span>
                               </td>
 
-                              <td className="py-4 px-4 text-center whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedSlipModal(order)}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#1d61f2] rounded-xl border border-blue-200/80 transition cursor-pointer"
-                                >
-                                  {currentSlipImg ? (
-                                    <img 
-                                      src={currentSlipImg} 
-                                      alt="สลิป" 
-                                      className="w-6 h-6 rounded-lg object-cover border border-blue-300"
-                                    />
-                                  ) : (
-                                    <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-[#1d61f2]">
-                                      <ImageIcon size={14} />
-                                    </div>
-                                  )}
-                                  <span className="text-xs font-bold">ดูสลิป</span>
-                                </button>
+                              {/* 6. หลักฐานสลิป (จัดกึ่งกลางพอดีเป๊ะ) */}
+                              <td className="py-3 px-3 align-middle text-center w-[9%]">
+                                <div className="flex justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedSlipModal(order)}
+                                    className="inline-flex items-center justify-center gap-1 py-1 px-2.5 bg-blue-50 hover:bg-blue-100 active:scale-95 text-[#1d61f2] rounded-lg border border-blue-200 transition cursor-pointer shadow-2xs whitespace-nowrap"
+                                  >
+                                    {currentSlipImg ? (
+                                      <img 
+                                        src={currentSlipImg} 
+                                        alt="สลิป" 
+                                        className="w-4 h-4 rounded-xs object-cover border border-blue-300 shrink-0"
+                                      />
+                                    ) : (
+                                      <ImageIcon size={12} className="shrink-0" />
+                                    )}
+                                    <span className="text-[10.5px] font-bold">ดูสลิป</span>
+                                  </button>
+                                </div>
                               </td>
 
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <div className="relative inline-flex items-center">
-                                  <div className="w-7 h-7 rounded-lg bg-[#1d61f2]/10 text-[#1d61f2] flex items-center justify-center shrink-0 absolute left-2 pointer-events-none">
-                                    <Bike size={14} />
+                              {/* 7. มอบหมายไรเดอร์ */}
+                              <td className="py-3 px-3 align-middle w-[13%]">
+                                <div className="relative inline-flex items-center w-full">
+                                  <div className="w-5 h-5 rounded-md bg-[#1d61f2]/10 text-[#1d61f2] flex items-center justify-center shrink-0 absolute left-1.5 pointer-events-none">
+                                    <Bike size={11} />
                                   </div>
                                   <select
                                     value={selectedRiderId}
                                     onChange={(e) => setSelectedRiders({ ...selectedRiders, [order.id]: e.target.value })}
-                                    className="appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-xl pl-10 pr-8 py-1.5 text-xs font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs"
+                                    className="w-full appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-lg pl-6 pr-5 py-1 text-[10.5px] font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs truncate"
                                   >
                                     {riderList.map(r => (
                                       <option key={r.id} value={r.id}>
@@ -1074,25 +1088,28 @@ const DashboardPage = () => {
                                       </option>
                                     ))}
                                   </select>
-                                  <ChevronDown size={14} className="text-slate-400 absolute right-2.5 pointer-events-none" />
+                                  <ChevronDown size={11} className="text-slate-400 absolute right-1 pointer-events-none" />
                                 </div>
                               </td>
 
-                              <td className="py-4 px-4 text-center whitespace-nowrap space-x-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => setRejectModal({ isOpen: true, orderId: order.id, reason: 'ยอดเงินไม่ถูกต้อง หรือภาพสลิปไม่ชัดเจน' })}
-                                  className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 rounded-xl font-bold text-xs transition cursor-pointer"
-                                >
-                                  ปฏิเสธ
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => confirmApproveSlip(order.id)}
-                                  className="px-3.5 py-1.5 bg-[#1d61f2] hover:bg-blue-700 active:scale-95 text-white rounded-xl font-bold text-xs shadow-xs transition cursor-pointer"
-                                >
-                                  อนุมัติงาน
-                                </button>
+                              {/* 8. ดำเนินการ */}
+                              <td className="py-3 px-3 align-middle text-center whitespace-nowrap w-[17%]">
+                                <div className="inline-flex items-center gap-1 justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => setRejectModal({ isOpen: true, orderId: order.id, reason: 'ยอดเงินไม่ถูกต้อง หรือภาพสลิปไม่ชัดเจน' })}
+                                    className="px-2 py-1 border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 rounded-lg font-bold text-[10.5px] transition cursor-pointer"
+                                  >
+                                    ปฏิเสธ
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => confirmApproveSlip(order.id)}
+                                    className="px-2 py-1 bg-[#1d61f2] hover:bg-blue-700 active:scale-95 text-white rounded-lg font-bold text-[10.5px] shadow-2xs transition cursor-pointer"
+                                  >
+                                    อนุมัติ
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1160,7 +1177,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 3: รายการที่ส่งมอบสำเร็จแล้ว (พร้อมตัวกรองวันที่) ======================= */}
+          {/* ======================= แท็บ 3: รายการที่ส่งมอบสำเร็จแล้ว ======================= */}
           {activeTab === 'completed' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
@@ -1269,7 +1286,7 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 3.1: ออเดอร์ที่ถูกยกเลิก (พร้อมตัวกรองวันที่) ======================= */}
+          {/* ======================= แท็บ 3.1: ออเดอร์ที่ถูกยกเลิก ======================= */}
           {activeTab === 'cancelled' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">

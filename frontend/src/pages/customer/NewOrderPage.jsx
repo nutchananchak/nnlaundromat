@@ -14,7 +14,8 @@ import {
   Package,
   Check,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  HelpCircle
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -54,8 +55,11 @@ export default function NewOrderPage() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [plasticBagCount, setPlasticBagCount] = useState(0);
 
-  // State สำหรับป้ายแจ้งเตือน Modal
+  // State สำหรับป้ายแจ้งเตือน Modal ทั่วไป
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
+
+  // State สำหรับ Confirmation Modal ก่อนส่งคำสั่งซื้อ
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const showAlert = (title, message) => {
     setAlertModal({ isOpen: true, title, message });
@@ -96,7 +100,6 @@ export default function NewOrderPage() {
 
   const selectedPickupConfig = timeSlotsConfig.find(s => s.label === pickupTime);
 
-  // แก้ไข: ถ้าเลือกรอบรับผ้า 20:00 - 21:00 น. ให้รอบส่งผ้าเริ่มได้ตั้งแต่ 21:00 น.
   const minDeliveryHour = selectedPickupConfig 
     ? (selectedPickupConfig.startHour >= 20 ? 21 : selectedPickupConfig.startHour + 2) 
     : currentDecimalHour + 2;
@@ -193,7 +196,8 @@ export default function NewOrderPage() {
       };
     });
 
-  const handleCreateOrder = (e) => {
+  // ตรวจสอบเงื่อนไขก่อนเปิด Confirmation Modal
+  const handleValidateAndPreConfirm = (e) => {
     e.preventDefault();
 
     if (!displayAddress) {
@@ -213,7 +217,6 @@ export default function NewOrderPage() {
 
     const hasSpecialItems = Object.values(specialItemCounts).some(count => count > 0);
 
-    // ทั้งซักอบพับและชุดเครื่องนอน: เลือกแพ็กเกจ หรือเลือกรายการพิเศษอย่างน้อย 1 อย่าง
     if (!selectedPackage && !hasSpecialItems) {
       showAlert('โปรดเลือกบริการ', 'กรุณาเลือกแพ็กเกจ หรือเลือกความต้องการพิเศษอย่างน้อย 1 รายการ');
       return;
@@ -223,6 +226,13 @@ export default function NewOrderPage() {
       showAlert('เงื่อนไขการให้บริการ', 'กรุณากดยอมรับเงื่อนไขการใช้บริการของทางร้านก่อนดำเนินการต่อ');
       return;
     }
+
+    setShowConfirmModal(true);
+  };
+
+  // ดำเนินการสร้างออเดอร์หลังกดยืนยันจาก Modal
+  const handleProceedOrder = () => {
+    setShowConfirmModal(false);
 
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date());
     const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
@@ -326,7 +336,7 @@ export default function NewOrderPage() {
             </div>
           </div>
 
-          {/* 2. เลือกแพ็กเกจ (สามารถแตะซ้ำเพื่อยกเลิกการเลือกได้) */}
+          {/* 2. เลือกแพ็กเกจ */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-bold text-gray-900">
@@ -665,14 +675,14 @@ export default function NewOrderPage() {
 
           <button
             type="button"
-            onClick={handleCreateOrder}
+            onClick={handleValidateAndPreConfirm}
             className="w-full py-3 rounded-xl bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-sm tracking-wide shadow-md shadow-blue-500/20 active:scale-[0.98] transition cursor-pointer"
           >
             ยืนยันการสั่งบริการ
           </button>
         </div>
 
-        {/* Modal เลือกที่อยู่จัดส่งทันทีในหน้านี้ */}
+        {/* Modal เลือกที่อยู่จัดส่ง */}
         {showAddressModal && (
           <div className="absolute inset-0 bg-black/60 z-50 flex items-end justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] rounded-t-3xl p-5 shadow-2xl flex flex-col gap-4 animate-in slide-in-from-bottom duration-200">
@@ -770,6 +780,76 @@ export default function NewOrderPage() {
               >
                 เข้าใจและยอมรับเงื่อนไข
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal ยืนยันการสั่งบริการ (Confirmation Modal เพื่อความปลอดภัย) */}
+        {showConfirmModal && (
+          <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 border border-slate-100 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1d61f2] flex items-center justify-center">
+                    <HelpCircle size={18} />
+                  </div>
+                  <h3 className="font-bold text-base text-slate-900 leading-tight">ยืนยันการสั่งบริการ</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* สรุปข้อมูลคำสั่งซื้อสั้นๆ */}
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col gap-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">บริการ:</span>
+                  <span className="font-bold text-slate-800">
+                    {serviceType === 'bedding' ? 'ชุดเครื่องนอน' : 'ซัก อบ พับ'} ({currentPkg ? currentPkg.name : 'เฉพาะรายการพิเศษ'})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">รอบรับผ้า:</span>
+                  <span className="font-bold text-slate-800">{pickupTime}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">รอบส่งผ้าคืน:</span>
+                  <span className="font-bold text-slate-800">{deliveryTime}</span>
+                </div>
+                <div className="flex justify-between items-start pt-1.5 border-t border-slate-200/60">
+                  <span className="text-slate-500 shrink-0 mr-2">สถานที่:</span>
+                  <span className="font-medium text-slate-700 text-right line-clamp-1">{displayAddress}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-200/60">
+                  <span className="font-bold text-slate-700">ยอดชำระสุทธิ:</span>
+                  <span className="font-extrabold text-[#1d61f2] text-sm">{totalPrice.toLocaleString()} บาท</span>
+                </div>
+              </div>
+
+              <p className="text-[11.5px] text-slate-500 text-center leading-relaxed">
+                โปรดตรวจสอบข้อมูลก่อนยืนยัน ท่านต้องการดำเนินการส่งคำสั่งซื้อและไปยังขั้นตอนชำระเงินใช่หรือไม่?
+              </p>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProceedOrder}
+                  className="flex-1 py-2.5 rounded-xl bg-[#1d61f2] hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-xs shadow-md shadow-blue-500/20 transition cursor-pointer"
+                >
+                  ยืนยันการสั่งซื้อ
+                </button>
+              </div>
             </div>
           </div>
         )}
