@@ -14,10 +14,12 @@ import {
   Clock,
   User,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { createNewOrder, updateOrder } from '../../api/order';
+import { generatePromptPayQRApi } from '../../api/auth';
 
 export default function PaymentPage() {
   const navigate = useNavigate();
@@ -43,6 +45,10 @@ export default function PaymentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
 
+  // State สำหรับ PromptPay QR Code จริงจาก Backend
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [isQrLoading, setIsQrLoading] = useState(false);
+
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
 
   const showAlert = (title, message) => {
@@ -55,9 +61,30 @@ export default function PaymentPage() {
     accountName: 'บริษัท เอ็นแอนด์เอ็น ลอนดรอแมท จำกัด',
   };
 
-  const qrCodeUrl = orderData 
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`
-    : '';
+  // ดึง PromptPay QR Code จริงจาก Backend (มาตรฐาน EMVCo)
+  useEffect(() => {
+    const fetchPromptPayQR = async () => {
+      if (!orderData || payableAmount <= 0) return;
+
+      try {
+        setIsQrLoading(true);
+        const res = await generatePromptPayQRApi(payableAmount);
+        if (res && res.qrCodeUrl) {
+          setQrCodeUrl(res.qrCodeUrl);
+        } else {
+          // แผนสำรองกรณี API ไม่คืนรูปภาพ
+          setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`);
+        }
+      } catch (err) {
+        console.error('Failed to generate real PromptPay QR, using fallback:', err);
+        setQrCodeUrl(`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`);
+      } finally {
+        setIsQrLoading(false);
+      }
+    };
+
+    fetchPromptPayQR();
+  }, [payableAmount, orderData]);
 
   const handleCopyAccount = () => {
     navigator.clipboard.writeText(bankAccount.accountNumber.replace(/-/g, ''));
@@ -112,7 +139,6 @@ export default function PaymentPage() {
           status: 'pending'
         });
 
-        // อัปเดต state ท้องถิ่นใน AppContext / localStorage
         const existingOrders = orders && orders.length > 0
           ? orders
           : JSON.parse(localStorage.getItem('orders') || '[]');
@@ -175,7 +201,6 @@ export default function PaymentPage() {
 
         const res = await createNewOrder(orderPayload);
 
-        // อัปเดต Context ท้องถิ่นสำรอง
         const existingOrders = orders && orders.length > 0
           ? orders
           : JSON.parse(localStorage.getItem('orders') || '[]');
@@ -354,17 +379,27 @@ export default function PaymentPage() {
             {paymentMethod === 'qrcode' ? (
               <>
                 <p className="text-xs text-slate-500 font-medium mb-3">สแกน QR Code ผ่านแอปพลิเคชันธนาคาร</p>
-                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl mb-3 shadow-inner">
-                  <img
-                    src={qrCodeUrl}
-                    alt="PromptPay QR Code"
-                    className="w-48 h-48 object-contain rounded-xl"
-                  />
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl mb-3 shadow-inner flex items-center justify-center min-h-[210px] min-w-[210px]">
+                  {isQrLoading ? (
+                    <div className="flex flex-col items-center justify-center gap-2 text-slate-400 py-10">
+                      <Loader2 size={28} className="animate-spin text-[#1d61f2]" />
+                      <span className="text-xs font-bold">กำลังสร้าง PromptPay QR...</span>
+                    </div>
+                  ) : qrCodeUrl ? (
+                    <img
+                      src={qrCodeUrl}
+                      alt="PromptPay QR Code"
+                      className="w-48 h-48 object-contain rounded-xl"
+                    />
+                  ) : (
+                    <div className="text-xs text-slate-400 py-10">ไม่สามารถโหลด QR Code ได้</div>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={handleDownloadQr}
-                  className="flex items-center gap-2 text-xs font-bold text-[#1d61f2] bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition cursor-pointer"
+                  disabled={!qrCodeUrl || isQrLoading}
+                  className="flex items-center gap-2 text-xs font-bold text-[#1d61f2] bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 hover:bg-blue-100 transition cursor-pointer disabled:opacity-50"
                 >
                   <Download size={14} />
                   บันทึกรูป QR Code

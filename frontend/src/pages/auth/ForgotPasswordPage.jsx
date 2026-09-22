@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
-import { forgotPasswordApi } from '../../api/auth';
+import { forgotPasswordApi, requestOtpApi, verifyOtpApi } from '../../api/auth';
 
 const AlertTriangleIcon = ({ size = 18, color = '#dc2626' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -65,7 +66,7 @@ const LiveSmsNotification = ({ otpCode, phone, onFill }) => {
       </div>
 
       <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>ข้อความ SMS จาก N&amp;N OTP</div>
+        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>ข้อความ SMS จาก N&amp;N Server OTP</div>
         <div style={{ fontSize: '13px', fontWeight: '700', marginTop: '2px' }}>
           รหัส OTP ของคุณคือ: <span style={{ color: '#60a5fa', letterSpacing: '1px' }}>{otpCode}</span>
         </div>
@@ -137,7 +138,7 @@ const ResetSuccessModal = ({ isOpen, onConfirm }) => {
           รีเซ็ตรหัสผ่านสำเร็จ!
         </h3>
         <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 24px 0', lineHeight: '1.5' }}>
-          ระบบได้อัปเดตรหัสผ่านใหม่ของคุณเรียบร้อยแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่
+          ระบบได้อัปเดตรหัสผ่านใหม่ของคุณในฐานข้อมูลเรียบร้อยแล้ว
         </p>
 
         <button
@@ -163,7 +164,7 @@ const ResetSuccessModal = ({ isOpen, onConfirm }) => {
   );
 };
 
-const ForgotPasswordPage = () => {
+export default function ForgotPasswordPage() {
   const [step, setStep] = useState(1);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
@@ -176,12 +177,7 @@ const ForgotPasswordPage = () => {
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
 
-  const sendRealSmsOtp = async (cleanPhone) => {
-    const realCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(realCode);
-    return realCode;
-  };
-
+  // 1. ขอ OTP จริงจาก Backend
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -192,31 +188,43 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    setIsSendingOtp(true);
-    await sendRealSmsOtp(cleanPhone);
-    setIsSendingOtp(false);
-    setStep(2);
+    try {
+      setIsSendingOtp(true);
+      const res = await requestOtpApi(cleanPhone);
+      if (res.success && res.devOtp) {
+        setGeneratedOtp(res.devOtp); // รับรหัส 6 หลักที่สร้างจาก Server จริง
+        setStep(2);
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'ไม่สามารถส่งรหัส OTP ได้ กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  const handleVerifyOtp = (e) => {
+  // 2. ยืนยัน OTP กับ Backend
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
     const cleanOtp = otp.trim();
-
     if (cleanOtp.length !== 6 || !/^[0-9]{6}$/.test(cleanOtp)) {
       setErrorMsg('กรุณากรอกรหัส OTP ให้ครบถ้วน');
       return;
     }
 
-    if (cleanOtp !== generatedOtp) {
-      setErrorMsg('รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบข้อความ SMS ที่ได้รับ');
-      return;
+    try {
+      const cleanPhone = phoneNumber.replace(/[-\s]/g, '');
+      const res = await verifyOtpApi(cleanPhone, cleanOtp);
+      if (res.success) {
+        setStep(3); // ผ่านแล้วไปเปลี่ยนรหัสผ่าน
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว');
     }
-
-    setStep(3);
   };
 
+  // 3. ตั้งรหัสผ่านใหม่และอัปเดต MySQL
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -273,7 +281,7 @@ const ForgotPasswordPage = () => {
       {step === 1 && (
         <form onSubmit={handleRequestOtp}>
           <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px', textAlign: 'center', lineHeight: '1.5' }}>
-            กรุณากรอกเบอร์โทรศัพท์ที่ลงทะเบียนไว้ ระบบจะส่งรหัส OTP ทาง SMS เพื่อยืนยันตัวตนจริง
+            กรุณากรอกเบอร์โทรศัพท์ ระบบจะส่งรหัส OTP จาก Server จริงเพื่อยืนยันตัวตน
           </p>
 
           <Input
@@ -292,7 +300,7 @@ const ForgotPasswordPage = () => {
 
           <div style={{ marginTop: '24px' }}>
             <Button type="submit" disabled={isSendingOtp}>
-              {isSendingOtp ? 'กำลังส่ง OTP...' : 'ขอรหัส OTP ทาง SMS'}
+              {isSendingOtp ? 'กำลังส่งรหัส OTP...' : 'ขอรหัส OTP'}
             </Button>
           </div>
 
@@ -308,11 +316,11 @@ const ForgotPasswordPage = () => {
       {step === 2 && (
         <form onSubmit={handleVerifyOtp}>
           <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px', textAlign: 'left', lineHeight: '1.5' }}>
-            กรุณากรอกรหัส OTP 6 หลัก ที่ส่งไปยังเบอร์ <b style={{ color: '#0f172a' }}>{phoneNumber}</b>
+            กรุณากรอกรหัส OTP 6 หลัก ที่ส่งมาจาก Server ไปยังเบอร์ <b style={{ color: '#0f172a' }}>{phoneNumber}</b>
           </p>
 
           <Input
-            label="รหัส OTP"
+            label="รหัส OTP 6 หลัก"
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -331,7 +339,7 @@ const ForgotPasswordPage = () => {
           />
 
           <div style={{ marginTop: '24px' }}>
-            <Button type="submit">ยืนยัน OTP</Button>
+            <Button type="submit">ยืนยัน OTP กับ Server</Button>
           </div>
 
           <p style={{ fontSize: '13px', color: '#9ca3af', marginTop: '16px' }}>
@@ -344,7 +352,7 @@ const ForgotPasswordPage = () => {
               }}
               style={{ background: 'none', border: 'none', color: '#1d61f2', cursor: 'pointer', fontWeight: '600' }}
             >
-              ส่งรหัสอีกครั้ง
+              ขอรหัสใหม่อีกครั้ง
             </button>
           </p>
         </form>
@@ -353,7 +361,7 @@ const ForgotPasswordPage = () => {
       {step === 3 && (
         <form onSubmit={handleResetPassword}>
           <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px', textAlign: 'center' }}>
-            กรุณาตั้งรหัสผ่านใหม่สำหรับเข้าใช้งาน (6 - 10 ตัวอักษร)
+            ยืนยันตัวตนสำเร็จ! กรุณาตั้งรหัสผ่านใหม่ (6 - 10 ตัวอักษร)
           </p>
 
           <div style={{ position: 'relative' }}>
@@ -375,19 +383,8 @@ const ForgotPasswordPage = () => {
               type="button"
               onClick={() => setShowNewPassword(!showNewPassword)}
               style={{
-                position: 'absolute',
-                right: '12px',
-                top: '36px',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#64748b'
+                position: 'absolute', right: '12px', top: '36px', background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: '#64748b'
               }}
-              title={showNewPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
             >
               {showNewPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
             </button>
@@ -411,26 +408,15 @@ const ForgotPasswordPage = () => {
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               style={{
-                position: 'absolute',
-                right: '12px',
-                top: '36px',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#64748b'
+                position: 'absolute', right: '12px', top: '36px', background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: '#64748b'
               }}
-              title={showConfirmPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
             >
               {showConfirmPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
             </button>
           </div>
 
           <div style={{ marginTop: '24px' }}>
-            <Button type="submit">บันทึกรหัสผ่านใหม่</Button>
+            <Button type="submit">บันทึกรหัสผ่านใหม่ลงฐานข้อมูล</Button>
           </div>
         </form>
       )}
@@ -444,6 +430,4 @@ const ForgotPasswordPage = () => {
       />
     </Card>
   );
-};
-
-export default ForgotPasswordPage;
+}

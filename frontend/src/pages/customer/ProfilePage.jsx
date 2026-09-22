@@ -31,7 +31,7 @@ import {
 } from '@react-google-maps/api';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
-import { updateProfileApi } from '../../api/auth';
+import { updateProfileApi, requestOtpApi, verifyOtpApi } from '../../api/auth';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const STORE_COORDS = { lat: 13.709648150061998, lng: 100.62401489583843 };
@@ -78,10 +78,13 @@ export default function ProfilePage() {
   const [editName, setEditName] = useState(userProfile?.fullName || userProfile?.name || '');
   const [editPhone, setEditPhone] = useState(userProfile?.phone || '');
 
+  // OTP State
   const [otpStep, setOtpStep] = useState('input');
   const [inputOtp, setInputOtp] = useState('');
-  const [mockGeneratedOtp, setMockGeneratedOtp] = useState('1234');
+  const [serverGeneratedOtp, setServerGeneratedOtp] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(60);
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   useEffect(() => {
     if (userProfile) {
@@ -383,7 +386,6 @@ export default function ProfilePage() {
       showToast('บันทึกที่อยู่จัดส่งใหม่เรียบร้อย');
     }
 
-    // ซิงค์ที่อยู่จัดส่งล่าสุดลงตาราง Customer ใน MySQL
     if (userProfile?.phone) {
       try {
         await updateProfileApi(userProfile.phone, { address: addressDetail.trim() });
@@ -433,7 +435,8 @@ export default function ProfilePage() {
     }
   };
 
-  const handleInitiateProfileSave = (e) => {
+  // 1. ตรวจสอบการเปลี่ยนเบอร์และขอ OTP จริงจาก Backend
+  const handleInitiateProfileSave = async (e) => {
     e.preventDefault();
     const trimmedName = editName.trim();
     const trimmedPhone = editPhone.trim();
@@ -450,27 +453,49 @@ export default function ProfilePage() {
 
     const originalPhone = userProfile?.phone || '';
     if (trimmedPhone !== originalPhone) {
-      const generatedCode = String(Math.floor(1000 + Math.random() * 9000));
-      setMockGeneratedOtp(generatedCode);
-      setOtpStep('verify');
-      setOtpCountdown(60);
-      setInputOtp('');
-      showToast(`รหัส OTP คือ: ${generatedCode} (สำหรับทดสอบ)`, 'success');
+      try {
+        setIsRequestingOtp(true);
+        const res = await requestOtpApi(trimmedPhone);
+        if (res.success && res.devOtp) {
+          setServerGeneratedOtp(res.devOtp);
+          setOtpStep('verify');
+          setOtpCountdown(60);
+          setInputOtp('');
+          showToast(`ส่งรหัส OTP จาก Server สำเร็จ! (รหัส: ${res.devOtp})`, 'success');
+        }
+      } catch (err) {
+        showToast(err.response?.data?.message || 'ไม่สามารถส่ง OTP ได้ กรุณาลองใหม่', 'error');
+      } finally {
+        setIsRequestingOtp(false);
+      }
       return;
     }
 
     finalizeProfileUpdate(trimmedName, trimmedPhone);
   };
 
-  const handleVerifyOtpAndSave = (e) => {
+  // 2. ตรวจสอบ OTP กับ Backend จริง
+  const handleVerifyOtpAndSave = async (e) => {
     e.preventDefault();
-    if (inputOtp.trim() !== mockGeneratedOtp && inputOtp.trim() !== '1234') {
-      showToast('รหัส OTP ไม่ถูกต้อง กรุณากรอกใหม่', 'error');
+    if (!inputOtp.trim()) {
+      showToast('กรุณากรอกรหัส OTP', 'error');
       return;
     }
-    finalizeProfileUpdate(editName.trim(), editPhone.trim());
+
+    try {
+      setIsVerifyingOtp(true);
+      const res = await verifyOtpApi(editPhone.trim(), inputOtp.trim());
+      if (res.success) {
+        await finalizeProfileUpdate(editName.trim(), editPhone.trim());
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว', 'error');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
+  // 3. บันทึกข้อมูลโปรไฟล์ลง MySQL และ State
   const finalizeProfileUpdate = async (name, phone) => {
     try {
       if (userProfile?.phone) {
@@ -994,6 +1019,7 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP เชื่อมต่อ Server จริง */}
         {showEditProfileModal && (
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 border border-slate-100">
@@ -1046,9 +1072,10 @@ export default function ProfilePage() {
                     </button>
                     <button 
                       type="submit" 
-                      className="flex-1 py-2.5 rounded-xl bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer"
+                      disabled={isRequestingOtp}
+                      className="flex-1 py-2.5 rounded-xl bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 cursor-pointer disabled:opacity-50"
                     >
-                      {editPhone.trim() !== (userProfile?.phone || '') ? 'ขอรหัส OTP' : 'บันทึก'}
+                      {isRequestingOtp ? 'กำลังส่ง OTP...' : editPhone.trim() !== (userProfile?.phone || '') ? 'ขอรหัส OTP' : 'บันทึก'}
                     </button>
                   </div>
                 </form>
@@ -1057,7 +1084,7 @@ export default function ProfilePage() {
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl flex items-start gap-2.5">
                     <KeyRound size={18} className="text-[#1d61f2] shrink-0 mt-0.5" />
                     <div>
-                      <span className="text-xs font-bold text-slate-900 block">ระบบได้ส่งรหัส OTP 4 หลัก</span>
+                      <span className="text-xs font-bold text-slate-900 block">ระบบส่งรหัส OTP 6 หลัก</span>
                       <span className="text-[11px] text-slate-500 block mt-0.5">
                         ไปยังหมายเลข <b>{editPhone}</b> เพื่อยืนยันความถูกต้องก่อนเปลี่ยนเบอร์ล็อกอิน
                       </span>
@@ -1065,14 +1092,16 @@ export default function ProfilePage() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">กรอกรหัส OTP (รหัสทดสอบ: {mockGeneratedOtp})</label>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      กรอกรหัส OTP {serverGeneratedOtp ? `(รหัสทดสอบ: ${serverGeneratedOtp})` : ''}
+                    </label>
                     <input
                       type="text"
-                      maxLength="4"
+                      maxLength="6"
                       required
-                      placeholder="• • • •"
+                      placeholder="• • • • • •"
                       value={inputOtp}
-                      onChange={(e) => setInputOtp(e.target.value)}
+                      onChange={(e) => setInputOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                       className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-center text-lg font-black tracking-widest text-slate-900 outline-none focus:border-[#1d61f2]"
                     />
                   </div>
@@ -1083,11 +1112,17 @@ export default function ProfilePage() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => {
-                          const newCode = String(Math.floor(1000 + Math.random() * 9000));
-                          setMockGeneratedOtp(newCode);
-                          setOtpCountdown(60);
-                          showToast(`รหัส OTP ใหม่คือ: ${newCode}`, 'success');
+                        onClick={async () => {
+                          try {
+                            const res = await requestOtpApi(editPhone.trim());
+                            if (res.success && res.devOtp) {
+                              setServerGeneratedOtp(res.devOtp);
+                              setOtpCountdown(60);
+                              showToast(`รหัส OTP ใหม่คือ: ${res.devOtp}`, 'success');
+                            }
+                          } catch (err) {
+                            showToast('ส่งรหัสใหม่ไม่สำเร็จ', 'error');
+                          }
                         }}
                         className="font-bold text-[#1d61f2] hover:underline cursor-pointer"
                       >
@@ -1106,9 +1141,10 @@ export default function ProfilePage() {
                     </button>
                     <button 
                       type="submit" 
-                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 cursor-pointer"
+                      disabled={isVerifyingOtp}
+                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
                     >
-                      ยืนยันและบันทึก
+                      {isVerifyingOtp ? 'กำลังตรวจสอบ...' : 'ยืนยันและบันทึก'}
                     </button>
                   </div>
                 </form>
