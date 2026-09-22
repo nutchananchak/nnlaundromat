@@ -16,6 +16,7 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { fetchOrders } from '../../api/order';
 
 // โลโก้ทางการ N&N LAUNDROMAT DELIVERY
 const OfficialNnLogo = () => (
@@ -26,58 +27,43 @@ const OfficialNnLogo = () => (
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    {/* 1. วงกลมพื้นหลังสีฟ้าอ่อน */}
     <circle cx="120" cy="120" r="110" fill="#dbeefd" />
 
-    {/* กลุ่มตัวรถ: ปรับ Scale ให้เล็กลงและจัดกึ่งกลางวงกลม */}
     <g transform="translate(14, 12) scale(0.88)">
-      {/* ตัวถังตู้ซักผ้าด้านหลัง */}
       <path 
         d="M50 56C50 50 54 46 60 46H138C144 46 148 50 148 56V130H50V56Z" 
         fill="#004b7a" 
       />
-
-      {/* ส่วนหัวรถคนขับด้านหน้า */}
       <path 
         d="M148 72H168C172 72 175.5 74 177.5 77L189 94C190.5 96.5 191.5 99.5 191.5 102.5V130H148V72Z" 
         fill="#004b7a" 
       />
-
-      {/* กระจกหน้าต่างห้องคนขับ */}
       <path 
         d="M156 80H166C168.5 80 170.8 81.3 172 83.5L179.5 95C180.5 96.5 181 98.2 181 100V104H156V80Z" 
         fill="#ffffff" 
       />
-
-      {/* รายละเอียดบนตัวตู้: ช่องผงซักฟอก และปุ่มควบคุม 2 จุด */}
       <rect x="62" y="55" width="20" height="9" rx="3.5" fill="#ffffff" />
       <circle cx="122" cy="59.5" r="4" fill="#ffffff" />
       <circle cx="136" cy="59.5" r="4" fill="#ffffff" />
 
-      {/* ถังเครื่องซักผ้าฝาหน้าทรงกลมใหญ่ */}
       <circle cx="106" cy="98" r="26" fill="#ffffff" />
 
-      {/* คลื่นน้ำสีน้ำเงินเข้มด้านในถังซัก */}
       <path 
         d="M84 98C84 91 89.5 85.5 96 87C102.5 88.5 106.5 97.5 114 96C119.5 94.8 123.5 98 123.5 98C123.5 110.5 113.5 120 101 120C88.5 120 84 110 84 98Z" 
         fill="#004b7a" 
       />
-      {/* ฟองอากาศสีขาว */}
       <circle cx="112" cy="90" r="2.8" fill="#ffffff" />
       <circle cx="121" cy="95" r="2" fill="#ffffff" />
 
-      {/* ล้อรถด้านซ้าย */}
       <circle cx="76" cy="144" r="15" fill="#004b7a" />
       <circle cx="76" cy="144" r="9.5" fill="#ffffff" />
       <circle cx="76" cy="144" r="5.5" fill="#004b7a" />
 
-      {/* ล้อรถด้านขวา */}
       <circle cx="166" cy="144" r="15" fill="#004b7a" />
       <circle cx="166" cy="144" r="9.5" fill="#ffffff" />
       <circle cx="166" cy="144" r="5.5" fill="#004b7a" />
     </g>
 
-    {/* 2. ข้อความ N&N LAUNDROMAT */}
     <text 
       x="120" 
       y="178" 
@@ -91,7 +77,6 @@ const OfficialNnLogo = () => (
       N&amp;N LAUNDROMAT
     </text>
 
-    {/* 3. ข้อความ DELIVERY */}
     <text 
       x="120" 
       y="196" 
@@ -111,9 +96,25 @@ export default function OrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { orders } = useApp ? useApp() : {};
+  const { orders, setOrders } = useApp ? useApp() : {};
 
-  // ค้นหาออเดอร์จริงจาก Context หรือ localStorage
+  // ดึงข้อมูลออเดอร์สดจาก MySQL เมื่อเข้าหน้านี้
+  useEffect(() => {
+    const fetchLiveDetail = async () => {
+      try {
+        const liveList = await fetchOrders();
+        if (setOrders) {
+          setOrders(liveList);
+        }
+        localStorage.setItem('orders', JSON.stringify(liveList));
+      } catch (err) {
+        console.error('Failed to sync order detail from MySQL:', err);
+      }
+    };
+
+    fetchLiveDetail();
+  }, [id, setOrders]);
+
   const order = useMemo(() => {
     const list = orders && orders.length > 0 
       ? orders 
@@ -139,7 +140,6 @@ export default function OrderDetailPage() {
     };
   }, [orders, id]);
 
-  // เช็คสถานะเสร็จสมบูรณ์
   const isCompleted = useMemo(() => {
     return (
       order.status === 'completed' || 
@@ -149,10 +149,8 @@ export default function OrderDetailPage() {
     );
   }, [order]);
 
-  // State สำหรับ Modal รูปหลักฐานส่งมอบ
   const [showDeliveryProofModal, setShowDeliveryProofModal] = useState(false);
 
-  // ถ้าส่ง state: { openProof: true } มาจาก Notification ให้เปิด Modal อัตโนมัติทันที
   useEffect(() => {
     if (location.state?.openProof && isCompleted) {
       setShowDeliveryProofModal(true);
@@ -267,7 +265,7 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า (แก้ให้ object-contain ไม่โดนตัดขอบ) */}
+            {/* ภาพถ่ายยืนยันจากไรเดอร์ตอนรับผ้า */}
             {order.riderBasketImage ? (
               <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
@@ -402,7 +400,6 @@ export default function OrderDetailPage() {
                   <CheckCircle2 size={13} className="text-emerald-600" /> จัดส่งผ้าคืนสำเร็จ
                 </div>
 
-                {/* ปุ่มเปิดดูรูปภาพหลักฐานการส่งมอบผ้าจากไรเดอร์ */}
                 <button
                   type="button"
                   onClick={() => setShowDeliveryProofModal(true)}
@@ -468,7 +465,6 @@ export default function OrderDetailPage() {
                     </div>
                   )}
                   
-                  {/* ค่าจัดส่ง */}
                   <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-200/60">
                     <span>ค่าบริการจัดส่ง Delivery</span>
                     <span className="font-bold text-slate-900">ฟรี</span>
@@ -546,7 +542,7 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* ✅ Popup Modal แสดงหลักฐานส่งมอบผ้า (ปรับแก้มิติภาพเป็น object-contain ไม่โดนตัดขอบทั้งบนและล่าง) */}
+        {/* Modal แสดงหลักฐานส่งมอบผ้า */}
         {showDeliveryProofModal && (
           <div className="fixed inset-0 bg-slate-950/75 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150">
             <div className="bg-white w-full max-w-[390px] rounded-3xl p-5 shadow-2xl flex flex-col gap-3.5 border border-slate-100">
@@ -570,7 +566,6 @@ export default function OrderDetailPage() {
                 </button>
               </div>
 
-              {/* รูปภาพจากไรเดอร์ (ใช้ object-contain + ความสูงยืดหยุ่น ภาพแสดงครบเต็มใบ 100%) */}
               <div className="w-full min-h-[180px] max-h-80 rounded-2xl overflow-hidden bg-slate-900/5 border border-slate-200 flex items-center justify-center p-2">
                 {order.proofImage || order.riderBasketImage ? (
                   <img
@@ -586,7 +581,6 @@ export default function OrderDetailPage() {
                 )}
               </div>
 
-              {/* ข้อมูลจุดส่งมอบ */}
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col gap-1.5 text-xs text-slate-600">
                 <div className="flex justify-between">
                   <span className="text-slate-400">ผู้ส่งมอบ:</span>

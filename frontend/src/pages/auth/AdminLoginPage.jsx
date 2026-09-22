@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import LoginForm from '../../components/auth/LoginForm';
-
-const REGISTERED_ADMINS = [
-  { id: 'ADM-01', name: 'ฝ่ายปฏิบัติการกลาง', username: 'admin@nnlaundromat.com', password: 'admin123' },
-  { id: 'ADM-02', name: 'ผู้จัดการ', username: 'manager', password: 'admin123' }
-];
+import { loginApi } from '../../api/auth';
 
 const AdminSecurityModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -79,8 +75,6 @@ const AdminLoginPage = () => {
   });
 
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
-
-  // State สำหรับป้ายแจ้งเตือนโมเดิร์น
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const triggerToast = (message, type = 'success') => {
@@ -90,38 +84,35 @@ const AdminLoginPage = () => {
     }, 2500);
   };
 
-  const handleAdminLogin = ({ identifier, password }) => {
+  const handleAdminLogin = async ({ identifier, password }) => {
     const trimmedInput = (identifier || '').trim();
     const trimmedPassword = (password || '').trim();
 
-    const admin = REGISTERED_ADMINS.find(
-      (a) =>
-        (a.username.toLowerCase() === trimmedInput.toLowerCase() ||
-          a.id.toLowerCase() === trimmedInput.toLowerCase()) &&
-        a.password === trimmedPassword
-    );
+    try {
+      const res = await loginApi(trimmedInput, trimmedPassword, 'admin');
 
-    if (!admin) {
-      triggerToast('ชื่อผู้ใช้งานหรือรหัสผ่านแอดมินไม่ถูกต้อง', 'error');
-      return;
+      if (res.success) {
+        localStorage.setItem('currentAdmin', JSON.stringify(res.user));
+        if (res.token) localStorage.setItem('token', res.token);
+
+        if (rememberMe) {
+          localStorage.setItem('rememberAdmin', 'true');
+          localStorage.setItem('rememberedAdminId', trimmedInput);
+          localStorage.setItem('rememberedAdminPass', trimmedPassword);
+        } else {
+          localStorage.removeItem('rememberAdmin');
+          localStorage.removeItem('rememberedAdminId');
+          localStorage.removeItem('rememberedAdminPass');
+        }
+
+        triggerToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${res.user.name} (${res.user.id})`, 'success');
+        setTimeout(() => {
+          navigate('/admin/dashboard');
+        }, 600);
+      }
+    } catch (err) {
+      triggerToast(err.response?.data?.message || 'ชื่อผู้ใช้งานหรือรหัสผ่านแอดมินไม่ถูกต้อง', 'error');
     }
-
-    localStorage.setItem('currentAdmin', JSON.stringify(admin));
-
-    if (rememberMe) {
-      localStorage.setItem('rememberAdmin', 'true');
-      localStorage.setItem('rememberedAdminId', trimmedInput);
-      localStorage.setItem('rememberedAdminPass', trimmedPassword);
-    } else {
-      localStorage.removeItem('rememberAdmin');
-      localStorage.removeItem('rememberedAdminId');
-      localStorage.removeItem('rememberedAdminPass');
-    }
-
-    triggerToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${admin.name} (${admin.id})`, 'success');
-    setTimeout(() => {
-      navigate('/admin/dashboard');
-    }, 600);
   };
 
   const adminFooterSlot = (
@@ -140,7 +131,6 @@ const AdminLoginPage = () => {
 
   return (
     <>
-      {/* ป้ายแจ้งเตือนดีไซน์โมเดิร์น */}
       {toast.show && (
         <div style={{
           position: 'fixed',

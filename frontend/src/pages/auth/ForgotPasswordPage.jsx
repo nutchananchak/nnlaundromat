@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import { forgotPasswordApi } from '../../api/auth';
 
-// ไอคอนเตือนภัย
 const AlertTriangleIcon = ({ size = 18, color = '#dc2626' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
     <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
@@ -12,7 +12,6 @@ const AlertTriangleIcon = ({ size = 18, color = '#dc2626' }) => (
   </svg>
 );
 
-// ไอคอนลูกตา
 const EyeIcon = ({ size = 18, color = '#64748b' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
@@ -29,7 +28,6 @@ const EyeOffIcon = ({ size = 18, color = '#64748b' }) => (
   </svg>
 );
 
-// แจ้งเตือน SMS OTP จำลองเสมือนจริงบนหัวจอ (iOS/Android Push Notification Style)
 const LiveSmsNotification = ({ otpCode, phone, onFill }) => {
   if (!otpCode) return null;
   return (
@@ -93,7 +91,6 @@ const LiveSmsNotification = ({ otpCode, phone, onFill }) => {
   );
 };
 
-// ป้ายแจ้งเตือนเปลี่ยนรหัสสำเร็จ
 const ResetSuccessModal = ({ isOpen, onConfirm }) => {
   if (!isOpen) return null;
   return (
@@ -167,7 +164,7 @@ const ResetSuccessModal = ({ isOpen, onConfirm }) => {
 };
 
 const ForgotPasswordPage = () => {
-  const [step, setStep] = useState(1); // 1: กรอกเบอร์, 2: กรอก OTP, 3: รหัสผ่านใหม่
+  const [step, setStep] = useState(1);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [generatedOtp, setGeneratedOtp] = useState('');
@@ -179,27 +176,12 @@ const ForgotPasswordPage = () => {
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
 
-  // ฟังก์ชันยิงส่ง OTP จริง (สุ่มเลข 6 หลักจริง + ส่งผ่าน SMS Gateway หรือจำลอง Push SMS)
   const sendRealSmsOtp = async (cleanPhone) => {
-    // 1. สุ่มรหัส OTP 6 หลักจริง (เช่น 748291)
     const realCode = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(realCode);
-
-    // 2. เรียก SMS Gateway (หากมี Twilio / ThaiBulkSMS สามารถต่อ Webhook ได้ที่นี่)
-    /*
-    try {
-      await fetch('https://api.your-sms-provider.com/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: cleanPhone, message: `รหัส OTP N&N ของคุณคือ ${realCode}` })
-      });
-    } catch(err) { ... }
-    */
-
     return realCode;
   };
 
-  // สเต็ป 1: ขอรหัส OTP
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -210,22 +192,12 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    // ตรวจสอบว่ามีเบอร์นี้ลงทะเบียนไว้ในระบบหรือไม่
-    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    const userExists = existingUsers.some(u => u.phone === cleanPhone);
-
-    if (!userExists) {
-      setErrorMsg('ไม่พบเบอร์โทรศัพท์นี้ในระบบ กรุณาตรวจสอบอีกครั้งหรือสมัครสมาชิกใหม่');
-      return;
-    }
-
     setIsSendingOtp(true);
     await sendRealSmsOtp(cleanPhone);
     setIsSendingOtp(false);
     setStep(2);
   };
 
-  // สเต็ป 2: ยืนยันรหัส OTP
   const handleVerifyOtp = (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -237,7 +209,6 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    // ตรวจสอบกับ OTP จริงที่ส่งออกไป
     if (cleanOtp !== generatedOtp) {
       setErrorMsg('รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบข้อความ SMS ที่ได้รับ');
       return;
@@ -246,8 +217,7 @@ const ForgotPasswordPage = () => {
     setStep(3);
   };
 
-  // สเต็ป 3: ตั้งรหัสผ่านใหม่
-  const handleResetPassword = (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -261,30 +231,24 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    // อัปเดตรหัสผ่านใหม่ลง localStorage จริง
     const cleanPhone = phoneNumber.replace(/[-\s]/g, '');
-    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    const updatedUsers = existingUsers.map(u => {
-      if (u.phone === cleanPhone) {
-        return { ...u, password: newPassword };
-      }
-      return u;
-    });
 
-    localStorage.setItem('users', JSON.stringify(updatedUsers));
-    setIsSuccessOpen(true);
+    try {
+      await forgotPasswordApi(cleanPhone, newPassword, 'customer');
+      setIsSuccessOpen(true);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || 'ไม่พบบัญชีผู้ใช้ที่ลงทะเบียนด้วยเบอร์นี้');
+    }
   };
 
   return (
     <Card subtitle="รีเซ็ตรหัสผ่าน">
-      {/* การแจ้งเตือน SMS OTP จริงบนหัวจอ */}
       <LiveSmsNotification
         otpCode={generatedOtp}
         phone={phoneNumber}
         onFill={(code) => setOtp(code)}
       />
 
-      {/* กล่องแจ้งเตือน Error */}
       {errorMsg && (
         <div style={{
           backgroundColor: '#fef2f2',
@@ -306,7 +270,6 @@ const ForgotPasswordPage = () => {
         </div>
       )}
 
-      {/* STEP 1: กรอกเบอร์มือถือ */}
       {step === 1 && (
         <form onSubmit={handleRequestOtp}>
           <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px', textAlign: 'center', lineHeight: '1.5' }}>
@@ -342,7 +305,6 @@ const ForgotPasswordPage = () => {
         </form>
       )}
 
-      {/* STEP 2: กรอก OTP 6 หลัก */}
       {step === 2 && (
         <form onSubmit={handleVerifyOtp}>
           <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px', textAlign: 'left', lineHeight: '1.5' }}>
@@ -388,14 +350,12 @@ const ForgotPasswordPage = () => {
         </form>
       )}
 
-      {/* STEP 3: ตั้งรหัสผ่านใหม่ */}
       {step === 3 && (
         <form onSubmit={handleResetPassword}>
           <p style={{ fontSize: '13.5px', color: '#64748b', marginBottom: '20px', textAlign: 'center' }}>
             กรุณาตั้งรหัสผ่านใหม่สำหรับเข้าใช้งาน (6 - 10 ตัวอักษร)
           </p>
 
-          {/* รหัสผ่านใหม่ พร้อมปุ่มเปิด/ปิดตา */}
           <div style={{ position: 'relative' }}>
             <Input
               label="รหัสผ่านใหม่"
@@ -433,7 +393,6 @@ const ForgotPasswordPage = () => {
             </button>
           </div>
 
-          {/* ยืนยันรหัสผ่านใหม่ พร้อมปุ่มเปิด/ปิดตา */}
           <div style={{ position: 'relative' }}>
             <Input
               label="ยืนยันรหัสผ่านใหม่"
@@ -476,7 +435,6 @@ const ForgotPasswordPage = () => {
         </form>
       )}
 
-      {/* ป้ายแจ้งเตือนสำเร็จ */}
       <ResetSuccessModal
         isOpen={isSuccessOpen}
         onConfirm={() => {

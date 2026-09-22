@@ -4,8 +4,8 @@ import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import { useApp } from '../../context/AppContext';
+import { loginApi } from '../../api/auth';
 
-// ไอคอนเตือนภัย
 const AlertTriangleIcon = ({ size = 18, color = '#dc2626' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
     <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
@@ -14,7 +14,6 @@ const AlertTriangleIcon = ({ size = 18, color = '#dc2626' }) => (
   </svg>
 );
 
-// ไอคอนลูกตา
 const EyeIcon = ({ size = 18, color = '#64748b' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
@@ -31,7 +30,6 @@ const EyeOffIcon = ({ size = 18, color = '#64748b' }) => (
   </svg>
 );
 
-// ป้ายแจ้งเตือนเข้าสู่ระบบสำเร็จแบบโมเดิร์น
 const LoginSuccessModal = ({ isOpen, user, onConfirm }) => {
   if (!isOpen) return null;
   return (
@@ -78,7 +76,7 @@ const LoginSuccessModal = ({ isOpen, user, onConfirm }) => {
           ยินดีต้อนรับกลับมา!
         </h3>
         <p style={{ fontSize: '13.5px', color: '#64748b', margin: '0 0 24px 0', lineHeight: '1.5' }}>
-          คุณ <b style={{ color: '#1e293b' }}>{user?.fullName || 'ผู้ใช้งาน'}</b> เข้าสู่ระบบสำเร็จแล้ว
+          คุณ <b style={{ color: '#1e293b' }}>{user?.fullName || user?.name || 'ผู้ใช้งาน'}</b> เข้าสู่ระบบสำเร็จแล้ว
         </p>
 
         <button
@@ -97,7 +95,7 @@ const LoginSuccessModal = ({ isOpen, user, onConfirm }) => {
             boxShadow: '0 10px 15px -3px rgba(29, 97, 242, 0.3)'
           }}
         >
-          เริ่มใช้งาน
+          เริ่มใช้งานแอปพลิเคชัน
         </button>
       </div>
     </div>
@@ -114,35 +112,37 @@ const CustomerLoginPage = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [loggedInUser, setLoggedInUser] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleCustomerLogin = (e) => {
+  const handleCustomerLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
     
-    // ดึงผู้ใช้ทั้งหมดที่เคยสมัครไว้
-    const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-    const user = existingUsers.find(u => u.phone === identifier.trim());
+    try {
+      setIsLoading(true);
+      const res = await loginApi(identifier.trim(), password, 'customer');
 
-    if (!user) {
-      setErrorMessage('ไม่พบบัญชีผู้ใช้นี้ กรุณาสมัครสมาชิกก่อนเข้าสู่ระบบ');
-      return;
+      if (res.success) {
+        const userData = {
+          ...res.user,
+          fullName: res.user.name,
+          phone: res.user.phone
+        };
+        if (res.token) localStorage.setItem('token', res.token);
+        loginUser(userData);
+        setLoggedInUser(userData);
+        setShowSuccessModal(true);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'เบอร์โทรศัพท์หรือรหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setIsLoading(false);
     }
-
-    if (user.password !== password) {
-      setErrorMessage('รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง');
-      return;
-    }
-
-    // ล็อกอินสำเร็จ: เก็บ State เพื่อแสดง Modal ก่อนเปลี่ยนหน้า
-    loginUser(user);
-    setLoggedInUser(user);
-    setShowSuccessModal(true);
   };
 
   return (
     <Card subtitle="บริการรับ-ส่งผ้าถึงหน้าบ้านคุณ">
       <form onSubmit={handleCustomerLogin}>
-        {/* ป้าย Error ดีไซน์สวยงาม */}
         {errorMessage && (
           <div style={{
             backgroundColor: '#fef2f2',
@@ -177,7 +177,6 @@ const CustomerLoginPage = () => {
           autoFocus
         />
 
-        {/* ช่องกรอกรหัสผ่าน พร้อมปุ่มเปิด/ปิดตา */}
         <div style={{ position: 'relative' }}>
           <Input
             label="รหัสผ่าน"
@@ -226,7 +225,9 @@ const CustomerLoginPage = () => {
           </a>
         </div>
 
-        <Button type="submit">เข้าสู่ระบบ</Button>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+        </Button>
 
         <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '22px', marginBottom: 0 }}>
           ยังไม่มีบัญชีใช่หรือไม่?{' '}
@@ -243,7 +244,6 @@ const CustomerLoginPage = () => {
         </p>
       </form>
 
-      {/* ป้ายแจ้งเตือนเข้าสู่ระบบสำเร็จ */}
       <LoginSuccessModal
         isOpen={showSuccessModal}
         user={loggedInUser}

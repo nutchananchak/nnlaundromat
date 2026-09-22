@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
+import { fetchOrders, updateOrder } from '../../api/order';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -65,7 +66,24 @@ export default function HomePage() {
 
   const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
 
-  // ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือนเฉพาะของ User ปัจจุบัน
+  // 1. ดึงข้อมูลออเดอร์ล่าสุดสดๆ จาก MySQL
+  useEffect(() => {
+    const loadRealtimeOrders = async () => {
+      try {
+        const liveOrders = await fetchOrders();
+        if (setOrders) {
+          setOrders(liveOrders);
+        }
+        localStorage.setItem('orders', JSON.stringify(liveOrders));
+      } catch (err) {
+        console.error('Failed to sync orders from MySQL:', err);
+      }
+    };
+
+    loadRealtimeOrders();
+  }, []);
+
+  // 2. ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือนเฉพาะของ User ปัจจุบัน
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
     if (savedStoreStatus !== null) {
@@ -81,13 +99,18 @@ export default function HomePage() {
       }
     }
 
-    // กรองเฉพาะการแจ้งเตือนของ User คนนี้เท่านั้น ป้องกันแจ้งเตือน User B โผล่มาที่ User A
     try {
+      // หากยังไม่ได้ล็อกอิน ไม่แสดงจุดแดงแจ้งเตือนของออเดอร์
+      if (!currentUserId) {
+        setHasUnreadNotices(false);
+        return;
+      }
+
       const storedNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
       const myNotices = storedNotices.filter(n => {
-        if (!n.userId && !n.customerPhone) return true; // ข้อความส่วนกลาง
+        const isSystemAnnouncement = !n.userId && !n.customerPhone && !n.orderId;
         const owner = String(n.userId || n.customerPhone || '').trim();
-        return owner === currentUserId;
+        return isSystemAnnouncement || owner === currentUserId;
       });
       const unreadExists = myNotices.some(n => !n.isRead);
       setHasUnreadNotices(unreadExists);
@@ -198,28 +221,36 @@ export default function HomePage() {
     }
   };
 
-  const handleConfirmCancelOrder = () => {
+  // กดยกเลิกออเดอร์ -> บันทึกลง MySQL จริงทันที
+  const handleConfirmCancelOrder = async () => {
     if (!activeOrder) return;
 
     const cancelTimestamp = getThaiTimestamp();
 
-    if (setOrders) {
-      setOrders(prev => prev.map(o => {
-        if (o.id === activeOrder.id) {
-          return {
-            ...o,
-            isCancelled: true,
-            status: 'cancelled',
-            statusTitle: 'ยกเลิกออเดอร์แล้ว',
-            cancelReason: cancelReason,
-            cancelledAt: cancelTimestamp
-          };
-        }
-        return o;
-      }));
-    }
-
     try {
+      await updateOrder(activeOrder.id, {
+        status: 'cancelled',
+        statusTitle: 'ยกเลิกออเดอร์แล้ว',
+        cancelReason: cancelReason,
+        cancelledAt: cancelTimestamp
+      });
+
+      if (setOrders) {
+        setOrders(prev => prev.map(o => {
+          if (o.id === activeOrder.id) {
+            return {
+              ...o,
+              isCancelled: true,
+              status: 'cancelled',
+              statusTitle: 'ยกเลิกออเดอร์แล้ว',
+              cancelReason: cancelReason,
+              cancelledAt: cancelTimestamp
+            };
+          }
+          return o;
+        }));
+      }
+
       const saved = JSON.parse(localStorage.getItem('orders') || '[]');
       const updated = saved.map(o => {
         if (o.id === activeOrder.id) {
@@ -251,11 +282,12 @@ export default function HomePage() {
       };
       localStorage.setItem('customerNotifications', JSON.stringify([cancelNotice, ...currentNotices]));
       setHasUnreadNotices(true);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error('Failed to cancel order in MySQL:', err);
+      alert('ยกเลิกออเดอร์ไม่สำเร็จ: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setShowCancelModal(false);
     }
-
-    setShowCancelModal(false);
   };
 
   const handleBookService = () => {

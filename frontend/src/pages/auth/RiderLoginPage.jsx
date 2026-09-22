@@ -3,12 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import LoginForm from '../../components/auth/LoginForm';
 import { useApp } from '../../context/AppContext';
-
-const REGISTERED_RIDERS = [
-  { id: 'RD-01', name: 'วรรณา สีดา', phone: '0891112222', password: 'rider1' },
-  { id: 'RD-02', name: 'วันดี ทองอ่อน', phone: '0893334444', password: 'rider2' },
-  { id: 'RD-03', name: 'สตาร์ วินเพียว', phone: '0895556666', password: 'rider3' }
-];
+import { loginApi } from '../../api/auth';
 
 const RiderSecurityModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -73,8 +68,6 @@ const RiderLoginPage = () => {
 
   const [rememberMe, setRememberMe] = useState(isRemembered);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
-
-  // State สำหรับป้ายแจ้งเตือนโมเดิร์น
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const triggerToast = (message, type = 'success') => {
@@ -84,41 +77,39 @@ const RiderLoginPage = () => {
     }, 2500);
   };
 
-  const handleRiderLogin = ({ identifier, password }) => {
+  const handleRiderLogin = async ({ identifier, password }) => {
     const trimmedInput = (identifier || '').trim();
     const trimmedPassword = (password || '').trim();
 
-    const rider = REGISTERED_RIDERS.find(
-      (r) =>
-        (r.phone === trimmedInput || r.id.toLowerCase() === trimmedInput.toLowerCase()) &&
-        r.password === trimmedPassword
-    );
+    try {
+      const res = await loginApi(trimmedInput, trimmedPassword, 'rider');
 
-    if (!rider) {
-      triggerToast('เบอร์โทรศัพท์/รหัสคนขับ หรือรหัสผ่านไม่ถูกต้อง', 'error');
-      return;
+      if (res.success) {
+        localStorage.setItem('currentRider', JSON.stringify(res.user));
+        if (res.token) localStorage.setItem('token', res.token);
+
+        if (rememberMe) {
+          localStorage.setItem('rememberRider', 'true');
+          localStorage.setItem('rememberedRiderId', trimmedInput);
+          localStorage.setItem('rememberedRiderPass', trimmedPassword);
+        } else {
+          localStorage.removeItem('rememberRider');
+          localStorage.removeItem('rememberedRiderId');
+          localStorage.removeItem('rememberedRiderPass');
+        }
+
+        if (typeof loginRider === 'function') {
+          loginRider(res.user);
+        }
+
+        triggerToast(`เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ ${res.user.name}`, 'success');
+        setTimeout(() => {
+          navigate('/rider/tasks');
+        }, 600);
+      }
+    } catch (err) {
+      triggerToast(err.response?.data?.message || 'เบอร์โทรศัพท์/รหัสคนขับ หรือรหัสผ่านไม่ถูกต้อง', 'error');
     }
-
-    localStorage.setItem('currentRider', JSON.stringify(rider));
-
-    if (rememberMe) {
-      localStorage.setItem('rememberRider', 'true');
-      localStorage.setItem('rememberedRiderId', trimmedInput);
-      localStorage.setItem('rememberedRiderPass', trimmedPassword);
-    } else {
-      localStorage.removeItem('rememberRider');
-      localStorage.removeItem('rememberedRiderId');
-      localStorage.removeItem('rememberedRiderPass');
-    }
-
-    if (typeof loginRider === 'function') {
-      loginRider(rider);
-    }
-
-    triggerToast(`เข้าสู่ระบบสำเร็จ! ยินดีต้อนรับคุณ ${rider.name}`, 'success');
-    setTimeout(() => {
-      navigate('/rider/tasks');
-    }, 600);
   };
 
   const riderFooterSlot = (
@@ -137,7 +128,6 @@ const RiderLoginPage = () => {
 
   return (
     <>
-      {/* ป้ายแจ้งเตือนดีไซน์โมเดิร์น */}
       {toast.show && (
         <div style={{
           position: 'fixed',

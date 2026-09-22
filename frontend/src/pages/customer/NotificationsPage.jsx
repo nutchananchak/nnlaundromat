@@ -6,24 +6,23 @@ import {
   CheckCircle2, 
   Trash2, 
   ChevronRight, 
-  Sparkles, 
-  Truck, 
   Shirt, 
   Calendar, 
   X, 
   Ban, 
   Clock,
-  QrCode
+  QrCode,
+  Truck
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
+import { fetchOrders } from '../../api/order';
 
 export default function NotificationPage() {
   const navigate = useNavigate();
-  const { orders, userProfile } = useApp ? useApp() : {};
+  const { orders, setOrders, userProfile } = useApp ? useApp() : {};
   const [notifications, setNotifications] = useState([]);
 
-  // ดึง ID/เบอร์โทรของผู้ใช้ปัจจุบันเพื่อใช้แยกแยะ
   const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
 
   const getThaiNow = () => {
@@ -34,141 +33,150 @@ export default function NotificationPage() {
   };
 
   useEffect(() => {
-    let stored = [];
-    try {
-      stored = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-    } catch (e) {
-      stored = [];
-    }
+    const syncAndGenerateNotices = async () => {
+      let liveOrders = orders || [];
+      try {
+        const fetched = await fetchOrders();
+        liveOrders = fetched;
+        if (setOrders) setOrders(fetched);
+        localStorage.setItem('orders', JSON.stringify(fetched));
+      } catch (e) {
+        console.error('Failed to fetch orders in NotificationPage:', e);
+      }
 
-    const timestampNow = getThaiNow();
+      let stored = [];
+      if (currentUserId) {
+        try {
+        stored = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+        } catch (e) {
+          stored = [];
+        }
+      }
 
-    const allOrders = orders && orders.length > 0 
-      ? orders 
-      : JSON.parse(localStorage.getItem('orders') || '[]');
+      const timestampNow = getThaiNow();
+      const newNotices = [...stored];
 
-    // 1. คัดกรองเฉพาะออเดอร์ที่เป็นของ User ปัจจุบัน
-    const myOrders = allOrders.filter(o => {
-      if (!currentUserId) return true;
-      const orderOwner = String(o.customerPhone || o.userPhone || o.userId || o.customerId || '').trim();
-      return orderOwner === currentUserId;
-    });
+      // 1. สร้างการแจ้งเตือนเฉพาะเมื่อมี User ล็อกอินอยู่เท่านั้น
+      if (currentUserId) {
+        const myOrders = liveOrders.filter(o => {
+          const orderOwner = String(o.customerPhone || o.userPhone || o.userId || o.customerId || '').trim();
+          return orderOwner === currentUserId;
+        });
 
-    const newNotices = [...stored];
+        myOrders.forEach(o => {
+          const step = Number(o.statusStep) || 1;
 
-    // 2. สร้างแจ้งเตือนอัตโนมัติเฉพาะออเดอร์ของ User นี้เท่านั้น
-    myOrders.forEach(o => {
-      const step = Number(o.statusStep) || 1;
+          // สลิปไม่ผ่าน (Reject)
+          if (o.paymentRejected && !newNotices.some(n => n.uniqueKey === `slip_rejected_${o.id}`)) {
+            newNotices.unshift({
+              id: Date.now() + Math.random(),
+              uniqueKey: `slip_rejected_${o.id}`,
+              orderId: o.id,
+              userId: currentUserId,
+              title: 'สลิปการโอนเงินไม่ถูกต้อง',
+              message: `ออเดอร์ #${o.id} ไม่ผ่านการตรวจสอบ: "${o.rejectReason || 'สลิปไม่ชัดเจน'}" กรุณาสแกน QR Code และแนบสลิปใหม่`,
+              time: o.rejectedAt || timestampNow,
+              type: 'slip_rejected',
+              isRead: false
+            });
+          }
 
-      // ส่งผ้าสำเร็จ
-      if ((step >= 7 || o.status === 'completed') && !newNotices.some(n => n.uniqueKey === `completed_${o.id}`)) {
-        newNotices.unshift({
-          id: Date.now() + Math.random(),
-          uniqueKey: `completed_${o.id}`,
-          orderId: o.id,
-          userId: currentUserId,
-          title: 'ส่งมอบผ้าสะอาดสำเร็จเรียบร้อย',
-          message: `ออเดอร์ #${o.id} ได้รับการส่งมอบเรียบร้อยแล้ว แตะเพื่อดูใบเสร็จและรูปถ่ายหลักฐานการส่งมอบ`,
-          time: o.deliveredAt || timestampNow,
-          type: 'delivery_success',
-          isRead: false
+          // ส่งผ้าสำเร็จ
+          if ((step >= 7 || o.status === 'completed') && !newNotices.some(n => n.uniqueKey === `completed_${o.id}`)) {
+            newNotices.unshift({
+              id: Date.now() + Math.random(),
+              uniqueKey: `completed_${o.id}`,
+              orderId: o.id,
+              userId: currentUserId,
+              title: 'ส่งมอบผ้าสะอาดสำเร็จเรียบร้อย',
+              message: `ออเดอร์ #${o.id} ได้รับการส่งมอบเรียบร้อยแล้ว แตะเพื่อดูใบเสร็จและรูปถ่ายหลักฐานการส่งมอบ`,
+              time: o.deliveredAt || timestampNow,
+              type: 'delivery_success',
+              isRead: false
+            });
+          }
+
+          // ยกเลิกออเดอร์
+          if ((o.isCancelled || o.status === 'cancelled') && !newNotices.some(n => n.uniqueKey === `cancelled_${o.id}`)) {
+            newNotices.unshift({
+              id: Date.now() + Math.random(),
+              uniqueKey: `cancelled_${o.id}`,
+              orderId: o.id,
+              userId: currentUserId,
+              title: 'คำสั่งซื้อถูกยกเลิกแล้ว',
+              message: `ออเดอร์ #${o.id} ถูกยกเลิกเรียบร้อยแล้ว (${o.cancelReason || 'ตามคำขอของลูกค้า'}) หากชำระเงินแล้วสามารถส่งสลิปเพื่อขอรับเงินคืนทาง LINE Official`,
+              time: o.cancelledAt || timestampNow,
+              type: 'cancel',
+              isRead: false
+            });
+          }
+
+          // ไรเดอร์รับผ้าเข้าสู่ร้าน
+          if (step >= 4 && !newNotices.some(n => n.uniqueKey === `picked_up_${o.id}`)) {
+            newNotices.unshift({
+              id: Date.now() + Math.random(),
+              uniqueKey: `picked_up_${o.id}`,
+              orderId: o.id,
+              userId: currentUserId,
+              title: 'ไรเดอร์รับผ้าเรียบร้อยแล้ว',
+              message: `ผ้าของออเดอร์ #${o.id} กำลังนำส่งร้าน N&N Laundromat`,
+              time: o.pickedUpAt || timestampNow,
+              type: 'progress',
+              isRead: false
+            });
+          }
+
+          // กำลังนำส่งคืน
+          if (step >= 6 && step < 7 && !newNotices.some(n => n.uniqueKey === `delivering_${o.id}`)) {
+            newNotices.unshift({
+              id: Date.now() + Math.random(),
+              uniqueKey: `delivering_${o.id}`,
+              orderId: o.id,
+              userId: currentUserId,
+              title: 'ผ้าซักอบเสร็จแล้ว กำลังนำส่งคืน',
+              message: `ออเดอร์ #${o.id} ดำเนินการเรียบร้อย ไรเดอร์กำลังเดินทางนำผ้าสะอาดไปส่งคืนให้ท่าน`,
+              time: o.deliveringAt || timestampNow,
+              type: 'delivering',
+              isRead: false
+            });
+          }
         });
       }
 
-      // ยกเลิกออเดอร์
-      if ((o.isCancelled || o.status === 'cancelled') && !newNotices.some(n => n.uniqueKey === `cancelled_${o.id}`)) {
+      // ประกาศร้านปิดฉุกเฉิน
+      const savedStoreStatus = localStorage.getItem('storeServiceStatus');
+      const isStoreClosedByAdmin = savedStoreStatus !== null && JSON.parse(savedStoreStatus) === false;
+
+      if (isStoreClosedByAdmin && !newNotices.some(n => n.uniqueKey === 'emergency_store_closed')) {
         newNotices.unshift({
           id: Date.now() + Math.random(),
-          uniqueKey: `cancelled_${o.id}`,
-          orderId: o.id,
-          userId: currentUserId,
-          title: 'คำสั่งซื้อถูกยกเลิกแล้ว',
-          message: `ออเดอร์ #${o.id} ถูกยกเลิกเรียบร้อยแล้ว (${o.cancelReason || 'ตามคำขอของลูกค้า'}) หากชำระเงินแล้วสามารถส่งสลิปเพื่อขอรับเงินคืนทาง LINE Official`,
-          time: o.cancelledAt || timestampNow,
-          type: 'cancel',
-          isRead: false
-        });
-      }
-
-      // ไรเดอร์รับผ้าเข้าสู่ร้าน
-      if (step >= 4 && !newNotices.some(n => n.uniqueKey === `picked_up_${o.id}`)) {
-        newNotices.unshift({
-          id: Date.now() + Math.random(),
-          uniqueKey: `picked_up_${o.id}`,
-          orderId: o.id,
-          userId: currentUserId,
-          title: 'ไรเดอร์รับผ้าเรียบร้อยแล้ว',
-          message: `ผ้าของออเดอร์ #${o.id} กำลังนำส่งร้าน N&N Laundromat`,
-          time: o.pickedUpAt || timestampNow,
-          type: 'progress',
-          isRead: false
-        });
-      }
-
-      // กำลังนำส่งคืน
-      if (step >= 6 && step < 7 && !newNotices.some(n => n.uniqueKey === `delivering_${o.id}`)) {
-        newNotices.unshift({
-          id: Date.now() + Math.random(),
-          uniqueKey: `delivering_${o.id}`,
-          orderId: o.id,
-          userId: currentUserId,
-          title: 'ผ้าซักอบเสร็จแล้ว กำลังนำส่งคืน',
-          message: `ออเดอร์ #${o.id} ดำเนินการเรียบร้อย ไรเดอร์กำลังเดินทางนำผ้าสะอาดไปส่งคืนให้ท่าน`,
-          time: o.deliveringAt || timestampNow,
-          type: 'delivering',
-          isRead: false
-        });
-      }
-    });
-
-    // ประกาศร้านปิดฉุกเฉิน (แสดงทุกคน)
-    const savedStoreStatus = localStorage.getItem('storeServiceStatus');
-    const isStoreClosedByAdmin = savedStoreStatus !== null && JSON.parse(savedStoreStatus) === false;
-
-    if (isStoreClosedByAdmin && !newNotices.some(n => n.uniqueKey === 'emergency_store_closed')) {
-      newNotices.unshift({
-        id: Date.now() + Math.random(),
-        uniqueKey: 'emergency_store_closed',
-        title: 'ประกาศ: ร้านปิดให้บริการชั่วคราว',
-        message: 'ขณะนี้ระบบปิดรับคำสั่งซื้อใหม่ชั่วคราวเนื่องจากเหตุฉุกเฉิน ขออภัยในความไม่สะดวก',
-        time: timestampNow,
-        type: 'alert',
-        isRead: false
-      });
-    }
-
-    // แจ้งเตือนวันหยุดบริการล่วงหน้า (แสดงทุกคน)
-    try {
-      const closedDates = JSON.parse(localStorage.getItem('closedDates') || '[]');
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-      if (closedDates.includes(tomorrowStr) && !newNotices.some(n => n.uniqueKey === `holiday_${tomorrowStr}`)) {
-        newNotices.unshift({
-          id: Date.now() + Math.random(),
-          uniqueKey: `holiday_${tomorrowStr}`,
-          title: 'แจ้งเตือนวันหยุดบริการล่วงหน้า',
-          message: `ในวันที่ (${tomorrowStr}) ทางร้านจะปิดทำการ 1 วัน โปรดสั่งซักและรับผ้าคืนภายในวันนี้ก่อน 22:00 น.`,
+          uniqueKey: 'emergency_store_closed',
+          title: 'ประกาศ: ร้านปิดให้บริการชั่วคราว',
+          message: 'ขณะนี้ระบบปิดรับคำสั่งซื้อใหม่ชั่วคราวเนื่องจากเหตุฉุกเฉิน ขออภัยในความไม่สะดวก',
           time: timestampNow,
-          type: 'warning',
+          type: 'alert',
           isRead: false
         });
       }
-    } catch (e) {
-      // Skip
-    }
 
-    // 3. กรองแสดงเฉพาะข้อความของ User ปัจจุบัน หรือข้อความส่วนกลาง (ไม่มี userId)
-    const filteredForCurrentUser = newNotices.filter(n => {
-      if (!n.userId && !n.customerPhone) return true; // ข้อความประกาศทั่วไป
-      const owner = String(n.userId || n.customerPhone).trim();
-      return owner === currentUserId;
-    });
+      // 2. กรองแสดงผล
+      // หากยังไม่ได้ล็อกอิน: แสดงเฉพาะประกาศร้าน (ไม่มี userId และไม่มี orderId)
+      // หากล็อกอินแล้ว: แสดงประกาศร้าน + แจ้งเตือนของ userId ตัวเอง
+      const filteredForCurrentUser = newNotices.filter(n => {
+        const isSystemAnnouncement = !n.userId && !n.customerPhone && !n.orderId;
+        if (!currentUserId) {
+          return isSystemAnnouncement;
+        }
+        const owner = String(n.userId || n.customerPhone || '').trim();
+        return isSystemAnnouncement || owner === currentUserId;
+      });
 
-    setNotifications(filteredForCurrentUser);
-    localStorage.setItem('customerNotifications', JSON.stringify(newNotices));
-  }, [orders, currentUserId]);
+      setNotifications(filteredForCurrentUser);
+      localStorage.setItem('customerNotifications', JSON.stringify(newNotices));
+    };
+
+    syncAndGenerateNotices();
+  }, [currentUserId]);
 
   const handleDeleteItem = (e, targetId) => {
     e.stopPropagation();
@@ -185,7 +193,6 @@ export default function NotificationPage() {
     if (window.confirm('คุณต้องการลบข้อความแจ้งเตือนทั้งหมดหรือไม่?')) {
       try {
         const fullList = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-        // ลบเฉพาะของตัวเอง ข้อความของ User อื่นยังคงอยู่
         const keepOthers = fullList.filter(n => {
           const owner = String(n.userId || n.customerPhone || '').trim();
           return owner && owner !== currentUserId;
@@ -218,7 +225,6 @@ export default function NotificationPage() {
     return item.type === 'slip_rejected' || (title.includes('สลิป') && title.includes('ไม่ถูกต้อง'));
   };
 
-  // แตะการ์ดแจ้งเตือน: นำทางไปหน้าเป้าหมาย
   const handleCardClick = (item) => {
     if (!item.isRead) {
       const updatedLocal = notifications.map(n => n.id === item.id ? { ...n, isRead: true } : n);
@@ -242,7 +248,6 @@ export default function NotificationPage() {
       : JSON.parse(localStorage.getItem('orders') || '[]');
     const targetOrder = allOrders.find(o => String(o.id) === String(targetOrderId));
 
-    // สลิปไม่ผ่าน: ตรงไปหน้า /order/payment เพื่อแนบใหม่
     if (isSlipRejectedNotice(item)) {
       if (targetOrder) {
         navigate('/order/payment', { state: { order: targetOrder, isRetry: true } });

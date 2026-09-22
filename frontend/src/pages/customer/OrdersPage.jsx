@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Clock, 
@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
+import { fetchOrders } from '../../api/order';
 
-// ฟังก์ชันแปลงวันเวลาแบบคงที่ ไม่สุ่มเวลาใหม่เมื่อเรนเดอร์
 const getSafeTimestamp = (timestamp, fallbackHourOffset = 0) => {
   if (timestamp && !String(timestamp).includes('เพิ่งสร้าง') && !String(timestamp).includes('วันนี้') && String(timestamp).trim() !== '-') {
     return timestamp;
@@ -28,8 +28,25 @@ const getSafeTimestamp = (timestamp, fallbackHourOffset = 0) => {
 
 export default function OrdersPage() {
   const navigate = useNavigate();
-  const { orders, userProfile } = useApp ? useApp() : { orders: [], userProfile: null };
+  const { orders, setOrders, userProfile } = useApp ? useApp() : { orders: [], userProfile: null };
   const [activeTab, setActiveTab] = useState('in_progress');
+
+  // ดึงรายการออเดอร์สดจาก MySQL
+  useEffect(() => {
+    const loadLiveOrders = async () => {
+      try {
+        const liveOrders = await fetchOrders();
+        if (setOrders) {
+          setOrders(liveOrders);
+        }
+        localStorage.setItem('orders', JSON.stringify(liveOrders));
+      } catch (err) {
+        console.error('Failed to sync orders in OrdersPage:', err);
+      }
+    };
+
+    loadLiveOrders();
+  }, [setOrders]);
 
   // แยก Order ตาม User ปัจจุบัน
   const currentUserId = userProfile?.phone || userProfile?.id || userProfile?.email;
@@ -143,7 +160,7 @@ export default function OrdersPage() {
             </button>
           </div>
 
-          {/* ================= แท็บ 1: กำลังดำเนินการ (เอาภาพถ่ายออกแล้วตามสั่ง) ================= */}
+          {/* ================= แท็บ 1: กำลังดำเนินการ ================= */}
           {activeTab === 'in_progress' && (
             inProgressOrders.length === 0 ? (
               <div className="py-20 text-center text-slate-400 text-xs font-medium">
@@ -175,7 +192,6 @@ export default function OrdersPage() {
                       </span>
                     </div>
 
-                    {/* ข้อมูลบริการ */}
                     <div className="flex flex-col gap-1.5 text-xs">
                       <div className="flex justify-between">
                         <span className="text-slate-500">บริการ</span>
@@ -197,7 +213,6 @@ export default function OrdersPage() {
                       </div>
                     </div>
 
-                    {/* Progress Bar */}
                     <div className="flex flex-col gap-1.5 pt-1">
                       <div className="flex justify-between text-[11px]">
                         <span className="font-bold text-slate-700">ความคืบหน้า</span>

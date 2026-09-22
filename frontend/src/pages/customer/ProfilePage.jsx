@@ -31,10 +31,9 @@ import {
 } from '@react-google-maps/api';
 import BottomNav from '../../components/layout/BottomNav';
 import { useApp } from '../../context/AppContext';
+import { updateProfileApi } from '../../api/auth';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-// พิกัดร้าน N&N Laundromat
 const STORE_COORDS = { lat: 13.709648150061998, lng: 100.62401489583843 };
 const MAX_DELIVERY_RADIUS_KM = 3.0;
 
@@ -66,7 +65,6 @@ export default function ProfilePage() {
 
   const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
 
-  // Toast Notification State
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const showToast = (message, type = 'success') => {
@@ -80,7 +78,6 @@ export default function ProfilePage() {
   const [editName, setEditName] = useState(userProfile?.fullName || userProfile?.name || '');
   const [editPhone, setEditPhone] = useState(userProfile?.phone || '');
 
-  // OTP State
   const [otpStep, setOtpStep] = useState('input');
   const [inputOtp, setInputOtp] = useState('');
   const [mockGeneratedOtp, setMockGeneratedOtp] = useState('1234');
@@ -106,13 +103,11 @@ export default function ProfilePage() {
   const [addressTitle, setAddressTitle] = useState('');
   const [addressDetail, setAddressDetail] = useState('');
 
-  // ค้นหาสถานที่
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // แผนที่ & พิกัด
   const [addressCoords, setAddressCoords] = useState(null);
   const [distanceFromStore, setDistanceFromStore] = useState(0);
   const [isWithinRange, setIsWithinRange] = useState(true);
@@ -343,7 +338,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSaveAddress = (e) => {
+  const handleSaveAddress = async (e) => {
     e.preventDefault();
     if (!addressTitle.trim() || !addressDetail.trim() || !addressCoords) {
       showToast('กรุณากรอกข้อมูลที่อยู่ให้ครบถ้วน', 'error');
@@ -387,6 +382,16 @@ export default function ProfilePage() {
       }
       showToast('บันทึกที่อยู่จัดส่งใหม่เรียบร้อย');
     }
+
+    // ซิงค์ที่อยู่จัดส่งล่าสุดลงตาราง Customer ใน MySQL
+    if (userProfile?.phone) {
+      try {
+        await updateProfileApi(userProfile.phone, { address: addressDetail.trim() });
+      } catch (err) {
+        console.error('Failed to sync address to MySQL:', err);
+      }
+    }
+
     setShowAddressModal(false);
   };
 
@@ -428,7 +433,6 @@ export default function ProfilePage() {
     }
   };
 
-  // ตรวจสอบและจัดการเปลี่ยนเบอร์ด้วย OTP
   const handleInitiateProfileSave = (e) => {
     e.preventDefault();
     const trimmedName = editName.trim();
@@ -467,23 +471,30 @@ export default function ProfilePage() {
     finalizeProfileUpdate(editName.trim(), editPhone.trim());
   };
 
-  const finalizeProfileUpdate = (name, phone) => {
-    const updatedUser = {
-      ...userProfile,
-      id: phone,
-      name: name,
-      fullName: name,
-      phone: phone
-    };
+  const finalizeProfileUpdate = async (name, phone) => {
+    try {
+      if (userProfile?.phone) {
+        await updateProfileApi(userProfile.phone, { name });
+      }
 
-    setUserProfile(updatedUser);
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    setShowEditProfileModal(false);
-    setOtpStep('input');
-    showToast('บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว');
+      const updatedUser = {
+        ...userProfile,
+        id: phone,
+        name: name,
+        fullName: name,
+        phone: phone
+      };
+
+      setUserProfile(updatedUser);
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      setShowEditProfileModal(false);
+      setOtpStep('input');
+      showToast('บันทึกข้อมูลส่วนตัวเรียบร้อยแล้ว');
+    } catch (err) {
+      showToast('อัปเดตข้อมูลไม่สำเร็จ: ' + (err.response?.data?.message || err.message), 'error');
+    }
   };
 
-  // ส่งเรื่องร้องเรียนโดยผูก userId/เบอร์โทรศัพท์ของลูกค้ากำกับชัดเจน
   const handleSubmitReport = (e) => {
     e.preventDefault();
     if (!reportDetail.trim()) {
@@ -563,7 +574,6 @@ export default function ProfilePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
-        {/* Toast Notification */}
         {toast.show && (
           <div className="absolute top-6 left-5 right-5 z-60 animate-in slide-in-from-top-4 duration-200">
             <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md ${
@@ -579,7 +589,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Header */}
         <div style={{
           background: 'linear-gradient(135deg, #1d61f2 0%, #1045b8 100%)',
           color: '#ffffff',
@@ -603,7 +612,6 @@ export default function ProfilePage() {
 
         <div className="flex-1 overflow-y-auto px-6 py-5 pb-28 flex flex-col gap-4">
 
-          {/* การ์ดโปรไฟล์ */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col items-center text-center relative">
             <div className="relative mb-3">
               {userProfile?.avatar ? (
@@ -642,7 +650,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* แก้ไขข้อมูลส่วนตัว */}
           <div className="bg-white rounded-3xl p-2 border border-slate-200/80 shadow-xs">
             <button
               type="button"
@@ -667,7 +674,6 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          {/* ที่อยู่รับ-ส่งผ้า */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -776,7 +782,6 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* รายงานปัญหา */}
           <div className="bg-white rounded-3xl p-2 border border-slate-200/80 shadow-xs">
             <button
               type="button"
@@ -798,7 +803,6 @@ export default function ProfilePage() {
 
         </div>
 
-        {/* Modal แผนที่ Google Maps */}
         {showAddressModal && (
           <div className="absolute inset-0 bg-black/75 z-50 flex items-end sm:items-center justify-center backdrop-blur-xs">
             <div className="bg-white w-full max-w-[430px] h-[92vh] max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200">
@@ -990,7 +994,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Modal แก้ไขข้อมูลส่วนตัว + OTP */}
         {showEditProfileModal && (
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-4 border border-slate-100">
@@ -1114,7 +1117,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Modal รายงานปัญหา */}
         {showReportModal && (
           <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col gap-3.5 border border-slate-100">
