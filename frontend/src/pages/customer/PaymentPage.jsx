@@ -17,6 +17,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { createNewOrder, updateOrder } from '../../api/order';
 
 export default function PaymentPage() {
   const navigate = useNavigate();
@@ -26,11 +27,8 @@ export default function PaymentPage() {
   const customerName = userProfile?.fullName || userProfile?.name || 'คุณลูกค้า';
   const customerPhone = userProfile?.phone || '';
 
-  // ตรวจสอบว่ามาจากการกด "แนบสลิปใหม่" หรือสร้างออเดอร์ใหม่
   const orderData = location.state?.order;
   const isRetry = Boolean(location.state?.isRetry || orderData?.paymentRejected);
-
-  // คำนวณยอดเงินให้ถูกต้องทั้งเคส order ใหม่และเคส retry
   const payableAmount = orderData ? (orderData.totalPrice || orderData.price || 0) : 0;
 
   useEffect(() => {
@@ -57,7 +55,6 @@ export default function PaymentPage() {
     accountName: 'บริษัท เอ็นแอนด์เอ็น ลอนดรอแมท จำกัด',
   };
 
-  // สร้าง QR Code จากยอดเงินและรหัสออเดอร์
   const qrCodeUrl = orderData 
     ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=PROMPTPAY_NN_LAUNDROMAT_ORDER_${orderData.id}_AMOUNT_${payableAmount}THB`
     : '';
@@ -89,7 +86,7 @@ export default function PaymentPage() {
     }
   };
 
-  const handleConfirmPayment = (e) => {
+  const handleConfirmPayment = async (e) => {
     e.preventDefault();
     if (!slipImage) {
       showAlert('ยังไม่ได้แนบสลิป', 'กรุณาแนบรูปภาพสลิปหลักฐานการโอนเงินก่อนกดยืนยัน');
@@ -98,31 +95,39 @@ export default function PaymentPage() {
 
     if (!orderData) return;
 
-    setIsSubmitting(true);
-
-    setTimeout(() => {
-      const existingOrders = orders && orders.length > 0
-        ? orders
-        : JSON.parse(localStorage.getItem('orders') || '[]');
+    try {
+      setIsSubmitting(true);
 
       if (isRetry) {
         // ==========================================
         // 1. กรณี: ส่งสลิปใหม่เพื่อให้อนุมัติใหม่ (Retry Flow)
         // ==========================================
+        await updateOrder(orderData.id, {
+          paymentVerified: false,
+          paymentRejected: false,
+          rejectReason: null,
+          slipImage: slipImage,
+          statusStep: 1,
+          statusTitle: 'ตรวจสอบยอดเงิน (ส่งสลิปใหม่แล้ว)',
+          status: 'pending'
+        });
+
+        // อัปเดต state ท้องถิ่นใน AppContext / localStorage
+        const existingOrders = orders && orders.length > 0
+          ? orders
+          : JSON.parse(localStorage.getItem('orders') || '[]');
+
         const updatedOrders = existingOrders.map(o => {
           if (String(o.id) === String(orderData.id)) {
             return {
               ...o,
               slipImage: slipImage,
               paymentSlip: slipImage,
-              paymentRejected: false, // ปลดสถานะปฏิเสธ
+              paymentRejected: false,
               rejectReason: null,
               statusStep: 1,
               statusTitle: 'ตรวจสอบยอดเงิน (ส่งสลิปใหม่แล้ว)',
               paymentStatus: 'รอตรวจสอบยอดใหม่',
-              stepsHistory: (o.stepsHistory || []).map(step => 
-                step.title === 'ตรวจสอบยอดเงิน' ? { ...step, time: 'กำลังตรวจสอบสลิปใหม่', current: true, done: true } : step
-              )
             };
           }
           return o;
@@ -131,7 +136,6 @@ export default function PaymentPage() {
         if (setOrders) setOrders(updatedOrders);
         localStorage.setItem('orders', JSON.stringify(updatedOrders));
 
-        // เคลียร์การแจ้งเตือนสลิปปฏิเสธเดิมออกจาก customerNotifications
         try {
           const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
           const filteredNotices = currentNotices.filter(n => 
@@ -144,60 +148,49 @@ export default function PaymentPage() {
 
       } else {
         // ==========================================
-        // 2. กรณี: สร้างออเดอร์ใหม่ครั้งแรก (New Order Flow)
+        // 2. กรณี: สร้างออเดอร์ใหม่ครั้งแรก (ยิงลง MySQL จริง)
         // ==========================================
-        const newOrder = {
+        const orderPayload = {
           id: orderData.id,
           customerName: orderData.customerName || customerName,
           customerPhone: orderData.customerPhone || customerPhone,
-          status: 'in_progress',
-          statusStep: 1,
-          statusTitle: 'ตรวจสอบยอดเงิน',
-          estimatedTime: 'รอเจ้าหน้าที่ยืนยันยอดเงิน',
-          serviceName: orderData.serviceName,
-          packageName: orderData.packageName,
+          serviceName: orderData.serviceName || 'ซัก อบ พับ',
+          packageName: orderData.packageName || '',
+          pickupTime: orderData.pickupTime || '',
+          deliveryTime: orderData.deliveryTime || '',
           specialItems: orderData.specialItems || [],
           plasticBagCount: orderData.plasticBagCount || 0,
-          plasticBagPrice: orderData.plasticBagPrice || 0,
-          price: payableAmount,
           totalPrice: payableAmount,
-          createdAt: orderData.createdAt,
-          pickupTime: orderData.pickupTime,
-          deliveryTime: orderData.deliveryTime,
-          address: orderData.address,
-          lat: orderData.lat,
-          lng: orderData.lng,
-          basketImage: orderData.basketImage || null,
-          note: orderData.note || 'ไม่มีหมายเหตุเพิ่มเติม',
-          paymentStatus: 'รอตรวจสอบยอด',
+          address: orderData.address || '',
+          lat: orderData.lat || null,
+          lng: orderData.lng || null,
+          riderBasketImage: orderData.basketImage || null,
+          note: orderData.note || '',
           slipImage: slipImage,
-          paymentSlip: slipImage,
-          paymentRejected: false,
-          rejectReason: null,
-          rider: {
-            name: 'กำลังจัดสรรไรเดอร์',
-            phone: '-',
-            vehicle: '-'
-          },
-          stepsHistory: [
-            { title: 'สั่งบริการเรียบร้อย', time: 'เมื่อสักครู่', done: true },
-            { title: 'ตรวจสอบยอดเงิน', time: 'กำลังตรวจสอบ', done: true, current: true },
-            { title: 'ไรเดอร์รับงาน', time: 'รอดำเนินการ', done: false },
-            { title: 'รับผ้าเข้าสู่ร้าน', time: 'รอดำเนินการ', done: false },
-            { title: 'กำลังดำเนินการซัก-อบ', time: 'รอดำเนินการ', done: false },
-            { title: 'ไรเดอร์นำส่งคืน', time: 'รอดำเนินการ', done: false },
-            { title: 'ส่งมอบผ้าสำเร็จ', time: 'รอดำเนินการ', done: false },
-          ]
+          status: 'pending',
+          statusStep: 1,
+          statusTitle: 'รอตรวจสอบสลิป',
+          createdAt: orderData.createdAt || new Date().toLocaleString('th-TH')
         };
 
-        const updatedOrders = [newOrder, ...existingOrders.filter(o => String(o.id) !== String(newOrder.id))];
+        const res = await createNewOrder(orderPayload);
+
+        // อัปเดต Context ท้องถิ่นสำรอง
+        const existingOrders = orders && orders.length > 0
+          ? orders
+          : JSON.parse(localStorage.getItem('orders') || '[]');
+        const updatedOrders = [res.order || orderPayload, ...existingOrders];
         if (setOrders) setOrders(updatedOrders);
         localStorage.setItem('orders', JSON.stringify(updatedOrders));
       }
 
-      setIsSubmitting(false);
       setIsSuccessModalOpen(true);
-    }, 800);
+    } catch (error) {
+      console.error('Failed to submit order:', error);
+      showAlert('เกิดข้อผิดพลาด', error.response?.data?.message || error.message || 'บันทึกคำสั่งซื้อไม่สำเร็จ');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!orderData) return null;
@@ -250,7 +243,6 @@ export default function PaymentPage() {
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6 pb-36 flex flex-col gap-5">
 
-          {/* ป้ายเตือนกรณีเข้ามาส่งสลิปใหม่ */}
           {isRetry && (
             <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3 text-amber-800 text-xs font-semibold shadow-2xs animate-in fade-in duration-200">
               <RotateCcw size={18} className="text-amber-600 shrink-0" />
@@ -258,7 +250,7 @@ export default function PaymentPage() {
             </div>
           )}
           
-          {/* ส่วนสรุปคำสั่งซื้อ */}
+          {/* สรุปคำสั่งซื้อ */}
           <div className="bg-white p-4.5 rounded-3xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
               <span className="font-bold text-slate-900 text-sm">สรุปคำสั่งซื้อ</span>
@@ -280,13 +272,11 @@ export default function PaymentPage() {
                 <span className="text-slate-900 font-bold">{orderData.serviceName}</span>
               </div>
               
-              {/* แพ็กเกจหลัก */}
               <div className="flex justify-between items-start">
                 <span className="text-slate-500 font-medium">แพ็กเกจหลัก</span>
                 <span className="text-slate-900 font-bold text-right">{orderData.packageName}</span>
               </div>
 
-              {/* รายการพิเศษ */}
               {orderData.specialItems && orderData.specialItems.length > 0 && (
                 <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1 mt-1">
                   <span className="text-[11px] font-bold text-slate-900 block">รายการความต้องการพิเศษ:</span>
@@ -299,7 +289,6 @@ export default function PaymentPage() {
                 </div>
               )}
 
-              {/* ถุงพลาสติกเสริม */}
               {orderData.plasticBagCount > 0 && (
                 <div className="flex justify-between items-center text-[11.5px]">
                   <span className="text-slate-500 font-medium">ถุงพลาสติกใส่ผ้า</span>
@@ -307,7 +296,6 @@ export default function PaymentPage() {
                 </div>
               )}
 
-              {/* รอบเวลารับผ้า */}
               <div className="flex justify-between items-center pt-1 border-t border-slate-100">
                 <span className="text-slate-500 font-medium">รอบเวลาเข้ารับผ้า</span>
                 <span className="text-slate-900 font-bold flex items-center gap-1">
@@ -315,7 +303,6 @@ export default function PaymentPage() {
                 </span>
               </div>
 
-              {/* รอบเวลาส่งผ้าคืน */}
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-medium">รอบเวลาส่งผ้าคืน</span>
                 <span className="text-slate-900 font-bold flex items-center gap-1">
@@ -323,7 +310,6 @@ export default function PaymentPage() {
                 </span>
               </div>
 
-              {/* จุดรับ-ส่งผ้า */}
               <div className="flex justify-between items-start pt-1 border-t border-slate-100">
                 <span className="text-slate-500 font-medium shrink-0 mr-2">จุดรับ-ส่งผ้า</span>
                 <span className="text-slate-900 font-bold text-right leading-relaxed">{orderData.address}</span>

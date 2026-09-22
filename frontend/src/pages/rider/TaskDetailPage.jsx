@@ -21,10 +21,9 @@ import {
   MarkerF 
 } from '@react-google-maps/api';
 import { useApp } from '../../context/AppContext';
+import { fetchOrders, updateOrder } from '../../api/order';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-// พิกัดร้าน N&N Laundromat สำหรับเป็นจุดอ้างอิง
 const STORE_COORDS = { lat: 13.709648150061998, lng: 100.62401489583843 };
 
 export default function TaskDetailPage() {
@@ -33,8 +32,8 @@ export default function TaskDetailPage() {
   const { orders, setOrders } = useApp ? useApp() : {};
   const fileInputRef = useRef(null);
 
-  // State ป้ายแจ้งเตือน Toast
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [updating, setUpdating] = useState(false);
 
   const triggerToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -58,7 +57,28 @@ export default function TaskDetailPage() {
     }
   }, [activeRider, navigate]);
 
-  const order = (orders || []).find((o) => String(o.id) === String(id));
+  // ค้นหาออเดอร์ หรือโหลดสดจาก API
+  const [order, setOrder] = useState(() => (orders || []).find((o) => String(o.id) === String(id)));
+
+  useEffect(() => {
+    const fetchCurrentOrder = async () => {
+      try {
+        const all = await fetchOrders();
+        const found = all.find((o) => String(o.id) === String(id));
+        if (found) {
+          setOrder(found);
+          setProofImage(found.riderBasketImage || found.proofImage || null);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    if (!order) {
+      fetchCurrentOrder();
+    }
+  }, [id]);
+
   const [proofImage, setProofImage] = useState(order?.riderBasketImage || order?.proofImage || null);
   const [mapType, setMapType] = useState('roadmap');
 
@@ -80,7 +100,7 @@ export default function TaskDetailPage() {
         backgroundColor: '#f1f5f9'
       }}>
         <div className="bg-white p-6 rounded-2xl shadow-sm text-center max-w-xs mx-auto">
-          <p className="text-gray-700 font-bold text-sm mb-4">ไม่พบข้อมูลออเดอร์นี้ในระบบ</p>
+          <p className="text-gray-700 font-bold text-sm mb-4">กำลังโหลดหรือค้นหาข้อมูลออเดอร์...</p>
           <button
             onClick={() => navigate('/rider/tasks')}
             className="w-full py-2.5 bg-[#1d61f2] text-white text-xs font-bold rounded-xl cursor-pointer"
@@ -92,12 +112,10 @@ export default function TaskDetailPage() {
     );
   }
 
-  // พิกัดเป้าหมาย (ใช้พิกัดของลูกค้า หรือถ้าไม่มีให้ใช้พิกัดร้าน)
   const targetCoords = (order.lat && order.lng) 
     ? { lat: Number(order.lat), lng: Number(order.lng) } 
     : STORE_COORDS;
 
-  // นำทางด้วยแอปภายนอก (Google Maps Navigation)
   const handleOpenGoogleMaps = () => {
     let destination = '';
     if (order.lat && order.lng) {
@@ -138,8 +156,8 @@ export default function TaskDetailPage() {
     triggerToast('ลบรูปถ่ายเรียบร้อยแล้ว', 'info');
   };
 
-  // เลื่อนสถานะงาน พร้อมบันทึกรูปถ่าย
-  const handleAdvanceStep = (nextStep, nextTitle) => {
+  // เลื่อนสถานะงาน พร้อมบันทึกรูปถ่ายตรงเข้า MySQL
+  const handleAdvanceStep = async (nextStep, nextTitle) => {
     const now = new Date();
     const d = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
     const t = new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
@@ -148,51 +166,76 @@ export default function TaskDetailPage() {
     const isDone = nextStep === 7;
     const orderOwnerPhone = order.customerPhone || order.userPhone || '';
 
-    const updatedOrders = (orders || []).map((item) => {
-      if (String(item.id) === String(order.id)) {
-        return {
-          ...item,
-          statusStep: nextStep,
-          statusTitle: nextTitle,
-          status: isDone ? 'completed' : item.status,
-          isCompleted: isDone,
-          riderBasketImage: proofImage || item.riderBasketImage || null,
-          proofImage: proofImage || item.proofImage || null,
-          deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
-          deliveryRiderName: activeRider?.name || item.rider?.name || 'ไรเดอร์ประจำร้าน'
-        };
+    try {
+      setUpdating(true);
+
+      const updatePayload = {
+        statusStep: nextStep,
+        statusTitle: nextTitle,
+        status: isDone ? 'completed' : 'in_progress',
+        deliveredAt: isDone ? realNowTimestamp : undefined
+      };
+
+      if (nextStep < 5 && proofImage) {
+        updatePayload.riderBasketImage = proofImage;
       }
-      return item;
-    });
+      if (nextStep >= 6 && proofImage) {
+        updatePayload.proofImage = proofImage;
+      }
 
-    if (setOrders) {
-      setOrders(updatedOrders);
+      await updateOrder(order.id, updatePayload);
+
+      const updatedOrders = (orders || []).map((item) => {
+        if (String(item.id) === String(order.id)) {
+          return {
+            ...item,
+            statusStep: nextStep,
+            statusTitle: nextTitle,
+            status: isDone ? 'completed' : item.status,
+            isCompleted: isDone,
+            riderBasketImage: updatePayload.riderBasketImage || item.riderBasketImage,
+            proofImage: updatePayload.proofImage || item.proofImage,
+            deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
+            deliveryRiderName: activeRider?.name || item.rider?.name || 'ไรเดอร์ประจำร้าน'
+          };
+        }
+        return item;
+      });
+
+      if (setOrders) {
+        setOrders(updatedOrders);
+      }
+      localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+      if (isDone) {
+        try {
+          const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+          const finishNotice = {
+            id: Date.now(),
+            uniqueKey: `completed_${order.id}`,
+            orderId: order.id,
+            userId: orderOwnerPhone,
+            customerPhone: orderOwnerPhone,
+            title: 'ส่งมอบผ้าสะอาดสำเร็จเรียบร้อย',
+            message: `ออเดอร์ #${order.id} ได้รับการส่งมอบโดยคุณ ${activeRider?.name || 'ไรเดอร์'} เรียบร้อยแล้วเมื่อ ${realNowTimestamp}`,
+            time: realNowTimestamp,
+            type: 'delivery_success',
+            isRead: false
+          };
+          localStorage.setItem('customerNotifications', JSON.stringify([finishNotice, ...currentNotices]));
+        } catch (e) {}
+      }
+
+      triggerToast(`อัปเดตสถานะเป็น "${nextTitle}" สำเร็จ!`);
+      setTimeout(() => {
+        navigate('/rider/tasks');
+      }, 700);
+    } catch (err) {
+      console.error(err);
+      triggerToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+    } finally {
+      setUpdating(false);
     }
-    localStorage.setItem('orders', JSON.stringify(updatedOrders));
-
-    if (isDone) {
-      try {
-        const currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-        const finishNotice = {
-          id: Date.now(),
-          uniqueKey: `completed_${order.id}`,
-          orderId: order.id,
-          userId: orderOwnerPhone,
-          customerPhone: orderOwnerPhone,
-          title: 'ส่งมอบผ้าสะอาดสำเร็จเรียบร้อย',
-          message: `ออเดอร์ #${order.id} ได้รับการส่งมอบโดยคุณ ${activeRider?.name || 'ไรเดอร์'} เรียบร้อยแล้วเมื่อ ${realNowTimestamp}`,
-          time: realNowTimestamp,
-          type: 'delivery_success',
-          isRead: false
-        };
-        localStorage.setItem('customerNotifications', JSON.stringify([finishNotice, ...currentNotices]));
-      } catch (e) {}
-    }
-
-    triggerToast(`อัปเดตสถานะเป็น "${nextTitle}" สำเร็จ!`);
-    setTimeout(() => {
-      navigate('/rider/tasks');
-    }, 600);
   };
 
   return (
@@ -219,7 +262,7 @@ export default function TaskDetailPage() {
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
       }}>
 
-        {/* ป้ายแจ้งเตือน Floating Toast */}
+        {/* Floating Toast */}
         {toast.show && (
           <div className="absolute top-4 left-4 right-4 z-50 animate-in slide-in-from-top duration-200">
             <div className={`p-3 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
@@ -273,7 +316,7 @@ export default function TaskDetailPage() {
             </span>
           </div>
 
-          {/* ข้อมูลลูกค้า และรอบเวลารับ-ส่งผ้าคนละบรรทัด (ไม่มีไอคอนด้านหน้า) */}
+          {/* ข้อมูลลูกค้า และรอบเวลารับ-ส่งผ้า */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
               <div>
@@ -292,7 +335,6 @@ export default function TaskDetailPage() {
               )}
             </div>
 
-            {/* รอบเวลารับผ้า และรอบเวลาส่งผ้าคืน แยกคนละบรรทัด ไม่มีไอคอน */}
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-2">
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-500 font-medium">รอบเวลารับผ้า:</span>
@@ -312,7 +354,7 @@ export default function TaskDetailPage() {
             )}
           </div>
 
-          {/* รายละเอียดบริการ & รายการผ้าในออเดอร์ (ไม่แสดงยอดรวม) */}
+          {/* รายละเอียดบริการ & รายการผ้าในออเดอร์ */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="border-b border-gray-100 pb-2">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -332,7 +374,6 @@ export default function TaskDetailPage() {
                 <span className="font-bold text-slate-800">{order.packageName || 'ตามที่ระบุ'}</span>
               </div>
 
-              {/* รายการความต้องการพิเศษ (Special Items) แสดงเฉพาะชื่อและจำนวน ไม่แสดงราคา */}
               {order.specialItems && order.specialItems.length > 0 && (
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 space-y-1">
                   <span className="text-[11px] font-bold text-slate-800 block">รายการความต้องการพิเศษ (แยกชิ้น):</span>
@@ -345,7 +386,6 @@ export default function TaskDetailPage() {
                 </div>
               )}
 
-              {/* รายการถุงพลาสติกเสริม ไม่แสดงราคา */}
               {order.plasticBagCount > 0 && (
                 <div className="flex justify-between items-center text-slate-700 pt-1 border-t border-slate-100">
                   <span className="text-slate-500 font-medium">ถุงพลาสติกใส่ผ้าเสริม</span>
@@ -355,7 +395,7 @@ export default function TaskDetailPage() {
             </div>
           </div>
 
-          {/* แผนที่แบบฝังในแอป (Embedded Map) พร้อมปุ่มเปิดแอปนำทาง */}
+          {/* แผนที่แบบฝังในแอป */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -372,7 +412,6 @@ export default function TaskDetailPage() {
               </button>
             </div>
 
-            {/* แผนที่ย่อในหน้าแอป */}
             <div className="relative w-full h-44 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
               {isLoaded ? (
                 <GoogleMap
@@ -415,7 +454,7 @@ export default function TaskDetailPage() {
             </button>
           </div>
 
-          {/* รูปถ่ายจุดวางผ้าจากลูกค้า (ใช้ object-contain ไม่โดนตัดขอบ) */}
+          {/* รูปถ่ายจุดวางผ้าจากลูกค้า */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -441,7 +480,7 @@ export default function TaskDetailPage() {
             )}
           </div>
           
-          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ (ใช้ object-contain ไม่โดนตัดขอบ) */}
+          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -492,35 +531,38 @@ export default function TaskDetailPage() {
           </div>
         </div>
 
-        {/* Footer Actions ตาม Step */}
+        {/* Footer Actions */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 flex flex-col gap-2 z-20 shadow-lg">
           {Number(order.statusStep) === 3 && (
             <button
               type="button"
+              disabled={updating}
               onClick={() => handleAdvanceStep(4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
-              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition"
+              className="w-full py-3 rounded-xl bg-[#1d61f2] text-white font-bold text-xs shadow-md shadow-blue-500/20 hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-50"
             >
-              ยืนยันรับผ้าจากลูกค้า (นำส่งร้าน)
+              {updating ? 'กำลังบันทึกลงระบบ...' : 'ยืนยันรับผ้าจากลูกค้า (นำส่งร้าน)'}
             </button>
           )}
 
           {Number(order.statusStep) === 4 && (
             <button
               type="button"
+              disabled={updating}
               onClick={() => handleAdvanceStep(5, 'ร้านกำลังดำเนินการซักอบ')}
-              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 active:scale-[0.99] cursor-pointer transition"
+              className="w-full py-3 rounded-xl bg-blue-800 text-white font-bold text-xs shadow-md hover:bg-blue-900 active:scale-[0.99] cursor-pointer transition disabled:opacity-50"
             >
-              ผ้าถึงร้านแล้ว (ส่งมอบแผนกซักอบ)
+              {updating ? 'กำลังบันทึกลงระบบ...' : 'ผ้าถึงร้านแล้ว (ส่งมอบแผนกซักอบ)'}
             </button>
           )}
 
           {Number(order.statusStep) === 6 && (
             <button
               type="button"
+              disabled={updating}
               onClick={() => handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ')}
-              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer transition"
+              className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-50"
             >
-              ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย
+              {updating ? 'กำลังบันทึกลงระบบ...' : 'ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย'}
             </button>
           )}
 

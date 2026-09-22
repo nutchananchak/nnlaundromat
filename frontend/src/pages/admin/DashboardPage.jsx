@@ -34,6 +34,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { fetchOrders, updateOrder } from '../../api/order';
 
 // โลโก้ร้าน N&N Laundromat
 const BrandLogo = ({ size = 48 }) => (
@@ -122,6 +123,23 @@ const DashboardPage = () => {
       setToast(prev => ({ ...prev, show: false }));
     }, 2800);
   };
+
+  // ดึงข้อมูลออเดอร์จาก API MySQL
+  const loadOrdersFromApi = async () => {
+    try {
+      const data = await fetchOrders();
+      if (setOrders) {
+        setOrders(data);
+      }
+      localStorage.setItem('orders', JSON.stringify(data));
+    } catch (err) {
+      console.error('Failed to load orders in admin:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadOrdersFromApi();
+  }, []);
 
   const [lastSeenCounts, setLastSeenCounts] = useState(() => {
     try {
@@ -454,141 +472,182 @@ const DashboardPage = () => {
     );
   };
 
-  const executeApproveSlip = (orderId, chosenRider) => {
+  // อนุมัติสลิป และบันทึกลง MySQL จริง
+  const executeApproveSlip = async (orderId, chosenRider) => {
     const realTimeNow = getThaiRealTimestamp();
 
-    let targetOrder = null;
-    if (setOrders) {
-      setOrders(prev => prev.map(order => {
-        if (String(order.id) === String(orderId)) {
-          targetOrder = order;
-          return {
-            ...order,
-            statusStep: 3,
-            statusTitle: 'ไรเดอร์ได้รับมอบหมาย กำลังไปรับผ้า',
-            status: 'in_progress',
-            paymentVerified: true,
-            paymentRejected: false,
-            rejectReason: null,
-            verifiedAt: realTimeNow,
-            rider: chosenRider
-          };
-        }
-        return order;
-      }));
-    }
-
-    if (!targetOrder && orders) {
-      targetOrder = orders.find(o => String(o.id) === String(orderId));
-    }
-    const orderOwnerPhone = targetOrder?.customerPhone || targetOrder?.userPhone || '';
-
-    let currentNotices = [];
     try {
-      currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-    } catch (e) {
-      currentNotices = [];
+      await updateOrder(orderId, {
+        statusStep: 3,
+        statusTitle: 'ไรเดอร์ได้รับมอบหมาย กำลังไปรับผ้า',
+        status: 'in_progress',
+        paymentVerified: true,
+        paymentRejected: false,
+        rejectReason: null,
+        rider: { id: chosenRider.id, name: chosenRider.name, phone: chosenRider.phone }
+      });
+
+      let targetOrder = null;
+      if (setOrders) {
+        setOrders(prev => prev.map(order => {
+          if (String(order.id) === String(orderId)) {
+            targetOrder = order;
+            return {
+              ...order,
+              statusStep: 3,
+              statusTitle: 'ไรเดอร์ได้รับมอบหมาย กำลังไปรับผ้า',
+              status: 'in_progress',
+              paymentVerified: true,
+              paymentRejected: false,
+              rejectReason: null,
+              verifiedAt: realTimeNow,
+              rider: chosenRider
+            };
+          }
+          return order;
+        }));
+      }
+
+      if (!targetOrder && orders) {
+        targetOrder = orders.find(o => String(o.id) === String(orderId));
+      }
+      const orderOwnerPhone = targetOrder?.customerPhone || targetOrder?.userPhone || '';
+
+      let currentNotices = [];
+      try {
+        currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+      } catch (e) {
+        currentNotices = [];
+      }
+
+      const cleanedNotices = currentNotices.filter(
+        n => String(n.orderId) !== String(orderId) || (!String(n.title).includes('สลิป') && n.type !== 'alert')
+      );
+
+      const newNotice = {
+        id: Date.now(),
+        uniqueKey: `payment_verified_${orderId}`,
+        orderId,
+        userId: orderOwnerPhone,
+        customerPhone: orderOwnerPhone,
+        title: 'สลิปได้รับการอนุมัติเรียบร้อย',
+        message: `ออเดอร์ #${orderId} ยอดเงินถูกต้อง ไรเดอร์ (${chosenRider.name}) กำลังเดินทางไปรับผ้า`,
+        time: realTimeNow,
+        type: 'info',
+        isRead: false
+      };
+
+      localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
+      triggerToast(`อนุมัติออเดอร์ #${orderId} และมอบหมายงานให้ "${chosenRider.name}" แล้ว`);
+    } catch (err) {
+      console.error(err);
+      triggerToast('อนุมัติสลิปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง', 'error');
     }
-
-    const cleanedNotices = currentNotices.filter(
-      n => String(n.orderId) !== String(orderId) || (!String(n.title).includes('สลิป') && n.type !== 'alert')
-    );
-
-    const newNotice = {
-      id: Date.now(),
-      uniqueKey: `payment_verified_${orderId}`,
-      orderId,
-      userId: orderOwnerPhone,
-      customerPhone: orderOwnerPhone,
-      title: 'สลิปได้รับการอนุมัติเรียบร้อย',
-      message: `ออเดอร์ #${orderId} ยอดเงินถูกต้อง ไรเดอร์ (${chosenRider.name}) กำลังเดินทางไปรับผ้า`,
-      time: realTimeNow,
-      type: 'info',
-      isRead: false
-    };
-
-    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
-    triggerToast(`อนุมัติออเดอร์ #${orderId} และมอบหมายงานให้ "${chosenRider.name}" แล้ว`);
   };
 
-  const executeRejectSlip = () => {
+  // ปฏิเสธสลิป และบันทึกลง MySQL จริง
+  const executeRejectSlip = async () => {
     const { orderId, reason } = rejectModal;
     if (!orderId || !reason.trim()) return;
 
     const realTimeNow = getThaiRealTimestamp();
 
-    let targetOrder = null;
-    if (setOrders) {
-      setOrders(prev => prev.map(order => {
-        if (String(order.id) === String(orderId)) {
-          targetOrder = order;
-          return {
-            ...order,
-            paymentRejected: true,
-            rejectReason: reason,
-            rejectedAt: realTimeNow,
-            statusTitle: 'สลิปไม่ถูกต้อง (รอแนบสลิปใหม่)'
-          };
-        }
-        return order;
-      }));
-    }
-
-    if (!targetOrder && orders) {
-      targetOrder = orders.find(o => String(o.id) === String(orderId));
-    }
-    const orderOwnerPhone = targetOrder?.customerPhone || targetOrder?.userPhone || '';
-
-    let currentNotices = [];
     try {
-      currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-    } catch (e) {
-      currentNotices = [];
+      await updateOrder(orderId, {
+        paymentRejected: true,
+        paymentVerified: false,
+        rejectReason: reason,
+        statusTitle: 'สลิปไม่ถูกต้อง (รอแนบสลิปใหม่)'
+      });
+
+      let targetOrder = null;
+      if (setOrders) {
+        setOrders(prev => prev.map(order => {
+          if (String(order.id) === String(orderId)) {
+            targetOrder = order;
+            return {
+              ...order,
+              paymentRejected: true,
+              rejectReason: reason,
+              rejectedAt: realTimeNow,
+              statusTitle: 'สลิปไม่ถูกต้อง (รอแนบสลิปใหม่)'
+            };
+          }
+          return order;
+        }));
+      }
+
+      if (!targetOrder && orders) {
+        targetOrder = orders.find(o => String(o.id) === String(orderId));
+      }
+      const orderOwnerPhone = targetOrder?.customerPhone || targetOrder?.userPhone || '';
+
+      let currentNotices = [];
+      try {
+        currentNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+      } catch (e) {
+        currentNotices = [];
+      }
+
+      const cleanedNotices = currentNotices.filter(n => String(n.orderId) !== String(orderId));
+
+      const newNotice = {
+        id: Date.now(),
+        uniqueKey: `slip_rejected_${orderId}`,
+        orderId,
+        userId: orderOwnerPhone,
+        customerPhone: orderOwnerPhone,
+        title: 'สลิปการโอนเงินไม่ถูกต้อง',
+        message: `ออเดอร์ #${orderId} ไม่ผ่านการตรวจสอบ: "${reason}" กรุณาสแกน QR Code และแนบสลิปใหม่`,
+        time: realTimeNow,
+        type: 'slip_rejected',
+        isRead: false
+      };
+
+      localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
+      setRejectModal({ isOpen: false, orderId: null, reason: '' });
+      triggerToast(`ปฏิเสธสลิป #${orderId} เรียบร้อยแล้ว (ออเดอร์จะซ่อนจนกว่าลูกค้าจะส่งใหม่)`, 'error');
+    } catch (err) {
+      console.error(err);
+      triggerToast('ปฏิเสธสลิปไม่สำเร็จ', 'error');
     }
-
-    const cleanedNotices = currentNotices.filter(n => String(n.orderId) !== String(orderId));
-
-    const newNotice = {
-      id: Date.now(),
-      uniqueKey: `slip_rejected_${orderId}`,
-      orderId,
-      userId: orderOwnerPhone,
-      customerPhone: orderOwnerPhone,
-      title: 'สลิปการโอนเงินไม่ถูกต้อง',
-      message: `ออเดอร์ #${orderId} ไม่ผ่านการตรวจสอบ: "${reason}" กรุณาสแกน QR Code และแนบสลิปใหม่`,
-      time: realTimeNow,
-      type: 'slip_rejected',
-      isRead: false
-    };
-
-    localStorage.setItem('customerNotifications', JSON.stringify([newNotice, ...cleanedNotices]));
-    setRejectModal({ isOpen: false, orderId: null, reason: '' });
-    triggerToast(`ปฏิเสธสลิป #${orderId} เรียบร้อยแล้ว (ออเดอร์จะซ่อนจนกว่าลูกค้าจะส่งใหม่)`, 'error');
   };
 
+  // แผนกซักอบเสร็จสิ้น และอัปเดตลง MySQL จริง
   const handleCompleteWashing = (orderId) => {
     openConfirm(
       'ยืนยันซักอบเสร็จสิ้น',
       `ต้องการส่งมอบออเดอร์ #${orderId} ให้ไรเดอร์นำส่งคืนลูกค้าใช่หรือไม่?`,
       'ส่งงานให้ไรเดอร์',
       'bg-[#1d61f2]',
-      () => {
+      async () => {
         const realTimeNow = getThaiRealTimestamp();
-        if (setOrders) {
-          setOrders(prev => prev.map(order => {
-            if (String(order.id) === String(orderId)) {
-              return {
-                ...order,
-                statusStep: 6,
-                statusTitle: 'ผ้าซักอบเสร็จแล้ว ไรเดอร์กำลังนำส่งคืนลูกค้า',
-                washedAt: realTimeNow
-              };
-            }
-            return order;
-          }));
+        try {
+          await updateOrder(orderId, {
+            statusStep: 6,
+            statusTitle: 'ผ้าซักอบเสร็จแล้ว ไรเดอร์กำลังนำส่งคืนลูกค้า'
+          });
+
+          if (setOrders) {
+            setOrders(prev => prev.map(order => {
+              if (String(order.id) === String(orderId)) {
+                return {
+                  ...order,
+                  statusStep: 6,
+                  statusTitle: 'ผ้าซักอบเสร็จแล้ว ไรเดอร์กำลังนำส่งคืนลูกค้า',
+                  washedAt: realTimeNow
+                };
+              }
+              return order;
+            }));
+          }
+          triggerToast(`อัปเดต #${orderId} เป็นซักอบเสร็จแล้ว ส่งงานให้ไรเดอร์เรียบร้อย`);
+        } catch (err) {
+          console.error(err);
+          triggerToast('อัปเดตสถานะไม่สำเร็จ', 'error');
+        } finally {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
-        triggerToast(`อัปเดต #${orderId} เป็นซักอบเสร็จแล้ว ส่งงานให้ไรเดอร์เรียบร้อย`);
-        setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     );
   };
@@ -950,7 +1009,7 @@ const DashboardPage = () => {
 
         <div className="flex-1 overflow-y-auto p-6">
 
-          {/* ======================= แท็บ 1: ตรวจสอบสลิป (จัดสัดส่วนและช่องว่างให้ตรงเป๊ะ 100%) ======================= */}
+          {/* ======================= แท็บ 1: ตรวจสอบสลิป ======================= */}
           {activeTab === 'slips' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -1010,7 +1069,7 @@ const DashboardPage = () => {
                                 </span>
                               </td>
 
-                              {/* 3. สถานที่รับผ้า (กดเพื่อเปิด Google Maps ในแท็บใหม่) */}
+                              {/* 3. สถานที่รับผ้า */}
                               <td className="py-3 px-3 align-middle w-[20%]">
                                 <button
                                   type="button"
@@ -1049,7 +1108,7 @@ const DashboardPage = () => {
                                 </span>
                               </td>
 
-                              {/* 6. หลักฐานสลิป (จัดกึ่งกลางพอดีเป๊ะ) */}
+                              {/* 6. หลักฐานสลิป */}
                               <td className="py-3 px-3 align-middle text-center w-[9%]">
                                 <div className="flex justify-center">
                                   <button
@@ -1550,7 +1609,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              {/* รายการคำสั่งซื้อที่คิดเป็นรายได้ (พร้อมตัวกรองวันที่รายวัน) */}
+              {/* รายการคำสั่งซื้อที่คิดเป็นรายได้ */}
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
                   <div>

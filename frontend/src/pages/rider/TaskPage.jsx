@@ -3,29 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Bike, 
   MapPin, 
-  Clock, 
   Phone, 
   CheckCircle2, 
-  Package, 
   LogOut, 
-  ChevronRight,
   Truck,
   FileText,
-  Sparkles,
   BellRing,
-  AlertTriangle,
   Flame,
   Calendar,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { fetchOrders, updateOrder } from '../../api/order';
 
 const TaskPage = () => {
   const navigate = useNavigate();
   const { orders, setOrders } = useApp ? useApp() : {};
 
-  // State ป้ายแจ้งเตือน Toast สวยงาม
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [loading, setLoading] = useState(false);
 
   const triggerToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -49,9 +46,29 @@ const TaskPage = () => {
     }
   }, [activeRider, navigate]);
 
+  // ดึงรายการงานจาก MySQL API
+  const loadOrdersFromApi = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchOrders();
+      if (setOrders) {
+        setOrders(data);
+      }
+      localStorage.setItem('orders', JSON.stringify(data));
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+      triggerToast('โหลดข้อมูลงานไม่สำเร็จ', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrdersFromApi();
+  }, []);
+
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'return' | 'history'
 
-  // ฟอร์แมตวันที่ปัจจุบันเป็นรูปแบบ YYYY-MM-DD
   const getTodayDateStr = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -60,7 +77,6 @@ const TaskPage = () => {
     return `${year}-${month}-${day}`;
   };
 
-  // State ตัวกรองวันที่สำหรับแท็บ 'สำเร็จแล้ว' ('today' | 'all' | 'custom')
   const [historyFilterType, setHistoryFilterType] = useState('today');
   const [selectedCustomDate, setSelectedCustomDate] = useState(getTodayDateStr());
 
@@ -74,7 +90,6 @@ const TaskPage = () => {
 
   if (!activeRider) return null;
 
-  // วันที่ปัจจุบันภาษาไทย
   const now = new Date();
   const todayDay = now.getDate();
   const todayMonthShort = new Intl.DateTimeFormat('th-TH', { month: 'short' }).format(now);
@@ -82,15 +97,14 @@ const TaskPage = () => {
 
   // 1. งานรับผ้าเข้าร้าน (Step 3: กำลังไปรับ, Step 4: ได้รับผ้าแล้วกำลังมาร้าน)
   const myPickupOrders = (orders || []).filter(
-    o => [3, 4].includes(o.statusStep) && (o.rider?.id === activeRider.id || !o.rider)
+    o => [3, 4].includes(Number(o.statusStep)) && (o.rider?.id === activeRider.id || !o.rider)
   );
 
   // 2. งานส่งคืนผ้าให้ลูกค้า (Step 6: ซักเสร็จแล้ว ไรเดอร์กำลังนำส่งคืน)
   const myReturnOrders = (orders || []).filter(
-    o => o.statusStep === 6 && (o.rider?.id === activeRider.id || !o.rider)
+    o => Number(o.statusStep) === 6 && (o.rider?.id === activeRider.id || !o.rider)
   );
 
-  // แปลง string วันที่จาก custom date picker เป็นรูปแบบย่อ เช่น "2026-09-20" -> "20 ก.ย."
   const getFormattedDateFromPicker = (dateStr) => {
     if (!dateStr) return '';
     const [y, m, d] = dateStr.split('-');
@@ -100,9 +114,9 @@ const TaskPage = () => {
     return `${day} ${monthShort}`;
   };
 
-  // 3. กรองงานที่สำเร็จแล้วตามตัวเลือกวันที่
+  // 3. กรองงานที่สำเร็จแล้ว
   const completedOrders = (orders || []).filter(o => {
-    if (o.statusStep !== 7 || o.rider?.id !== activeRider.id) return false;
+    if (Number(o.statusStep) !== 7 || o.rider?.id !== activeRider.id) return false;
     const finishedTimeStr = String(o.deliveredAt || o.completedAt || o.createdAt || '');
 
     if (historyFilterType === 'all') return true;
@@ -119,7 +133,6 @@ const TaskPage = () => {
     return true;
   });
 
-  // ตรวจจับงานใหม่เพื่อแจ้งเตือน
   const prevPickupCount = useRef(myPickupOrders.length);
   useEffect(() => {
     if (myPickupOrders.length > prevPickupCount.current) {
@@ -128,23 +141,38 @@ const TaskPage = () => {
     prevPickupCount.current = myPickupOrders.length;
   }, [myPickupOrders.length]);
 
-  const handleAdvanceStep = (orderId, nextStep, nextTitle) => {
-    if (!setOrders) return;
+  // อัปเดตสเต็ปงานและบันทึกตรงลง MySQL
+  const handleAdvanceStep = async (orderId, nextStep, nextTitle) => {
     const realTimeNow = `${todayDay} ${todayMonthShort}, ${new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date())} น.`;
 
-    setOrders(prev => prev.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          statusStep: nextStep,
-          statusTitle: nextTitle,
-          status: nextStep === 7 ? 'completed' : order.status,
-          deliveredAt: nextStep === 7 ? realTimeNow : order.deliveredAt
-        };
+    try {
+      await updateOrder(orderId, {
+        statusStep: nextStep,
+        statusTitle: nextTitle,
+        status: nextStep === 7 ? 'completed' : 'in_progress',
+        deliveredAt: nextStep === 7 ? realTimeNow : undefined
+      });
+
+      if (setOrders) {
+        setOrders(prev => prev.map(order => {
+          if (order.id === orderId) {
+            return {
+              ...order,
+              statusStep: nextStep,
+              statusTitle: nextTitle,
+              status: nextStep === 7 ? 'completed' : order.status,
+              deliveredAt: nextStep === 7 ? realTimeNow : order.deliveredAt
+            };
+          }
+          return order;
+        }));
       }
-      return order;
-    }));
-    triggerToast(nextStep === 7 ? 'ปิดงานส่งมอบสำเร็จเรียบร้อย!' : 'อัปเดตสถานะงานเรียบร้อย');
+
+      triggerToast(nextStep === 7 ? 'ปิดงานส่งมอบสำเร็จเรียบร้อย!' : 'อัปเดตสถานะงานเรียบร้อย');
+    } catch (err) {
+      console.error(err);
+      triggerToast('อัปเดตสถานะงานไม่สำเร็จ', 'error');
+    }
   };
 
   const totalUrgentTasks = myPickupOrders.length + myReturnOrders.length;
@@ -173,7 +201,7 @@ const TaskPage = () => {
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
       }}>
 
-        {/* ป้ายแจ้งเตือน Floating Toast */}
+        {/* Floating Toast */}
         {toast.show && (
           <div className="absolute top-4 left-4 right-4 z-50 animate-in slide-in-from-top duration-200">
             <div className={`p-3 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
@@ -209,17 +237,27 @@ const TaskPage = () => {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-red-500 active:bg-red-600 text-white flex items-center justify-center transition-colors duration-200 cursor-pointer shadow-xs"
-              title="ออกจากระบบ"
-            >
-              <LogOut size={18} />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={loadOrdersFromApi}
+                className={`w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors cursor-pointer shadow-xs ${loading ? 'animate-spin' : ''}`}
+                title="รีเฟรชงาน"
+              >
+                <RefreshCw size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-10 h-10 rounded-2xl bg-white/15 hover:bg-red-500 active:bg-red-600 text-white flex items-center justify-center transition-colors duration-200 cursor-pointer shadow-xs"
+                title="ออกจากระบบ"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
           </div>
 
-          {/* แท็บสถานะงาน 3 หมวดหมู่ */}
+          {/* แท็บสถานะงาน */}
           <div className="grid grid-cols-3 gap-1.5 bg-black/15 p-1 rounded-2xl border border-white/15 text-xs font-semibold">
             <button
               type="button"
@@ -266,7 +304,6 @@ const TaskPage = () => {
         {/* รายการงาน */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
 
-          {/* ป้ายเตือนงานใหม่เด่นสะดุดตา เมื่อมีงานค้าง */}
           {totalUrgentTasks > 0 && activeTab !== 'history' && (
             <div className="p-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl shadow-md shadow-orange-500/15 flex items-center justify-between gap-3 animate-in fade-in duration-200">
               <div className="flex items-center gap-2.5 min-w-0">
@@ -284,7 +321,7 @@ const TaskPage = () => {
             </div>
           )}
 
-          {/* แท็บ 1: งานรับผ้าเข้าร้าน (Step 3, 4) */}
+          {/* แท็บ 1: รับผ้า */}
           {activeTab === 'active' && (
             <>
               {myPickupOrders.length === 0 ? (
@@ -333,7 +370,7 @@ const TaskPage = () => {
                       <FileText size={14} /> รายละเอียดงานและ GPS
                     </button>
 
-                    {order.statusStep === 3 && (
+                    {Number(order.statusStep) === 3 && (
                       <button
                         type="button"
                         onClick={() => handleAdvanceStep(order.id, 4, 'รับผ้าเข้าสู่ร้านเรียบร้อย')}
@@ -343,7 +380,7 @@ const TaskPage = () => {
                       </button>
                     )}
 
-                    {order.statusStep === 4 && (
+                    {Number(order.statusStep) === 4 && (
                       <button
                         type="button"
                         onClick={() => handleAdvanceStep(order.id, 5, 'ร้านกำลังดำเนินการซักอบ')}
@@ -358,7 +395,7 @@ const TaskPage = () => {
             </>
           )}
 
-          {/* แท็บ 2: งานส่งคืนผ้าลูกค้า (Step 6) */}
+          {/* แท็บ 2: ส่งคืน */}
           {activeTab === 'return' && (
             <>
               {myReturnOrders.length === 0 ? (
@@ -420,11 +457,9 @@ const TaskPage = () => {
             </>
           )}
 
-          {/* แท็บ 3: งานที่สำเร็จแล้ว (Step 7) พร้อมตัวเลือกดูตามวันที่ */}
+          {/* แท็บ 3: สำเร็จแล้ว */}
           {activeTab === 'history' && (
             <div className="flex flex-col gap-3">
-              
-              {/* ตัวเลือกฟิลเตอร์วันที่ */}
               <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
@@ -466,7 +501,6 @@ const TaskPage = () => {
                   </button>
                 </div>
 
-                {/* กล่องเลือกวันที่แบบ Custom */}
                 {historyFilterType === 'custom' && (
                   <div className="flex items-center gap-2 pt-1 animate-in fade-in duration-150">
                     <Calendar size={14} className="text-[#1d61f2] shrink-0" />
@@ -480,7 +514,6 @@ const TaskPage = () => {
                 )}
               </div>
 
-              {/* รายการการ์ดงานที่สำเร็จแล้ว */}
               {completedOrders.length === 0 ? (
                 <div className="text-center py-20 text-gray-400 text-xs flex flex-col items-center gap-2">
                   <CheckCircle2 size={36} className="text-gray-300" />

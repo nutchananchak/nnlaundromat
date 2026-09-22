@@ -5,17 +5,14 @@ import {
   MapPin, 
   Clock, 
   Camera, 
-  FileText, 
   ShoppingBag, 
   X, 
   Plus, 
   Minus, 
   Upload, 
-  Package,
-  Check,
-  AlertCircle,
-  ChevronRight,
-  HelpCircle
+  Check, 
+  AlertCircle, 
+  HelpCircle 
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -30,7 +27,6 @@ export default function NewOrderPage() {
 
   const serviceType = reorderData.service || location.state?.service || 'wash_dry_fold';
   
-  // จัดการการเลือกที่อยู่ภายในหน้านี้
   const [showAddressModal, setShowAddressModal] = useState(false);
   const displayAddress = currentAddress ? `${currentAddress.title} - ${currentAddress.detail}` : (reorderData.address || null);
 
@@ -55,10 +51,7 @@ export default function NewOrderPage() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [plasticBagCount, setPlasticBagCount] = useState(0);
 
-  // State สำหรับป้ายแจ้งเตือน Modal ทั่วไป
   const [alertModal, setAlertModal] = useState({ isOpen: false, title: '', message: '' });
-
-  // State สำหรับ Confirmation Modal ก่อนส่งคำสั่งซื้อ
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const showAlert = (title, message) => {
@@ -167,9 +160,15 @@ export default function NewOrderPage() {
     });
   };
 
+  // แปลงรูปเป็น Base64 เพื่อส่งต่อข้ามหน้าและบันทึกลง Database ได้อย่างสมบูรณ์
   const handleImageFile = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setBasketImage(URL.createObjectURL(e.target.files[0]));
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBasketImage(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -196,7 +195,6 @@ export default function NewOrderPage() {
       };
     });
 
-  // ตรวจสอบเงื่อนไขก่อนเปิด Confirmation Modal
   const handleValidateAndPreConfirm = (e) => {
     e.preventDefault();
 
@@ -230,7 +228,6 @@ export default function NewOrderPage() {
     setShowConfirmModal(true);
   };
 
-  // ดำเนินการสร้างออเดอร์หลังกดยืนยันจาก Modal
   const handleProceedOrder = () => {
     setShowConfirmModal(false);
 
@@ -252,8 +249,8 @@ export default function NewOrderPage() {
           plasticBagCount,
           plasticBagPrice,
           address: displayAddress,
-          lat: currentAddress?.lat,
-          lng: currentAddress?.lng,
+          lat: currentAddress?.lat || null,
+          lng: currentAddress?.lng || null,
           basketImage,
           note,
           totalPrice,
@@ -784,7 +781,7 @@ export default function NewOrderPage() {
           </div>
         )}
 
-        {/* Modal ยืนยันการสั่งบริการ (Confirmation Modal เพื่อความปลอดภัย) */}
+        {/* Modal ยืนยันการสั่งบริการ */}
         {showConfirmModal && (
           <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl flex flex-col gap-4 border border-slate-100 animate-in zoom-in-95 duration-150">
@@ -804,7 +801,6 @@ export default function NewOrderPage() {
                 </button>
               </div>
 
-              {/* สรุปข้อมูลคำสั่งซื้อสั้นๆ */}
               <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col gap-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">บริการ:</span>
@@ -854,7 +850,7 @@ export default function NewOrderPage() {
           </div>
         )}
 
-        {/* Alert Modal แจ้งเตือนแบบโมเดิร์น */}
+        {/* Alert Modal */}
         {alertModal.isOpen && (
           <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-xs">
             <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-150">
