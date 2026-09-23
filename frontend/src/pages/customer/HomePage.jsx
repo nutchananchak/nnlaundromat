@@ -53,6 +53,15 @@ export default function HomePage() {
   // State ตรวจสอบว่ามีข้อความแจ้งเตือนที่ยังไม่ได้อ่านหรือไม่
   const [hasUnreadNotices, setHasUnreadNotices] = useState(false);
 
+  // State เก็บรายการออเดอร์ที่สำเร็จแล้วและลูกค้าเคยกดเข้าไปดูใบเสร็จแล้ว
+  const [viewedCompletedIds, setViewedCompletedIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('viewed_completed_orders') || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
+
   // State สำหรับ Modal ยกเลิกออเดอร์
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('เปลี่ยนใจ / ไม่สะดวกช่วงเวลานี้');
@@ -66,15 +75,23 @@ export default function HomePage() {
 
   const currentUserId = String(userProfile?.phone || userProfile?.id || userProfile?.email || '').trim();
 
-  // 1. ดึงข้อมูลออเดอร์ล่าสุดสดๆ จาก MySQL
+  // 1. ดึงข้อมูลออเดอร์ล่าสุดจาก MySQL พร้อมคงสถานะ viewedCompleted ไว้เสมอ
   useEffect(() => {
     const loadRealtimeOrders = async () => {
       try {
         const liveOrders = await fetchOrders();
+        const savedViewedIds = JSON.parse(localStorage.getItem('viewed_completed_orders') || '[]');
+        
+        // ผสานค่า viewedCompleted จาก localStorage เข้ากับข้อมูลสดจากฐานข้อมูล
+        const mergedOrders = (liveOrders || []).map(order => ({
+          ...order,
+          viewedCompleted: savedViewedIds.includes(String(order.id)) || Boolean(order.viewedCompleted)
+        }));
+
         if (setOrders) {
-          setOrders(liveOrders);
+          setOrders(mergedOrders);
         }
-        localStorage.setItem('orders', JSON.stringify(liveOrders));
+        localStorage.setItem('orders', JSON.stringify(mergedOrders));
       } catch (err) {
         console.error('Failed to sync orders from MySQL:', err);
       }
@@ -100,7 +117,6 @@ export default function HomePage() {
     }
 
     try {
-      // หากยังไม่ได้ล็อกอิน ไม่แสดงจุดแดงแจ้งเตือนของออเดอร์
       if (!currentUserId) {
         setHasUnreadNotices(false);
         return;
@@ -142,12 +158,19 @@ export default function HomePage() {
     return currentUserId && orderOwner === currentUserId;
   });
 
-  // ค้นหาออเดอร์ที่ยังไม่เสร็จและยังไม่ถูกยกเลิก หรือสำเร็จแล้วแต่ยังไม่ได้กดดู
+  // ค้นหาออเดอร์ที่กำลังดำเนินอยู่ หรือสำเร็จแล้วแต่ยังไม่เคยกดเปิดดูใบเสร็จ
   const activeOrder = userOrders.find(o => {
     if (o.isCancelled || o.status === 'cancelled') return false;
     const step = Number(o.statusStep) || 1;
+    
+    // หากอยู่ระหว่างดำเนินการ (Step 1 ถึง 6)
     if (step >= 1 && step < 7 && !o.isCompleted) return true;
-    if (step >= 7 && !o.viewedCompleted) return true;
+    
+    // หากสำเร็จแล้ว (Step 7) ต้องเช็กว่าเคยกดดูใบเสร็จแล้วหรือไม่ (ถ้าดูแล้วจะไม่แสดงการ์ดติดตาม)
+    if (step >= 7) {
+      const isViewed = viewedCompletedIds.includes(String(o.id)) || o.viewedCompleted;
+      return !isViewed;
+    }
     return false;
   });
 
@@ -191,17 +214,28 @@ export default function HomePage() {
     { step: 7, label: 'สำเร็จ', icon: CheckCircle2 },
   ];
 
+  // เมื่อกดดูใบเสร็จ / รายละเอียดออเดอร์: บันทึกว่าดูแล้ว เพื่อให้หน้าต่างติดตามสถานะหายไปอย่างถาวร
   const handleViewOrderStatus = () => {
     if (!activeOrder) return;
 
     if (Number(activeOrder.statusStep) >= 7) {
+      const orderIdStr = String(activeOrder.id);
+      
+      // บันทึก ID ลงใน viewed_completed_orders ใน localStorage ทันที
+      const updatedViewed = Array.from(new Set([...viewedCompletedIds, orderIdStr]));
+      setViewedCompletedIds(updatedViewed);
+      localStorage.setItem('viewed_completed_orders', JSON.stringify(updatedViewed));
+
+      // อัปเดตใน AppContext State
       if (setOrders) {
-        setOrders(prev => prev.map(o => o.id === activeOrder.id ? { ...o, viewedCompleted: true } : o));
+        setOrders(prev => prev.map(o => String(o.id) === orderIdStr ? { ...o, viewedCompleted: true } : o));
       }
+
+      // อัปเดตใน orders cache ใน localStorage
       try {
-        const saved = JSON.parse(localStorage.getItem('orders') || '[]');
-        const updated = saved.map(o => o.id === activeOrder.id ? { ...o, viewedCompleted: true } : o);
-        localStorage.setItem('orders', JSON.stringify(updated));
+        const cachedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+        const updatedCache = cachedOrders.map(o => String(o.id) === orderIdStr ? { ...o, viewedCompleted: true } : o);
+        localStorage.setItem('orders', JSON.stringify(updatedCache));
       } catch (e) {
         console.error(e);
       }

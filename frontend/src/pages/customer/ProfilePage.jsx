@@ -22,7 +22,8 @@ import {
   Loader2, 
   KeyRound, 
   CheckCircle2, 
-  AlertTriangle 
+  AlertTriangle,
+  HelpCircle
 } from 'lucide-react';
 import { 
   GoogleMap, 
@@ -72,6 +73,29 @@ export default function ProfilePage() {
     setTimeout(() => {
       setToast(prev => ({ ...prev, show: false }));
     }, 2800);
+  };
+
+  // Custom Modal สำหรับยืนยันการทำรายการต่างๆ เช่น ออกจากระบบ หรือ ลบที่อยู่
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'ยืนยัน',
+    confirmColor: 'bg-[#1d61f2]',
+    iconType: 'help',
+    onConfirm: () => {}
+  });
+
+  const openConfirm = ({ title, message, confirmText = 'ยืนยัน', confirmColor = 'bg-[#1d61f2]', iconType = 'help', onConfirm }) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      confirmColor,
+      iconType,
+      onConfirm
+    });
   };
 
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -410,17 +434,25 @@ export default function ProfilePage() {
   };
 
   const handleDeleteAddress = (id) => {
-    if (window.confirm('คุณต้องการลบที่อยู่นี้ใช่หรือไม่?')) {
-      const remaining = (addresses || []).filter(a => a.id !== id);
-      if (remaining.length > 0 && !remaining.some(a => a.isDefault)) {
-        remaining[0].isDefault = true;
-        if (setSelectedAddressId) {
-          setSelectedAddressId(remaining[0].id);
+    openConfirm({
+      title: 'ลบที่อยู่จัดส่ง',
+      message: 'คุณต้องการลบที่อยู่นี้ออกจากระบบใช่หรือไม่?',
+      confirmText: 'ยืนยันลบ',
+      confirmColor: 'bg-red-600',
+      iconType: 'trash',
+      onConfirm: () => {
+        const remaining = (addresses || []).filter(a => a.id !== id);
+        if (remaining.length > 0 && !remaining.some(a => a.isDefault)) {
+          remaining[0].isDefault = true;
+          if (setSelectedAddressId) {
+            setSelectedAddressId(remaining[0].id);
+          }
         }
+        setAddresses(remaining);
+        showToast('ลบที่อยู่เรียบร้อยแล้ว');
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
-      setAddresses(remaining);
-      showToast('ลบที่อยู่เรียบร้อยแล้ว');
-    }
+    });
   };
 
   const handleAvatarChange = (e) => {
@@ -566,11 +598,20 @@ export default function ProfilePage() {
     }, 1200);
   };
 
+  // จัดการการออกจากระบบด้วย Custom Confirm Modal
   const handleLogout = () => {
-    if (window.confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
-      logoutUser();
-      navigate('/login/customer');
-    }
+    openConfirm({
+      title: 'ออกจากระบบ',
+      message: 'คุณต้องการออกจากระบบบัญชีผู้ใช้นี้ใช่หรือไม่?',
+      confirmText: 'ออกจากระบบ',
+      confirmColor: 'bg-red-600',
+      iconType: 'logout',
+      onConfirm: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        logoutUser();
+        navigate('/login/customer');
+      }
+    });
   };
 
   const displayName = userProfile?.fullName || userProfile?.name || 'ผู้ใช้งาน';
@@ -599,17 +640,61 @@ export default function ProfilePage() {
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
       }} className="font-body text-base">
 
+        {/* Floating Toast แจ้งเตือนสไตล์พรีเมียม */}
         {toast.show && (
-          <div className="absolute top-6 left-5 right-5 z-60 animate-in slide-in-from-top-4 duration-200">
-            <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md ${
+          <div className="absolute top-5 left-4 right-4 z-60 animate-in slide-in-from-top-4 duration-200">
+            <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
               toast.type === 'error'
-                ? 'bg-red-500/95 border-red-400 text-white'
-                : 'bg-emerald-600/95 border-emerald-500 text-white'
+                ? 'bg-red-500/95 border-red-400 shadow-red-500/20'
+                : 'bg-emerald-600/95 border-emerald-500 shadow-emerald-500/20'
             }`}>
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
                 {toast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
               </div>
               <span className="text-xs font-bold flex-1 leading-snug">{toast.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Confirmation Modal สำหรับ Logout / ลบรายการ */}
+        {confirmModal.isOpen && (
+          <div className="absolute inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
+                confirmModal.iconType === 'logout' 
+                  ? 'bg-red-50 text-red-600' 
+                  : confirmModal.iconType === 'trash'
+                  ? 'bg-red-50 text-red-600'
+                  : 'bg-blue-50 text-[#1d61f2]'
+              }`}>
+                {confirmModal.iconType === 'logout' ? (
+                  <LogOut size={24} />
+                ) : confirmModal.iconType === 'trash' ? (
+                  <Trash2 size={24} />
+                ) : (
+                  <HelpCircle size={24} />
+                )}
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-base text-slate-900">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{confirmModal.message}</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmModal.onConfirm}
+                  className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition cursor-pointer ${confirmModal.confirmColor}`}
+                >
+                  {confirmModal.confirmText}
+                </button>
+              </div>
             </div>
           </div>
         )}

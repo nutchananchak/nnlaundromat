@@ -130,7 +130,7 @@ export default function NewOrderPage() {
     { id: 'evening_dress', name: 'ชุดราตรี', price: 150, unit: 'ตัว' },
     { id: 'suit_top', name: 'สูท (เฉพาะเสื้อ)', price: 120, unit: 'ตัว' },
     { id: 'suit_full', name: 'สูท (เสื้อและกางเกง)', price: 180, unit: 'ชุด' },
-    { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 100, unit: 'ตัว' },
+    { id: 'sequin', name: 'เสื้อผ้าติดเลื่อม/เพชรประดับ', price: 120, unit: 'ตัว' },
     { id: 'brandname', name: 'เสื้อผ้าแบรนด์เนม', price: 100, unit: 'ตัว' },
     { id: 'dry_clean_only', name: 'เสื้อผ้าที่มีคำแนะนำ "ซักแห้งเท่านั้น"', price: 120, unit: 'ตัว' },
   ];

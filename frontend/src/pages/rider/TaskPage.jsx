@@ -12,7 +12,10 @@ import {
   Flame,
   Calendar,
   Filter,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle,
+  HelpCircle,
+  X
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { fetchOrders, updateOrder } from '../../api/order';
@@ -23,6 +26,27 @@ const TaskPage = () => {
 
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [loading, setLoading] = useState(false);
+
+  // Custom Modal สำหรับยืนยันการออกจากระบบ
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'ยืนยัน',
+    confirmColor: 'bg-red-600',
+    onConfirm: () => {}
+  });
+
+  const openConfirm = ({ title, message, confirmText = 'ยืนยัน', confirmColor = 'bg-red-600', onConfirm }) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      confirmColor,
+      onConfirm
+    });
+  };
 
   const triggerToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -80,12 +104,20 @@ const TaskPage = () => {
   const [historyFilterType, setHistoryFilterType] = useState('today');
   const [selectedCustomDate, setSelectedCustomDate] = useState(getTodayDateStr());
 
+  // จัดการการออกจากระบบด้วย Custom Confirm Modal ดีไซน์โมเดิร์น
   const handleLogout = () => {
-    if (window.confirm('คุณต้องการออกจากระบบพนักงานใช่หรือไม่?')) {
-      localStorage.removeItem('currentRider');
-      setActiveRider(null);
-      navigate('/login/rider', { replace: true });
-    }
+    openConfirm({
+      title: 'ออกจากระบบพนักงาน',
+      message: 'คุณต้องการออกจากระบบคนขับในขณะนี้ใช่หรือไม่?',
+      confirmText: 'ออกจากระบบ',
+      confirmColor: 'bg-red-600',
+      onConfirm: () => {
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        localStorage.removeItem('currentRider');
+        setActiveRider(null);
+        navigate('/login/rider', { replace: true });
+      }
+    });
   };
 
   if (!activeRider) return null;
@@ -201,20 +233,57 @@ const TaskPage = () => {
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
       }}>
 
-        {/* Floating Toast */}
+        {/* Floating Toast แจ้งเตือนสไตล์พรีเมียม สวยงาม คมชัด */}
         {toast.show && (
-          <div className="absolute top-4 left-4 right-4 z-50 animate-in slide-in-from-top duration-200">
-            <div className={`p-3 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
+          <div className="absolute top-5 left-4 right-4 z-50 animate-in slide-in-from-top-4 duration-200">
+            <div className={`p-3.5 rounded-2xl shadow-xl border flex items-center gap-3 backdrop-blur-md text-white ${
               toast.type === 'info' 
-                ? 'bg-amber-500/95 border-amber-400' 
+                ? 'bg-amber-500/95 border-amber-400 shadow-amber-500/20' 
                 : toast.type === 'error'
-                ? 'bg-red-500/95 border-red-400'
-                : 'bg-emerald-600/95 border-emerald-500'
+                ? 'bg-red-500/95 border-red-400 shadow-red-500/20'
+                : 'bg-emerald-600/95 border-emerald-500 shadow-emerald-500/20'
             }`}>
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                {toast.type === 'info' ? <BellRing size={16} /> : <CheckCircle2 size={16} />}
+                {toast.type === 'info' ? (
+                  <BellRing size={18} />
+                ) : toast.type === 'error' ? (
+                  <AlertTriangle size={18} />
+                ) : (
+                  <CheckCircle2 size={18} />
+                )}
               </div>
-              <span className="text-xs font-bold flex-1">{toast.message}</span>
+              <span className="text-xs font-bold flex-1 leading-snug">{toast.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Confirmation Modal สำหรับออกจากระบบ */}
+        {confirmModal.isOpen && (
+          <div className="absolute inset-0 bg-slate-900/60 z-60 flex items-center justify-center p-6 backdrop-blur-xs animate-in fade-in duration-150">
+            <div className="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl flex flex-col gap-4 text-center border border-slate-100 animate-in zoom-in-95 duration-150">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+                <LogOut size={24} />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold text-base text-slate-900">{confirmModal.title}</h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{confirmModal.message}</p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmModal.onConfirm}
+                  className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition cursor-pointer ${confirmModal.confirmColor}`}
+                >
+                  {confirmModal.confirmText}
+                </button>
+              </div>
             </div>
           </div>
         )}

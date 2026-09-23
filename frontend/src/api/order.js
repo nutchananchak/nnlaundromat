@@ -14,7 +14,19 @@ export const createNewOrder = async (orderPayload) => {
 };
 
 // 3. [Admin / Rider] อัปเดตสถานะ, อนุมัติ/ปฏิเสธสลิป, มอบหมายไรเดอร์, ส่งรูป
-export const updateOrder = async (orderId, updatePayload) => {
-  const response = await client.patch(`/orders/${orderId}`, updatePayload);
+export const updateOrder = async (id, data) => {
+  const response = await client.put(`/orders/${id}`, data);
+  return response.data;
+};
+
+// ถ้ามีฟังก์ชัน cancelOrder แยกต่างหาก:
+export const cancelOrder = async (id, reason) => {
+  const response = await client.put(`/orders/${id}`, {
+    status: 'cancelled',
+    statusStep: 5,
+    statusTitle: 'ยกเลิกคำสั่งซื้อแล้ว',
+    cancelReason: reason,
+    cancelledAt: new Date().toLocaleString('th-TH')
+  });
   return response.data;
 };

@@ -241,9 +241,9 @@ const DashboardPage = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
 
   const riderList = [
-    { id: 'RD-01', name: 'วรรณา สีดา', phone: '089-111-2233' },
-    { id: 'RD-02', name: 'วันดี ทองอ่อน', phone: '081-444-5566' },
-    { id: 'RD-03', name: 'สตาร์ วินเพียว', phone: '086-777-8899' },
+    { id: 'RD-01', name: 'วรรณา สีดา', phone: '094-285-5891' },
+    { id: 'RD-02', name: 'วันดี ทองอ่อน', phone: '083-188-7742' },
+    { id: 'RD-03', name: 'สตาร์ วินเพียว', phone: '084-078-8915' },
   ];
 
   const [selectedRiders, setSelectedRiders] = useState({});
@@ -274,9 +274,9 @@ const DashboardPage = () => {
 
   const pendingSlipOrders = (orders || []).filter(o => 
     Number(o.statusStep) === 1 && 
-    !o.paymentRejected &&
-    !o.isCancelled &&
-    o.status !== 'cancelled' &&
+    !o.paymentRejected && 
+    !o.isCancelled && 
+    o.status !== 'cancelled' && 
     (String(o.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
      (o.customerName && o.customerName.toLowerCase().includes(searchTerm.toLowerCase())))
   );
@@ -339,8 +339,8 @@ const DashboardPage = () => {
     weeklyRevenue, 
     selectedMonthRevenue, 
     totalRevenue, 
-    revenueOrdersGroupedByDate,
-    chartData
+    revenueOrdersGroupedByDate, 
+    chartData 
   } = useMemo(() => {
     const now = new Date();
     const currentDay = now.getDate();
@@ -351,7 +351,7 @@ const DashboardPage = () => {
 
     const validOrders = (orders || []).filter(o => 
       !o.paymentRejected && 
-      !o.isCancelled &&
+      !o.isCancelled && 
       (o.paymentVerified === true || Number(o.statusStep) >= 3 || Number(o.statusStep) === 7 || o.status === 'completed')
     );
 
@@ -472,7 +472,6 @@ const DashboardPage = () => {
     );
   };
 
-  // อนุมัติสลิป และบันทึกลง MySQL จริง
   const executeApproveSlip = async (orderId, chosenRider) => {
     const realTimeNow = getThaiRealTimestamp();
 
@@ -545,7 +544,6 @@ const DashboardPage = () => {
     }
   };
 
-  // ปฏิเสธสลิป และบันทึกลง MySQL จริง
   const executeRejectSlip = async () => {
     const { orderId, reason } = rejectModal;
     if (!orderId || !reason.trim()) return;
@@ -613,7 +611,6 @@ const DashboardPage = () => {
     }
   };
 
-  // แผนกซักอบเสร็จสิ้น และอัปเดตลง MySQL จริง
   const handleCompleteWashing = (orderId) => {
     openConfirm(
       'ยืนยันซักอบเสร็จสิ้น',
@@ -692,7 +689,7 @@ const DashboardPage = () => {
   const unreadCancelledCount = Math.max(0, allCancelledOrders.length - (lastSeenCounts.cancelled || 0));
 
   return (
-    <div className="flex h-screen w-screen bg-slate-100 font-body text-slate-800 overflow-hidden text-base">
+    <div className="flex h-screen w-screen bg-slate-100 font-body text-slate-800 overflow-hidden text-sm">
 
       {/* ป้ายแจ้งเตือน Floating Toast */}
       {toast.show && (
@@ -707,7 +704,7 @@ const DashboardPage = () => {
             <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               {toast.type === 'error' ? <AlertCircle size={18} /> : toast.type === 'info' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
             </div>
-            <span className="text-xs font-bold leading-snug">{toast.message}</span>
+            <span className="text-sm font-bold">{toast.message}</span>
           </div>
         </div>
       )}
@@ -721,20 +718,20 @@ const DashboardPage = () => {
             </div>
             <div>
               <h3 className="font-heading font-bold text-base text-slate-900">{confirmModal.title}</h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">{confirmModal.message}</p>
+              <p className="text-sm text-slate-500 mt-1 leading-relaxed">{confirmModal.message}</p>
             </div>
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition cursor-pointer"
               >
                 ยกเลิก
               </button>
               <button
                 type="button"
                 onClick={confirmModal.onConfirm}
-                className={`flex-1 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition cursor-pointer ${confirmModal.confirmColor}`}
+                className={`flex-1 py-2.5 rounded-xl text-white font-bold text-sm shadow-md transition cursor-pointer ${confirmModal.confirmColor}`}
               >
                 {confirmModal.confirmText}
               </button>
@@ -760,7 +757,7 @@ const DashboardPage = () => {
               </button>
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-sm font-bold text-slate-700 block mb-1">
                 โปรดระบุสาเหตุที่ปฏิเสธสลิป:
               </label>
               <textarea
@@ -768,9 +765,9 @@ const DashboardPage = () => {
                 value={rejectModal.reason}
                 onChange={(e) => setRejectModal(prev => ({ ...prev, reason: e.target.value }))}
                 placeholder="เช่น ยอดเงินไม่ตรง, สลิปซ้ำ, สลิปไม่ชัดเจน..."
-                className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-red-500 resize-none"
+                className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-sm font-medium text-slate-800 outline-none focus:border-red-500 resize-none"
               />
-              <span className="text-[10.5px] text-slate-400 mt-1 block">
+              <span className="text-xs text-slate-400 mt-1 block">
                 ข้อความนี้จะถูกส่งแจ้งเตือนไปยังหน้าจอของลูกค้าทันที
               </span>
             </div>
@@ -778,14 +775,14 @@ const DashboardPage = () => {
               <button
                 type="button"
                 onClick={() => setRejectModal({ isOpen: false, orderId: null, reason: '' })}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-50 transition cursor-pointer"
               >
                 ย้อนกลับ
               </button>
               <button
                 type="button"
                 onClick={executeRejectSlip}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 transition cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-500/20 transition cursor-pointer"
               >
                 ยืนยันปฏิเสธสลิป
               </button>
@@ -819,7 +816,7 @@ const DashboardPage = () => {
                 <h2 className="font-heading font-bold text-base text-white tracking-normal leading-tight truncate">
                   N&amp;N Laundromat
                 </h2>
-                <span className="text-[11px] text-blue-400 font-semibold tracking-wide block mt-0.5">
+                <span className="text-xs text-blue-400 font-semibold tracking-wide block mt-0.5">
                   ADMIN HUB
                 </span>
               </div>
@@ -840,7 +837,7 @@ const DashboardPage = () => {
                 {isSidebarOpen && <span className="truncate">ตรวจสอบสลิป</span>}
               </div>
               {pendingSlipOrders.length > 0 && (
-                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px]'} bg-amber-500 text-white font-black rounded-full`}>
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs'} bg-amber-500 text-white font-black rounded-full`}>
                   {pendingSlipOrders.length}
                 </span>
               )}
@@ -859,7 +856,7 @@ const DashboardPage = () => {
                 {isSidebarOpen && <span className="truncate">ผ้ากำลังซักอบ</span>}
               </div>
               {washingOrders.length > 0 && (
-                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px]'} bg-blue-500 text-white font-black rounded-full`}>
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs'} bg-blue-500 text-white font-black rounded-full`}>
                   {washingOrders.length}
                 </span>
               )}
@@ -878,7 +875,7 @@ const DashboardPage = () => {
                 {isSidebarOpen && <span className="truncate">ส่งมอบสำเร็จแล้ว</span>}
               </div>
               {unreadCompletedCount > 0 && (
-                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px]'} bg-emerald-600 text-white font-black rounded-full animate-in zoom-in-50 duration-150`}>
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs'} bg-emerald-600 text-white font-black rounded-full animate-in zoom-in-50 duration-150`}>
                   {unreadCompletedCount}
                 </span>
               )}
@@ -897,7 +894,7 @@ const DashboardPage = () => {
                 {isSidebarOpen && <span className="truncate">ออเดอร์ที่ยกเลิก</span>}
               </div>
               {unreadCancelledCount > 0 && (
-                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px]'} bg-red-500 text-white font-black rounded-full animate-in zoom-in-50 duration-150`}>
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs'} bg-red-500 text-white font-black rounded-full animate-in zoom-in-50 duration-150`}>
                   {unreadCancelledCount}
                 </span>
               )}
@@ -928,7 +925,7 @@ const DashboardPage = () => {
                 {isSidebarOpen && <span className="truncate">ปัญหาจากลูกค้า</span>}
               </div>
               {pendingReportsCount > 0 && (
-                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px]'} bg-orange-500 text-white font-black rounded-full`}>
+                <span className={`${isSidebarOpen ? 'px-2 py-0.5 text-xs' : 'absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs'} bg-orange-500 text-white font-black rounded-full`}>
                   {pendingReportsCount}
                 </span>
               )}
@@ -951,13 +948,13 @@ const DashboardPage = () => {
         <div className="p-3.5 border-t border-slate-800 bg-slate-950/60">
           <div className={`flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center'}`}>
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-[#1d61f2]/20 border border-[#1d61f2]/40 flex items-center justify-center text-xs font-bold text-blue-400 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-[#1d61f2]/20 border border-[#1d61f2]/40 flex items-center justify-center text-xs font-bold text-blue-400 shrink-0">
                 ADM
               </div>
               {isSidebarOpen && (
                 <div className="text-left min-w-0">
-                  <span className="text-xs font-bold text-slate-100 block truncate max-w-[110px]">{activeAdmin.name}</span>
-                  <span className="text-[10px] text-slate-400 block">{activeAdmin.id}</span>
+                  <span className="text-sm font-bold text-slate-100 block truncate max-w-[110px]">{activeAdmin.name}</span>
+                  <span className="text-xs text-slate-400 block">{activeAdmin.id}</span>
                 </div>
               )}
             </div>
@@ -968,7 +965,7 @@ const DashboardPage = () => {
                 className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-xl transition cursor-pointer"
                 title="ออกจากระบบ"
               >
-                <LogOut size={16} />
+                <LogOut size={18} />
               </button>
             )}
           </div>
@@ -977,9 +974,9 @@ const DashboardPage = () => {
 
       {/* 2. Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-xs">
+        <header className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-xs">
           <div>
-            <h1 className="font-heading font-bold text-lg text-slate-900 leading-tight">
+            <h1 className="font-heading font-bold text-base text-slate-900 leading-tight">
               {activeTab === 'slips' && 'ตรวจสอบสลิปและมอบหมายไรเดอร์'}
               {activeTab === 'washing' && 'แผนกซัก-อบผ้าของทางร้าน'}
               {activeTab === 'completed' && 'รายการที่ไรเดอร์ส่งมอบผ้าสำเร็จแล้ว'}
@@ -988,9 +985,6 @@ const DashboardPage = () => {
               {activeTab === 'reports' && 'รายการแจ้งปัญหาและข้อร้องเรียนจากลูกค้า'}
               {activeTab === 'calendar' && 'จัดการตารางเวลาและวันหยุดบริการ'}
             </h1>
-            <p className="text-xs text-slate-500 font-normal">
-              ระบบบริหารจัดการสำหรับเจ้าหน้าที่ N&amp;N Laundromat
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1001,7 +995,7 @@ const DashboardPage = () => {
                 placeholder="ค้นหาเลขออเดอร์, ชื่อลูกค้า..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs w-64 focus:outline-none focus:border-[#1d61f2] focus:bg-white transition"
+                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm w-64 focus:outline-none focus:border-[#1d61f2] focus:bg-white transition"
               />
             </div>
           </div>
@@ -1015,8 +1009,8 @@ const DashboardPage = () => {
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <span className="font-heading font-bold text-sm text-slate-900">รายการสลิปที่รอตรวจสอบและมอบหมายงาน</span>
-                    <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full">
+                    <span className="font-heading font-bold text-base text-slate-900">รายการสลิปที่รอตรวจสอบและมอบหมายงาน</span>
+                    <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">
                       {pendingSlipOrders.length} รายการ
                     </span>
                   </div>
@@ -1029,17 +1023,17 @@ const DashboardPage = () => {
                   </div>
                 ) : (
                   <div className="w-full overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse table-fixed min-w-[980px]">
+                    <table className="w-full text-left text-sm border-collapse min-w-[950px]">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
-                          <th className="py-3 px-3 w-[12%]">เลขออเดอร์</th>
-                          <th className="py-3 px-3 w-[15%]">ข้อมูลลูกค้า</th>
-                          <th className="py-3 px-3 w-[20%]">สถานที่รับผ้า</th>
-                          <th className="py-3 px-3 w-[13%]">บริการ</th>
-                          <th className="py-3 px-3 w-[8%] text-right">ยอดโอน</th>
-                          <th className="py-3 px-3 w-[9%] text-center">สลิป</th>
-                          <th className="py-3 px-3 w-[13%]">ไรเดอร์</th>
-                          <th className="py-3 px-3 w-[10%] text-center">ดำเนินการ</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                          <th className="py-4 px-5 text-left w-36">เลขออเดอร์</th>
+                          <th className="py-4 px-5 text-left w-44">ลูกค้า</th>
+                          <th className="py-4 px-5 text-left">สถานที่รับผ้า</th>
+                          <th className="py-4 px-5 text-left w-40">บริการ</th>
+                          <th className="py-4 px-5 text-left w-32">ยอดโอน</th>
+                          <th className="py-4 px-5 text-center w-28">สลิป</th>
+                          <th className="py-4 px-5 text-left w-44">ไรเดอร์</th>
+                          <th className="py-4 px-5 text-center w-36">ดำเนินการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -1049,97 +1043,85 @@ const DashboardPage = () => {
 
                           return (
                             <tr key={order.id} className="hover:bg-blue-50/30 transition-colors">
-                              {/* 1. เลขออเดอร์ */}
-                              <td className="py-3 px-3 align-middle w-[12%]">
-                                <span className="font-extrabold text-[#1d61f2] text-xs tracking-tight block truncate">
+                              <td className="py-4 px-5 align-middle text-left">
+                                <span className="font-extrabold text-[#1d61f2] text-sm block truncate">
                                   #{order.id}
                                 </span>
-                                <span className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5 truncate">
-                                  <Clock size={10} className="shrink-0" /> {order.createdAt || 'เมื่อสักครู่'}
+                                <span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                                  <Clock size={12} className="shrink-0" /> {order.createdAt || 'เมื่อสักครู่'}
                                 </span>
                               </td>
 
-                              {/* 2. ข้อมูลลูกค้า */}
-                              <td className="py-3 px-3 align-middle w-[15%]">
-                                <span className="font-bold text-slate-800 text-xs block truncate" title={order.customerName}>
+                              <td className="py-4 px-5 align-middle text-left">
+                                <span className="font-bold text-slate-800 text-sm block truncate" title={order.customerName}>
                                   {order.customerName || 'คุณลูกค้า'}
                                 </span>
-                                <span className="text-[11px] text-slate-400 font-normal block truncate mt-0.5">
+                                <span className="text-xs text-slate-400 block truncate mt-0.5">
                                   {order.customerPhone || '-'}
                                 </span>
                               </td>
 
-                              {/* 3. สถานที่รับผ้า */}
-                              <td className="py-3 px-3 align-middle w-[20%]">
+                              <td className="py-4 px-5 align-middle text-left">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenMap(order)}
-                                  className="group text-left flex items-start gap-1 p-1 -ml-1 rounded-lg hover:bg-blue-50/80 transition cursor-pointer w-full"
+                                  className="group text-left inline-flex items-start gap-1.5 p-2 rounded-xl bg-blue-50/60 hover:bg-blue-100/80 border border-blue-100 transition cursor-pointer max-w-md w-full"
                                   title="แตะเพื่อเปิดพิกัดนำทางบน Google Maps"
                                 >
-                                  <MapPin size={13} className="text-[#1d61f2] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                                  <MapPin size={15} className="text-[#1d61f2] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                                   <div className="min-w-0 flex-1">
-                                    <span className="text-[11px] text-slate-700 font-medium line-clamp-1 leading-snug group-hover:text-[#1d61f2] transition-colors block">
+                                    <span className="text-xs text-slate-700 font-medium line-clamp-2 leading-relaxed group-hover:text-[#1d61f2] transition-colors block">
                                       {order.address || 'ไม่ระบุที่อยู่'}
-                                    </span>
-                                    <span className="text-[9px] text-[#1d61f2] font-bold inline-flex items-center gap-0.5 opacity-80 group-hover:opacity-100">
-                                      เปิดแผนที่ <ExternalLink size={7} />
                                     </span>
                                   </div>
                                 </button>
                               </td>
 
-                              {/* 4. บริการ */}
-                              <td className="py-3 px-3 align-middle w-[13%]">
-                                <span className="font-semibold text-slate-800 text-xs block truncate" title={order.serviceName}>
+                              <td className="py-4 px-5 align-middle text-left">
+                                <span className="font-bold text-slate-800 text-sm block truncate" title={order.serviceName}>
                                   {order.serviceName}
                                 </span>
                                 {order.packageName && (
-                                  <span className="text-[10px] text-slate-400 font-normal block truncate mt-0.5">
+                                  <span className="text-xs text-slate-400 font-medium block truncate mt-0.5">
                                     {order.packageName}
                                   </span>
                                 )}
                               </td>
 
-                              {/* 5. ยอดโอน */}
-                              <td className="py-3 px-3 align-middle text-right whitespace-nowrap w-[8%]">
-                                <span className="font-black text-slate-900 text-xs">
+                              <td className="py-4 px-5 align-middle text-left whitespace-nowrap">
+                                <span className="font-extrabold text-slate-900 text-sm">
                                   {(order.totalPrice || order.price || 0).toLocaleString()} ฿
                                 </span>
                               </td>
 
-                              {/* 6. หลักฐานสลิป */}
-                              <td className="py-3 px-3 align-middle text-center w-[9%]">
-                                <div className="flex justify-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedSlipModal(order)}
-                                    className="inline-flex items-center justify-center gap-1 py-1 px-2.5 bg-blue-50 hover:bg-blue-100 active:scale-95 text-[#1d61f2] rounded-lg border border-blue-200 transition cursor-pointer shadow-2xs whitespace-nowrap"
-                                  >
-                                    {currentSlipImg ? (
-                                      <img 
-                                        src={currentSlipImg} 
-                                        alt="สลิป" 
-                                        className="w-4 h-4 rounded-xs object-cover border border-blue-300 shrink-0"
-                                      />
-                                    ) : (
-                                      <ImageIcon size={12} className="shrink-0" />
-                                    )}
-                                    <span className="text-[10.5px] font-bold">ดูสลิป</span>
-                                  </button>
-                                </div>
+                              <td className="py-4 px-5 align-middle text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedSlipModal(order)}
+                                  className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-blue-50 hover:bg-blue-100 active:scale-95 text-[#1d61f2] rounded-xl border border-blue-200 transition cursor-pointer shadow-2xs whitespace-nowrap text-xs font-bold"
+                                >
+                                  {currentSlipImg ? (
+                                    <img 
+                                      src={currentSlipImg} 
+                                      alt="สลิป" 
+                                      className="w-4 h-4 rounded-xs object-cover border border-blue-300 shrink-0"
+                                    />
+                                  ) : (
+                                    <ImageIcon size={13} className="shrink-0" />
+                                  )}
+                                  <span>ดูสลิป</span>
+                                </button>
                               </td>
 
-                              {/* 7. มอบหมายไรเดอร์ */}
-                              <td className="py-3 px-3 align-middle w-[13%]">
+                              <td className="py-4 px-5 align-middle text-left">
                                 <div className="relative inline-flex items-center w-full">
-                                  <div className="w-5 h-5 rounded-md bg-[#1d61f2]/10 text-[#1d61f2] flex items-center justify-center shrink-0 absolute left-1.5 pointer-events-none">
-                                    <Bike size={11} />
+                                  <div className="w-6 h-6 rounded-lg bg-[#1d61f2]/10 text-[#1d61f2] flex items-center justify-center shrink-0 absolute left-2 pointer-events-none">
+                                    <Bike size={13} />
                                   </div>
                                   <select
                                     value={selectedRiderId}
                                     onChange={(e) => setSelectedRiders({ ...selectedRiders, [order.id]: e.target.value })}
-                                    className="w-full appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-lg pl-6 pr-5 py-1 text-[10.5px] font-bold text-slate-700 outline-none cursor-pointer transition shadow-2xs truncate"
+                                    className="w-full appearance-none bg-slate-50 border border-slate-200 hover:border-[#1d61f2] focus:border-[#1d61f2] rounded-xl pl-8 pr-6 py-1.5 text-xs font-semibold text-slate-700 outline-none cursor-pointer transition shadow-2xs truncate"
                                   >
                                     {riderList.map(r => (
                                       <option key={r.id} value={r.id}>
@@ -1147,24 +1129,23 @@ const DashboardPage = () => {
                                       </option>
                                     ))}
                                   </select>
-                                  <ChevronDown size={11} className="text-slate-400 absolute right-1 pointer-events-none" />
+                                  <ChevronDown size={13} className="text-slate-400 absolute right-2 pointer-events-none" />
                                 </div>
                               </td>
 
-                              {/* 8. ดำเนินการ */}
-                              <td className="py-3 px-3 align-middle text-center whitespace-nowrap w-[17%]">
-                                <div className="inline-flex items-center gap-1 justify-center">
+                              <td className="py-4 px-5 align-middle text-center whitespace-nowrap">
+                                <div className="inline-flex items-center gap-2 justify-center">
                                   <button
                                     type="button"
                                     onClick={() => setRejectModal({ isOpen: true, orderId: order.id, reason: 'ยอดเงินไม่ถูกต้อง หรือภาพสลิปไม่ชัดเจน' })}
-                                    className="px-2 py-1 border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 rounded-lg font-bold text-[10.5px] transition cursor-pointer"
+                                    className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-95 rounded-xl font-bold text-xs transition cursor-pointer"
                                   >
                                     ปฏิเสธ
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => confirmApproveSlip(order.id)}
-                                    className="px-2 py-1 bg-[#1d61f2] hover:bg-blue-700 active:scale-95 text-white rounded-lg font-bold text-[10.5px] shadow-2xs transition cursor-pointer"
+                                    className="px-3 py-1.5 bg-[#1d61f2] hover:bg-blue-700 active:scale-95 text-white rounded-xl font-bold text-xs shadow-2xs transition cursor-pointer"
                                   >
                                     อนุมัติ
                                   </button>
@@ -1188,9 +1169,9 @@ const DashboardPage = () => {
                 <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
                   <div>
                     <h3 className="font-heading font-bold text-base text-slate-900">รายการผ้าที่กำลังดำเนินการซัก-อบที่ร้าน</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">เมื่อผ้าแห้งสนิทและพับเรียบร้อยแล้ว ให้กดปุ่มเพื่อเรียกไรเดอร์ส่งคืนลูกค้า</p>
+                    <p className="text-sm text-slate-500 mt-0.5">เมื่อผ้าแห้งสนิทและพับเรียบร้อยแล้ว ให้กดปุ่มเพื่อเรียกไรเดอร์ส่งคืนลูกค้า</p>
                   </div>
-                  <span className="bg-blue-50 text-[#1d61f2] font-bold text-xs px-3 py-1 rounded-full">
+                  <span className="bg-blue-50 text-[#1d61f2] font-bold text-sm px-3.5 py-1 rounded-full">
                     {washingOrders.length} รายการ
                   </span>
                 </div>
@@ -1198,35 +1179,35 @@ const DashboardPage = () => {
                 {washingOrders.length === 0 ? (
                   <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
                     <Sparkles size={40} className="text-slate-300" />
-                    <span>ไม่มีรายการผ้าที่กำลังซักอบในขณะนี้</span>
+                    <span className="text-sm">ไม่มีรายการผ้าที่กำลังซักอบในขณะนี้</span>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {washingOrders.map(order => (
                       <div key={order.id} className="p-5 rounded-2xl border border-blue-100 bg-blue-50/30 flex flex-col justify-between gap-4">
                         <div>
                           <div className="flex justify-between items-center">
                             <div>
-                              <span className="font-extrabold text-base text-[#1d61f2] block">ออเดอร์ #{order.id}</span>
-                              <span className="text-[11px] text-slate-400 font-medium">สั่งเมื่อ: {order.createdAt || '-'}</span>
+                              <span className="font-bold text-base text-[#1d61f2] block">ออเดอร์ #{order.id}</span>
+                              <span className="text-xs text-slate-400 font-medium">สั่งเมื่อ: {order.createdAt || '-'}</span>
                             </div>
-                            <span className="text-xs font-bold bg-white text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-lg">
+                            <span className="text-xs font-bold bg-white text-blue-800 border border-blue-200 px-3 py-1 rounded-xl">
                               {order.serviceName}
                             </span>
                           </div>
-                          <div className="mt-3 space-y-1 text-xs text-slate-600">
-                            <div><span className="font-bold">ลูกค้า:</span> {order.customerName || 'คุณลูกค้า'} ({order.customerPhone || '-'})</div>
-                            <div><span className="font-bold">ที่อยู่จัดส่ง:</span> {order.address}</div>
-                            <div><span className="font-bold text-blue-700">ไรเดอร์ผู้ดูแล:</span> {order.rider?.name || 'สมชาย ส่งไว'}</div>
+                          <div className="mt-3 space-y-1.5 text-sm text-slate-600">
+                            <div className="truncate"><span className="font-bold">ลูกค้า:</span> {order.customerName || 'คุณลูกค้า'} ({order.customerPhone || '-'})</div>
+                            <div className="line-clamp-2 leading-relaxed"><span className="font-bold">ที่อยู่จัดส่ง:</span> {order.address}</div>
+                            <div className="truncate"><span className="font-bold text-blue-700">ไรเดอร์ผู้ดูแล:</span> {order.rider?.name || 'สมชาย ส่งไว'}</div>
                           </div>
                         </div>
 
                         <button
                           type="button"
                           onClick={() => handleCompleteWashing(order.id)}
-                          className="w-full py-2.5 bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                          className="w-full py-3 bg-[#1d61f2] hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
                         >
-                          <Truck size={16} /> ซักอบเสร็จแล้ว - ส่งงานให้ไรเดอร์นำส่งคืน
+                          <Truck size={18} /> ซักอบเสร็จแล้ว - ส่งงานให้ไรเดอร์นำส่งคืน
                         </button>
                       </div>
                     ))}
@@ -1243,29 +1224,29 @@ const DashboardPage = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
                   <div>
                     <h3 className="font-heading font-bold text-base text-slate-900">ประวัติออเดอร์ที่ไรเดอร์ส่งมอบสำเร็จแล้ว</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">เลือกวันที่ต้องการตรวจสอบเพื่อดูรายการเฉพาะวันได้ทันที</p>
+                    <p className="text-sm text-slate-500 mt-0.5">เลือกวันที่ต้องการตรวจสอบเพื่อดูรายการเฉพาะวันได้ทันที</p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-2xl">
-                      <Calendar size={14} className="text-[#1d61f2]" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-2xl">
+                      <Calendar size={16} className="text-[#1d61f2]" />
                       <input
                         type="date"
                         value={completedFilterDate}
                         onChange={(e) => setCompletedFilterDate(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
                       />
                     </div>
                     {completedFilterDate && (
                       <button
                         type="button"
                         onClick={() => setCompletedFilterDate('')}
-                        className="text-[11px] font-bold text-slate-500 hover:text-red-500 bg-slate-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+                        className="text-xs font-bold text-slate-500 hover:text-red-500 bg-slate-100 px-3 py-2 rounded-xl transition cursor-pointer"
                       >
                         ดูทั้งหมด
                       </button>
                     )}
-                    <span className="bg-emerald-50 text-emerald-700 font-bold text-xs px-3 py-1.5 rounded-xl">
+                    <span className="bg-emerald-50 text-emerald-700 font-bold text-sm px-3.5 py-2 rounded-xl">
                       {deliveredOrders.length} รายการ
                     </span>
                   </div>
@@ -1273,66 +1254,76 @@ const DashboardPage = () => {
 
                 {deliveredOrders.length === 0 ? (
                   <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
-                    <CheckCheck size={40} className="text-slate-300" />
-                    <span>
+                    <CheckCheck size={44} className="text-slate-300" />
+                    <span className="text-sm">
                       {completedFilterDate 
                         ? `ไม่พบรายการที่ส่งมอบในวันที่ ${completedFilterDate}` 
                         : 'ยังไม่มีออเดอร์ที่ส่งมอบสำเร็จในระบบ'}
                     </span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse">
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse min-w-[950px]">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider whitespace-nowrap">
-                          <th className="py-3.5 px-4">เลขออเดอร์ / เวลาสั่ง</th>
-                          <th className="py-3.5 px-4">ลูกค้า</th>
-                          <th className="py-3.5 px-4">บริการ</th>
-                          <th className="py-3.5 px-4">ยอดเงินสุทธิ</th>
-                          <th className="py-3.5 px-4">ไรเดอร์ผู้ส่งมอบ</th>
-                          <th className="py-3.5 px-4">เวลาที่ส่งมอบสำเร็จจริง</th>
-                          <th className="py-3.5 px-4 text-center">หลักฐาน</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                          <th className="py-4 px-5 text-left w-36">เลขออเดอร์</th>
+                          <th className="py-4 px-3 text-left w-40">ลูกค้า</th>
+                          <th className="py-4 px-3 text-left w-40">บริการ</th>
+                          <th className="py-4 px-5 text-left w-32">ยอดเงินสุทธิ</th>
+                          <th className="py-4 px-5 text-left w-44">ไรเดอร์ผู้ส่งมอบ</th>
+                          <th className="py-4 px-5 text-left">เวลาส่งมอบสำเร็จ</th>
+                          <th className="py-4 px-5 text-center w-36">หลักฐาน</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {deliveredOrders.map(order => (
                           <tr key={order.id} className="hover:bg-emerald-50/20 transition-colors">
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="font-extrabold text-[#1d61f2] text-sm block">#{order.id}</span>
-                              <span className="text-[11px] text-slate-400 font-medium">สั่งเมื่อ: {order.createdAt || '-'}</span>
+                            <td className="py-4 px-5 align-middle text-left">
+                              <span className="font-extrabold text-[#1d61f2] text-sm block truncate">#{order.id}</span>
+                              <span className="text-xs text-slate-400 font-medium block truncate mt-0.5">สั่งเมื่อ: {order.createdAt || '-'}</span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="font-bold text-slate-800 text-xs block">{order.customerName || 'คุณลูกค้า'}</span>
-                              <span className="text-[11px] text-slate-400">{order.customerPhone || '-'}</span>
+
+                            <td className="py-4 px-3 align-middle text-left">
+                              <span className="font-bold text-slate-800 text-sm block truncate" title={order.customerName}>{order.customerName || 'คุณลูกค้า'}</span>
+                              <span className="text-xs text-slate-400 block truncate mt-0.5">{order.customerPhone || '-'}</span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-700">
-                              {order.serviceName}
+
+                            <td className="py-4 px-3 align-middle text-left">
+                              <span className="font-semibold text-slate-800 text-sm block truncate" title={order.serviceName}>{order.serviceName}</span>
+                              {order.packageName && <span className="text-xs text-slate-400 font-normal block truncate mt-0.5">{order.packageName}</span>}
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap font-bold text-slate-900 text-xs">
-                              {(order.totalPrice || order.price || 0).toLocaleString()} ฿
+
+                            <td className="py-4 px-5 align-middle text-left whitespace-nowrap">
+                              <span className="font-extrabold text-slate-900 text-sm">
+                                {(order.totalPrice || order.price || 0).toLocaleString()} ฿
+                              </span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="text-xs font-bold text-blue-700 block">
+
+                            <td className="py-4 px-5 align-middle text-left">
+                              <span className="text-sm font-bold text-blue-700 block truncate" title={order.deliveryRiderName || order.rider?.name || 'ไรเดอร์ประจำร้าน'}>
                                 {order.deliveryRiderName || order.rider?.name || 'ไรเดอร์ประจำร้าน'}
                               </span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 flex items-center gap-1.5 w-fit">
-                                <Clock size={12} />
-                                {order.deliveredAt || order.createdAt || 'ไม่ระบุเวลา'}
+
+                            <td className="py-4 px-5 align-middle text-left whitespace-nowrap">
+                              <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100 inline-flex items-center gap-1.5 truncate max-w-full">
+                                <Clock size={13} className="shrink-0" />
+                                <span className="truncate">{order.deliveredAt || order.createdAt || 'ไม่ระบุเวลา'}</span>
                               </span>
                             </td>
-                            <td className="py-4 px-4 text-center whitespace-nowrap">
+
+                            <td className="py-4 px-5 align-middle text-center whitespace-nowrap">
                               {order.proofImage ? (
                                 <button
                                   type="button"
                                   onClick={() => setSelectedSlipModal({ ...order, slipImage: order.proofImage })}
-                                  className="text-xs text-[#1d61f2] font-bold underline cursor-pointer"
+                                  className="inline-flex items-center justify-center gap-1.5 py-1.5 px-3 bg-blue-50 hover:bg-blue-100 active:scale-95 text-[#1d61f2] rounded-xl border border-blue-200 transition cursor-pointer shadow-2xs whitespace-nowrap text-xs font-bold"
                                 >
-                                  ดูภาพส่งงาน
+                                  <ImageIcon size={13} className="shrink-0" />
+                                  <span>ดูภาพส่งงาน</span>
                                 </button>
                               ) : (
-                                <span className="text-[11px] text-slate-400">ไม่มีรูป</span>
+                                <span className="text-xs text-slate-400">ไม่มีรูป</span>
                               )}
                             </td>
                           </tr>
@@ -1345,36 +1336,36 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 3.1: ออเดอร์ที่ถูกยกเลิก ======================= */}
+          {/* ======================= แท็บ 3.1: ออเดอร์ที่ถูกยกเลิก (ขยับลูกค้ากับบริการชิดกัน) ======================= */}
           {activeTab === 'cancelled' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-100">
                   <div>
                     <h3 className="font-heading font-bold text-base text-slate-900">รายการคำสั่งซื้อที่ยกเลิก</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">เลือกวันที่เพื่อตรวจสอบออเดอร์ที่ลูกค้ายกเลิกในแต่ละวัน</p>
+                    <p className="text-sm text-slate-500 mt-0.5">เลือกวันที่เพื่อตรวจสอบออเดอร์ที่ลูกค้ายกเลิกในแต่ละวัน</p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-2xl">
-                      <Calendar size={14} className="text-red-500" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-2xl">
+                      <Calendar size={16} className="text-red-500" />
                       <input
                         type="date"
                         value={cancelledFilterDate}
                         onChange={(e) => setCancelledFilterDate(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
                       />
                     </div>
                     {cancelledFilterDate && (
                       <button
                         type="button"
                         onClick={() => setCancelledFilterDate('')}
-                        className="text-[11px] font-bold text-slate-500 hover:text-red-500 bg-slate-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+                        className="text-xs font-bold text-slate-500 hover:text-red-500 bg-slate-100 px-3 py-2 rounded-xl transition cursor-pointer"
                       >
                         ดูทั้งหมด
                       </button>
                     )}
-                    <span className="bg-red-50 text-red-700 font-bold text-xs px-3 py-1.5 rounded-xl">
+                    <span className="bg-red-50 text-red-700 font-bold text-sm px-3.5 py-2 rounded-xl">
                       {cancelledOrders.length} รายการ
                     </span>
                   </div>
@@ -1382,56 +1373,62 @@ const DashboardPage = () => {
 
                 {cancelledOrders.length === 0 ? (
                   <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
-                    <CheckCircle2 size={40} className="text-slate-300" />
-                    <span>
+                    <CheckCircle2 size={44} className="text-slate-300" />
+                    <span className="text-sm">
                       {cancelledFilterDate 
                         ? `ไม่พบรายการยกเลิกในวันที่ ${cancelledFilterDate}` 
                         : 'ไม่มีรายการคำสั่งซื้อที่ยกเลิก'}
                     </span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse">
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse min-w-[950px]">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider whitespace-nowrap">
-                          <th className="py-3.5 px-4">เลขออเดอร์</th>
-                          <th className="py-3.5 px-4">ลูกค้า</th>
-                          <th className="py-3.5 px-4">บริการ</th>
-                          <th className="py-3.5 px-4">ยอดเงิน</th>
-                          <th className="py-3.5 px-4">เวลาที่สั่งซื้อ</th>
-                          <th className="py-3.5 px-4">เวลาที่ยกเลิก</th>
-                          <th className="py-3.5 px-4">เหตุผลที่ลูกค้ายกเลิก</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                          <th className="py-4 px-5 text-left w-36">เลขออเดอร์</th>
+                          <th className="py-4 px-2.5 text-left w-36">ลูกค้า</th>
+                          <th className="py-4 px-2.5 text-left w-36">บริการ</th>
+                          <th className="py-4 px-5 text-left w-32">ยอดเงิน</th>
+                          <th className="py-4 px-5 text-left w-44">เวลาที่ยกเลิก</th>
+                          <th className="py-4 px-5 text-left">เหตุผลที่ลูกค้ายกเลิก</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
                         {cancelledOrders.map(order => (
                           <tr key={order.id} className="hover:bg-red-50/20 transition-colors">
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="font-extrabold text-slate-800 text-sm block">#{order.id}</span>
-                              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full inline-block mt-0.5">
-                                ยกเลิกแล้ว
+                            <td className="py-4 px-5 align-middle text-left">
+                              <span className="font-extrabold text-slate-800 text-sm block truncate">#{order.id}</span>
+                              <span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                                <Clock size={12} className="shrink-0" /> สั่งเมื่อ: {order.createdAt || '-'}
                               </span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap">
-                              <span className="font-bold text-slate-800 text-xs block">{order.customerName || 'คุณลูกค้า'}</span>
-                              <span className="text-[11px] text-slate-400">{order.customerPhone || '-'}</span>
+
+                            <td className="py-4 px-2.5 align-middle text-left">
+                              <span className="font-bold text-slate-800 text-sm block truncate" title={order.customerName}>{order.customerName || 'คุณลูกค้า'}</span>
+                              <span className="text-xs text-slate-400 block truncate mt-0.5">{order.customerPhone || '-'}</span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-700">
-                              {order.serviceName}
+
+                            <td className="py-4 px-2.5 align-middle text-slate-700 text-left">
+                              <span className="font-bold text-sm block truncate" title={order.serviceName}>{order.serviceName}</span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap font-bold text-slate-900 text-xs">
-                              {(order.totalPrice || order.price || 0).toLocaleString()} ฿
+
+                            <td className="py-4 px-5 align-middle text-left whitespace-nowrap">
+                              <span className="font-extrabold text-slate-900 text-sm">
+                                {(order.totalPrice || order.price || 0).toLocaleString()} ฿
+                              </span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-500">
-                              {order.createdAt || '-'}
+
+                            <td className="py-4 px-5 align-middle text-left whitespace-nowrap">
+                              <span className="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 inline-flex items-center gap-1.5">
+                                <Clock size={13} className="shrink-0" />
+                                <span>{order.cancelledAt || '-'}</span>
+                              </span>
                             </td>
-                            <td className="py-4 px-4 whitespace-nowrap text-xs text-red-600 font-semibold">
-                              {order.cancelledAt || '-'}
-                            </td>
-                            <td className="py-4 px-4 text-xs text-slate-700 font-medium max-w-xs">
-                              <span className="bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg inline-block">
+
+                            <td className="py-4 px-5 align-middle text-slate-700 text-left">
+                              <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-medium line-clamp-2 leading-relaxed max-w-md" title={order.cancelReason}>
                                 {order.cancelReason || 'ไม่ระบุเหตุผล'}
-                              </span>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1597,7 +1594,7 @@ const DashboardPage = () => {
                             style={{ height: `${Math.max(heightPercent, 6)}%` }}
                           />
 
-                          <span className={`text-[11px] sm:text-xs mt-3 block text-center font-semibold transition whitespace-nowrap ${
+                          <span className={`text-xs mt-3 block text-center font-semibold transition whitespace-nowrap ${
                             hasValue ? 'text-slate-800 font-bold' : 'text-slate-400'
                           }`}>
                             {item.label}
@@ -1614,31 +1611,31 @@ const DashboardPage = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
                   <div>
                     <h3 className="font-heading font-bold text-base text-slate-900">รายการคำสั่งซื้อที่คิดเป็นรายได้ (แยกตามวัน)</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">เลือกวันที่ต้องการเพื่อตรวจเช็กรายการคำสั่งซื้อเฉพาะวันนั้น</p>
+                    <p className="text-sm text-slate-500 mt-0.5">เลือกวันที่ต้องการเพื่อตรวจเช็กรายการคำสั่งซื้อเฉพาะวันนั้น</p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-2xl">
-                      <Calendar size={14} className="text-[#1d61f2]" />
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3.5 py-2 rounded-2xl">
+                      <Calendar size={16} className="text-[#1d61f2]" />
                       <input
                         type="date"
                         value={revenueFilterDate}
                         onChange={(e) => setRevenueFilterDate(e.target.value)}
-                        className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                        className="bg-transparent text-sm font-bold text-slate-700 outline-none cursor-pointer"
                       />
                     </div>
                     {revenueFilterDate && (
                       <button
                         type="button"
                         onClick={() => setRevenueFilterDate('')}
-                        className="text-[11px] font-bold text-slate-500 hover:text-red-500 bg-slate-100 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+                        className="text-xs font-bold text-slate-500 hover:text-red-500 bg-slate-100 px-3 py-2 rounded-xl transition cursor-pointer"
                       >
                         ดูทุกวัน
                       </button>
                     )}
-                    <div className="text-right pl-2 border-l border-slate-200">
-                      <span className="text-[10.5px] text-slate-400 block">ยอดรวมสะสม</span>
-                      <span className="text-sm font-black text-emerald-600">{totalRevenue.toLocaleString()} ฿</span>
+                    <div className="text-right pl-3 border-l border-slate-200">
+                      <span className="text-xs text-slate-400 block font-medium">ยอดรวมสะสม</span>
+                      <span className="text-base font-extrabold text-emerald-600">{totalRevenue.toLocaleString()} ฿</span>
                     </div>
                   </div>
                 </div>
@@ -1656,33 +1653,33 @@ const DashboardPage = () => {
                   <div className="space-y-6">
                     {revenueOrdersGroupedByDate.map((group, groupIdx) => (
                       <div key={groupIdx} className="border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
-                        <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200/80 flex items-center justify-between text-xs">
+                        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200/80 flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2 font-bold text-slate-800">
-                            <Calendar size={14} className="text-[#1d61f2]" />
+                            <Calendar size={16} className="text-[#1d61f2]" />
                             <span>{group.dateTitle}</span>
                             <span className="text-slate-400 font-normal">({group.orders.length} รายการ)</span>
                           </div>
-                          <span className="font-extrabold text-[#1d61f2] bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-100">
+                          <span className="font-extrabold text-[#1d61f2] bg-blue-50 px-3 py-1 rounded-xl border border-blue-100">
                             รวมวัน: {group.totalDailyAmount.toLocaleString()} ฿
                           </span>
                         </div>
 
                         <div className="divide-y divide-slate-100 bg-white">
                           {group.orders.map((o) => (
-                            <div key={o.id} className="py-3 px-4 flex items-center justify-between text-xs hover:bg-slate-50/50 transition">
+                            <div key={o.id} className="py-3.5 px-5 flex items-center justify-between text-sm hover:bg-slate-50/50 transition">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                                   ✓
                                 </div>
                                 <div>
                                   <div className="flex items-center gap-2">
-                                    <span className="font-extrabold text-slate-900 text-sm">#{o.id}</span>
+                                    <span className="font-bold text-slate-900 text-sm">#{o.id}</span>
                                     <span className="text-slate-700 font-bold">{o.customerName || 'คุณลูกค้า'}</span>
                                     <span className="text-slate-500">• {o.serviceName}</span>
-                                    {o.packageName && <span className="text-[11px] text-slate-400">({o.packageName})</span>}
+                                    {o.packageName && <span className="text-xs text-slate-400">({o.packageName})</span>}
                                   </div>
-                                  <span className="text-[11px] text-slate-400 mt-0.5 block flex items-center gap-1">
-                                    <Clock size={11} /> เวลาทำรายการ: {o.deliveredAt || o.verifiedAt || o.createdAt || '-'}
+                                  <span className="text-xs text-slate-400 mt-0.5 block flex items-center gap-1">
+                                    <Clock size={12} /> เวลาทำรายการ: {o.deliveredAt || o.verifiedAt || o.createdAt || '-'}
                                   </span>
                                 </div>
                               </div>
@@ -1690,7 +1687,7 @@ const DashboardPage = () => {
                                 <span className="font-extrabold text-[#1d61f2] text-sm block">
                                   +{(Number(o.totalPrice || o.price) || 0).toLocaleString()} ฿
                                 </span>
-                                <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 inline-block mt-0.5">
+                                <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 inline-block mt-0.5">
                                   พร้อมเพย์สำเร็จ
                                 </span>
                               </div>
@@ -1706,37 +1703,37 @@ const DashboardPage = () => {
             </div>
           )}
 
-          {/* ======================= แท็บ 5: รายการปัญหาจากลูกค้า ======================= */}
+          {/* ======================= แท็บ 5: รายการปัญหาจากลูกค้า (ขยับลูกค้ากับหมวดหมู่ปัญหาชิดกัน) ======================= */}
           {activeTab === 'reports' && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden p-6">
                 <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
                   <div>
                     <h3 className="font-heading font-bold text-base text-slate-900">รายการแจ้งปัญหาและข้อร้องเรียนจากลูกค้า</h3>
-                    <p className="text-xs text-slate-500 mt-0.5">เรื่องที่ลูกค้าส่งรายงานปัญหาผ่านหน้าโปรไฟล์ในแอปพลิเคชัน</p>
+                    <p className="text-sm text-slate-500 mt-0.5">เรื่องที่ลูกค้าส่งรายงานปัญหาผ่านหน้าโปรไฟล์ในแอปพลิเคชัน</p>
                   </div>
-                  <span className="bg-orange-50 text-orange-700 font-bold text-xs px-3 py-1 rounded-full">
+                  <span className="bg-orange-50 text-orange-700 font-bold text-sm px-3.5 py-1 rounded-full">
                     {reports.length} รายการทั้งหมด
                   </span>
                 </div>
 
                 {reports.length === 0 ? (
                   <div className="py-20 text-center text-slate-400 flex flex-col items-center gap-2">
-                    <CheckCircle2 size={40} className="text-emerald-400" />
-                    <span>ไม่มีรายการแจ้งปัญหาจากลูกค้าในขณะนี้</span>
+                    <CheckCircle2 size={44} className="text-emerald-400" />
+                    <span className="text-sm">ไม่มีรายการแจ้งปัญหาจากลูกค้าในขณะนี้</span>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse">
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse min-w-[950px]">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider whitespace-nowrap">
-                          <th className="py-3.5 px-4">รหัสเรื่อง</th>
-                          <th className="py-3.5 px-4">ข้อมูลลูกค้า</th>
-                          <th className="py-3.5 px-4">หมวดหมู่ปัญหา</th>
-                          <th className="py-3.5 px-4">รายละเอียดข้อความ</th>
-                          <th className="py-3.5 px-4">วันเวลาที่แจ้ง</th>
-                          <th className="py-3.5 px-4">สถานะ</th>
-                          <th className="py-3.5 px-4 text-center">จัดการ</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold text-xs uppercase tracking-wider">
+                          <th className="py-4 px-5 text-left w-36">รหัสเรื่อง</th>
+                          <th className="py-4 px-2.5 text-left w-36">ลูกค้า</th>
+                          <th className="py-4 px-2.5 text-left w-36">หมวดหมู่ปัญหา</th>
+                          <th className="py-4 px-5 text-left">รายละเอียดข้อความ</th>
+                          <th className="py-4 px-5 text-left w-40">วันเวลาที่แจ้ง</th>
+                          <th className="py-4 px-5 text-center w-32">สถานะ</th>
+                          <th className="py-4 px-5 text-center w-28">จัดการ</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -1745,28 +1742,33 @@ const DashboardPage = () => {
 
                           return (
                             <tr key={rep.id} className="hover:bg-slate-50/50 transition">
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className="font-extrabold text-slate-800 text-xs">{rep.id}</span>
+                              <td className="py-4 px-5 align-middle whitespace-nowrap text-left">
+                                <span className="font-extrabold text-slate-800 text-sm">#{rep.id}</span>
                               </td>
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className="font-bold text-slate-900 text-xs block">{rep.customerName}</span>
-                                <span className="text-[11px] text-slate-400">{rep.customerPhone}</span>
+
+                              <td className="py-4 px-2.5 align-middle text-left">
+                                <span className="font-bold text-slate-900 text-sm block truncate" title={rep.customerName}>{rep.customerName}</span>
+                                <span className="text-xs text-slate-400 block truncate mt-0.5">{rep.customerPhone}</span>
                               </td>
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className="text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-lg">
+
+                              <td className="py-4 px-2.5 align-middle text-left">
+                                <span className="text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-1 rounded-xl inline-block truncate max-w-full">
                                   {rep.topic}
                                 </span>
                               </td>
-                              <td className="py-4 px-4 max-w-xs">
-                                <p className="text-xs text-slate-700 leading-relaxed truncate" title={rep.detail}>
+
+                              <td className="py-4 px-5 align-middle text-left">
+                                <p className="text-xs text-slate-700 leading-relaxed line-clamp-2 max-w-lg" title={rep.detail}>
                                   {rep.detail}
                                 </p>
                               </td>
-                              <td className="py-4 px-4 whitespace-nowrap text-xs text-slate-500">
+
+                              <td className="py-4 px-5 align-middle whitespace-nowrap text-xs text-slate-500 text-left">
                                 {rep.createdAt}
                               </td>
-                              <td className="py-4 px-4 whitespace-nowrap">
-                                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+
+                              <td className="py-4 px-5 align-middle text-center whitespace-nowrap">
+                                <span className={`text-xs font-bold px-3 py-1 rounded-full inline-block ${
                                   isPending 
                                     ? 'bg-amber-100 text-amber-800' 
                                     : 'bg-emerald-100 text-emerald-800'
@@ -1774,25 +1776,28 @@ const DashboardPage = () => {
                                   {isPending ? 'รอดำเนินการ' : 'แก้ไขเรียบร้อย'}
                                 </span>
                               </td>
-                              <td className="py-4 px-4 text-center whitespace-nowrap space-x-1.5">
-                                {isPending && (
+
+                              <td className="py-4 px-5 align-middle text-center whitespace-nowrap">
+                                <div className="inline-flex items-center gap-2 justify-center">
+                                  {isPending && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResolveReport(rep.id)}
+                                      className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl transition cursor-pointer"
+                                      title="ทำเครื่องหมายว่าแก้ไขแล้ว"
+                                    >
+                                      <Check size={16} />
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
-                                    onClick={() => handleResolveReport(rep.id)}
-                                    className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition cursor-pointer"
-                                    title="ทำเครื่องหมายว่าแก้ไขแล้ว"
+                                    onClick={() => handleDeleteReport(rep.id)}
+                                    className="p-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition cursor-pointer"
+                                    title="ลบรายงานนี้"
                                   >
-                                    <Check size={15} />
+                                    <Trash2 size={16} />
                                   </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteReport(rep.id)}
-                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition cursor-pointer"
-                                  title="ลบรายงานนี้"
-                                >
-                                  <Trash2 size={15} />
-                                </button>
+                                </div>
                               </td>
                             </tr>
                           );

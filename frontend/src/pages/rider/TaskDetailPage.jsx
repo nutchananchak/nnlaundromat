@@ -57,8 +57,14 @@ export default function TaskDetailPage() {
     }
   }, [activeRider, navigate]);
 
-  // ค้นหาออเดอร์ หรือโหลดสดจาก API
+  // ค้นหาออเดอร์เริ่มต้นจาก Context / State
   const [order, setOrder] = useState(() => (orders || []).find((o) => String(o.id) === String(id)));
+
+  // กำหนดภาพหลักฐานตามขั้นตอนปัจจุบัน (ขั้นตอนส่งมอบจะไม่ดึงรูปรับผ้ามาใส่)
+  const isDeliveryPhase = Number(order?.statusStep) >= 6;
+  const [proofImage, setProofImage] = useState(
+    isDeliveryPhase ? (order?.proofImage || null) : (order?.riderBasketImage || null)
+  );
 
   useEffect(() => {
     const fetchCurrentOrder = async () => {
@@ -67,19 +73,18 @@ export default function TaskDetailPage() {
         const found = all.find((o) => String(o.id) === String(id));
         if (found) {
           setOrder(found);
-          setProofImage(found.riderBasketImage || found.proofImage || null);
+          const inDelivery = Number(found.statusStep) >= 6;
+          // แยกชัดเจน: ขั้นตอนส่งมอบผ้า (Step 6+) จะไม่ดึงรูปรับผ้ามาใส่ค้างเด็ดขาด
+          setProofImage(inDelivery ? (found.proofImage || null) : (found.riderBasketImage || null));
         }
       } catch (err) {
         console.error(err);
       }
     };
 
-    if (!order) {
-      fetchCurrentOrder();
-    }
+    fetchCurrentOrder();
   }, [id]);
 
-  const [proofImage, setProofImage] = useState(order?.riderBasketImage || order?.proofImage || null);
   const [mapType, setMapType] = useState('roadmap');
 
   const { isLoaded, loadError } = useJsApiLoader({
@@ -111,6 +116,9 @@ export default function TaskDetailPage() {
       </div>
     );
   }
+
+  // รูปจุดวางผ้าของลูกค้าตอนกดสั่งซื้อ
+  const customerBasketImage = order.riderBasketImage || order.basketImage || null;
 
   const targetCoords = (order.lat && order.lng) 
     ? { lat: Number(order.lat), lng: Number(order.lng) } 
@@ -176,6 +184,7 @@ export default function TaskDetailPage() {
         deliveredAt: isDone ? realNowTimestamp : undefined
       };
 
+      // แยกการบันทึกภาพ: ถ้ารับผ้าให้เก็บ riderBasketImage, ถ้าส่งมอบให้เก็บ proofImage
       if (nextStep < 5 && proofImage) {
         updatePayload.riderBasketImage = proofImage;
       }
@@ -395,7 +404,7 @@ export default function TaskDetailPage() {
             </div>
           </div>
 
-          {/* แผนที่แบบฝังในแอป */}
+          {/* แผนที่ตำแหน่งลูกค้า */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -454,7 +463,7 @@ export default function TaskDetailPage() {
             </button>
           </div>
 
-          {/* รูปถ่ายจุดวางผ้าจากลูกค้า */}
+          {/* รูปถ่ายจุดวางผ้าจากลูกค้าตอนสั่งซื้อ */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -464,10 +473,10 @@ export default function TaskDetailPage() {
               <span className="text-[10.5px] text-slate-400 font-medium">ภาพตอนสั่งซื้อ</span>
             </div>
 
-            {order.basketImage ? (
+            {customerBasketImage ? (
               <div className="relative w-full min-h-[160px] max-h-72 rounded-xl overflow-hidden border border-slate-200 bg-slate-950/5 flex items-center justify-center p-1.5">
                 <img
-                  src={order.basketImage}
+                  src={customerBasketImage}
                   alt="Customer basket spot"
                   className="w-full h-auto max-h-64 object-contain rounded-lg shadow-2xs"
                 />
@@ -480,12 +489,12 @@ export default function TaskDetailPage() {
             )}
           </div>
           
-          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ */}
+          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ (แยกการแสดงผลตามขั้นตอนรับ vs ส่งมอบ) */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
                 <Camera size={15} className="text-[#1d61f2]" />
-                รูปถ่ายยืนยันจุดรับผ้า / ส่งมอบผ้า 
+                {Number(order.statusStep) >= 6 ? 'รูปถ่ายยืนยันการส่งมอบผ้าคืนลูกค้า' : 'รูปถ่ายยืนยันจุดรับผ้าจากลูกค้า'}
               </span>
               {proofImage && (
                 <button
@@ -493,7 +502,7 @@ export default function TaskDetailPage() {
                   onClick={handleRemoveImage}
                   className="text-red-500 hover:text-red-600 text-xs flex items-center gap-1 cursor-pointer font-semibold"
                 >
-                  <Trash2 size={13} /> ลบรูป
+                  <Trash2 size={13} /> ลบรูปเพื่อถ่ายใหม่
                 </button>
               )}
             </div>
@@ -519,13 +528,23 @@ export default function TaskDetailPage() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-7 border-2 border-dashed border-gray-200 hover:border-[#1d61f2] rounded-xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-[#1d61f2] transition cursor-pointer bg-gray-50/50 group"
+                className={`w-full py-7 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 transition cursor-pointer group ${
+                  Number(order.statusStep) >= 6
+                    ? 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-500 text-emerald-600'
+                    : 'border-gray-200 bg-gray-50/50 hover:border-[#1d61f2] text-gray-400'
+                }`}
               >
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1d61f2] flex items-center justify-center group-hover:scale-105 transition">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-105 transition ${
+                  Number(order.statusStep) >= 6 ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-50 text-[#1d61f2]'
+                }`}>
                   <Camera size={22} />
                 </div>
-                <span className="text-xs font-bold text-slate-700">กดเพื่อถ่ายภาพตะกร้าผ้าหน้างาน</span>
-                <span className="text-[10px] text-slate-400">ใช้เป็นหลักฐานยืนยันการรับ-ส่งผ้า</span>
+                <span className="text-xs font-bold text-slate-700">
+                  {Number(order.statusStep) >= 6 ? 'แตะเพื่อถ่ายรูปผ้าที่แขวน/ส่งมอบหน้าบ้านลูกค้า' : 'แตะเพื่อถ่ายรูปตะกร้าผ้าที่รับมา'}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {Number(order.statusStep) >= 6 ? '*จำเป็นต้องถ่ายรูปก่อนกดยืนยันส่งมอบ' : 'ใช้เป็นหลักฐานยืนยันการรับผ้า'}
+                </span>
               </button>
             )}
           </div>
@@ -559,7 +578,14 @@ export default function TaskDetailPage() {
             <button
               type="button"
               disabled={updating}
-              onClick={() => handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ')}
+              onClick={() => {
+                if (!proofImage) {
+                  triggerToast('กรุณาถ่ายรูปยืนยันการส่งมอบผ้าคืนลูกค้าก่อนกดยืนยัน', 'error');
+                  fileInputRef.current?.click();
+                  return;
+                }
+                handleAdvanceStep(7, 'จัดส่งผ้าคืนสำเร็จ');
+              }}
               className="w-full py-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-50"
             >
               {updating ? 'กำลังบันทึกลงระบบ...' : 'ยืนยันส่งมอบผ้าคืนลูกค้าเรียบร้อย'}
