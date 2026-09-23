@@ -100,7 +100,7 @@ export default function HomePage() {
     loadRealtimeOrders();
   }, []);
 
-  // 2. ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือนเฉพาะของ User ปัจจุบัน
+  // 2. ดึงสถานะร้าน วันหยุด และเช็กสถานะการแจ้งเตือนเฉพาะของ User ปัจจุบันแบบ Realtime
   useEffect(() => {
     const savedStoreStatus = localStorage.getItem('storeServiceStatus');
     if (savedStoreStatus !== null) {
@@ -116,23 +116,38 @@ export default function HomePage() {
       }
     }
 
-    try {
+    const checkUnreadNotices = () => {
       if (!currentUserId) {
         setHasUnreadNotices(false);
         return;
       }
 
-      const storedNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
-      const myNotices = storedNotices.filter(n => {
-        const isSystemAnnouncement = !n.userId && !n.customerPhone && !n.orderId;
-        const owner = String(n.userId || n.customerPhone || '').trim();
-        return isSystemAnnouncement || owner === currentUserId;
-      });
-      const unreadExists = myNotices.some(n => !n.isRead);
-      setHasUnreadNotices(unreadExists);
-    } catch (e) {
-      setHasUnreadNotices(false);
-    }
+      try {
+        const storedNotices = JSON.parse(localStorage.getItem('customerNotifications') || '[]');
+        const myNotices = storedNotices.filter(n => {
+          const isSystemAnnouncement = !n.userId && !n.customerPhone && !n.orderId;
+          const owner = String(n.userId || n.customerPhone || '').trim();
+          return isSystemAnnouncement || owner === currentUserId;
+        });
+
+        // ตรวจสอบว่ามีรายการที่ยังไม่อ่านจริงหรือไม่
+        const unreadExists = myNotices.some(n => n.isRead === false || n.isRead === 'false' || !n.isRead);
+        setHasUnreadNotices(unreadExists);
+      } catch (e) {
+        setHasUnreadNotices(false);
+      }
+    };
+
+    checkUnreadNotices();
+
+    // ดักฟัง Event เมื่อกลับมาจากหน้า Notification หรือมีการสลับแท็บ
+    window.addEventListener('storage', checkUnreadNotices);
+    window.addEventListener('focus', checkUnreadNotices);
+
+    return () => {
+      window.removeEventListener('storage', checkUnreadNotices);
+      window.removeEventListener('focus', checkUnreadNotices);
+    };
   }, [currentUserId]);
 
   const getThaiTimestamp = () => {
@@ -408,7 +423,10 @@ export default function HomePage() {
           <div className="flex items-center">
             <button 
               type="button"
-              onClick={() => navigate('/notifications')}
+              onClick={() => {
+                setHasUnreadNotices(false);
+                navigate('/notifications');
+              }}
               className="relative w-10 h-10 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 text-white flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95"
               title="การแจ้งเตือน"
             >

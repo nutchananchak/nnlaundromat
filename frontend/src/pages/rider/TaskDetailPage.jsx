@@ -60,11 +60,22 @@ export default function TaskDetailPage() {
   // ค้นหาออเดอร์เริ่มต้นจาก Context / State
   const [order, setOrder] = useState(() => (orders || []).find((o) => String(o.id) === String(id)));
 
-  // กำหนดภาพหลักฐานตามขั้นตอนปัจจุบัน (ขั้นตอนส่งมอบจะไม่ดึงรูปรับผ้ามาใส่)
-  const isDeliveryPhase = Number(order?.statusStep) >= 6;
-  const [proofImage, setProofImage] = useState(
-    isDeliveryPhase ? (order?.proofImage || null) : (order?.riderBasketImage || null)
-  );
+  // จัดการรูปหลักฐานที่ไรเดอร์ถ่าย:
+  // - ถ้าเป็น Step 3 (เพิ่งไปรับผ้า): ต้องว่าง (null) เสมอ เพื่อให้ไรเดอร์เป็นคนถ่ายเอง
+  // - ถ้าเป็น Step 4-5 (ถ่ายรับผ้าแล้ว): แสดง riderPickupProof หรือ riderBasketImage ที่ไรเดอร์ถ่าย
+  // - ถ้าเป็น Step 6 (กำลังส่งมอบ): ต้องว่าง (null) รอให้ไรเดอร์ถ่ายส่งมอบ
+  // - ถ้าเป็น Step 7 (ส่งมอบแล้ว): แสดง proofImage
+  const getInitialProofImage = (currentOrder) => {
+    if (!currentOrder) return null;
+    const step = Number(currentOrder.statusStep);
+    if (step === 3) return null; // เพิ่งได้รับงาน ยังไม่ได้ถ่ายรูปรับผ้า
+    if (step >= 4 && step <= 5) return currentOrder.riderPickupImage || currentOrder.riderBasketImage || null;
+    if (step === 6) return null; // เพิ่งถึงบ้านลูกค้า รอถ่ายรูปส่งมอบ
+    if (step >= 7) return currentOrder.proofImage || null;
+    return null;
+  };
+
+  const [proofImage, setProofImage] = useState(() => getInitialProofImage(order));
 
   useEffect(() => {
     const fetchCurrentOrder = async () => {
@@ -73,9 +84,7 @@ export default function TaskDetailPage() {
         const found = all.find((o) => String(o.id) === String(id));
         if (found) {
           setOrder(found);
-          const inDelivery = Number(found.statusStep) >= 6;
-          // แยกชัดเจน: ขั้นตอนส่งมอบผ้า (Step 6+) จะไม่ดึงรูปรับผ้ามาใส่ค้างเด็ดขาด
-          setProofImage(inDelivery ? (found.proofImage || null) : (found.riderBasketImage || null));
+          setProofImage(getInitialProofImage(found));
         }
       } catch (err) {
         console.error(err);
@@ -117,8 +126,8 @@ export default function TaskDetailPage() {
     );
   }
 
-  // รูปจุดวางผ้าของลูกค้าตอนกดสั่งซื้อ
-  const customerBasketImage = order.riderBasketImage || order.basketImage || null;
+  // รูปจุดวางผ้าของลูกค้าตอนกดสั่งซื้อ (แยกฟิลด์ชัดเจน ไม่นำรูปไรเดอร์มาปน)
+  const customerBasketImage = order.basketImage || order.customerBasketImage || order.basketPhoto || null;
 
   const targetCoords = (order.lat && order.lng) 
     ? { lat: Number(order.lat), lng: Number(order.lng) } 
@@ -184,10 +193,13 @@ export default function TaskDetailPage() {
         deliveredAt: isDone ? realNowTimestamp : undefined
       };
 
-      // แยกการบันทึกภาพ: ถ้ารับผ้าให้เก็บ riderBasketImage, ถ้าส่งมอบให้เก็บ proofImage
-      if (nextStep < 5 && proofImage) {
+      // แยกการบันทึกภาพ:
+      // ถ้ารับผ้า (เลื่อนเป็น Step 4) ให้เก็บใน riderPickupImage และ riderBasketImage
+      if (nextStep === 4 && proofImage) {
+        updatePayload.riderPickupImage = proofImage;
         updatePayload.riderBasketImage = proofImage;
       }
+      // ถ้าส่งมอบ (เลื่อนเป็น Step 7) ให้เก็บใน proofImage
       if (nextStep >= 6 && proofImage) {
         updatePayload.proofImage = proofImage;
       }
@@ -202,6 +214,7 @@ export default function TaskDetailPage() {
             statusTitle: nextTitle,
             status: isDone ? 'completed' : item.status,
             isCompleted: isDone,
+            riderPickupImage: updatePayload.riderPickupImage || item.riderPickupImage,
             riderBasketImage: updatePayload.riderBasketImage || item.riderBasketImage,
             proofImage: updatePayload.proofImage || item.proofImage,
             deliveredAt: isDone ? realNowTimestamp : item.deliveredAt,
@@ -463,7 +476,7 @@ export default function TaskDetailPage() {
             </button>
           </div>
 
-          {/* รูปถ่ายจุดวางผ้าจากลูกค้าตอนสั่งซื้อ */}
+          {/* รูปถ่ายจุดวางผ้าจากลูกค้าตอนสั่งซื้อ (ภาพต้นทางของลูกค้า) */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
@@ -489,14 +502,14 @@ export default function TaskDetailPage() {
             )}
           </div>
           
-          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ (แยกการแสดงผลตามขั้นตอนรับ vs ส่งมอบ) */}
+          {/* อัปโหลดรูปถ่ายหน้างานจากไรเดอร์ (เปิดเข้ามาครั้งแรกจะว่างเสมอ ให้ไรเดอร์ถ่ายเอง) */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
                 <Camera size={15} className="text-[#1d61f2]" />
                 {Number(order.statusStep) >= 6 ? 'รูปถ่ายยืนยันการส่งมอบผ้าคืนลูกค้า' : 'รูปถ่ายยืนยันจุดรับผ้าจากลูกค้า'}
               </span>
-              {proofImage && (
+              {proofImage && Number(order.statusStep) < 7 && (
                 <button
                   type="button"
                   onClick={handleRemoveImage}
