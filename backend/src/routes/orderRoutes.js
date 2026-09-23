@@ -5,6 +5,7 @@ const router = express.Router();
 
 router.get('/', getOrders);
 router.post('/', createOrder);
+router.put('/:id', updateOrderStatus);
 router.patch('/:id/status', updateOrderStatus);
 
 export default router;
